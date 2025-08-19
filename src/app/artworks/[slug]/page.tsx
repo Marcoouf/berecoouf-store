@@ -1,6 +1,6 @@
 'use client'
 
-import Image from 'next/image'
+import Image from '@/components/SmartImage'
 import Link from 'next/link'
 import { findArtworkBySlug, artists, artworksByArtist } from '@/lib/data'
 import { useState, useMemo } from 'react'

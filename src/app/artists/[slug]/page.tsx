@@ -1,4 +1,4 @@
-import Image from 'next/image'
+import Image from '@/components/SmartImage'
 import Link from 'next/link'
 import { findArtistBySlug, artworksByArtist } from '@/lib/data'
 import type { Metadata } from 'next'

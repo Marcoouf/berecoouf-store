@@ -1,13 +1,14 @@
 'use client'
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import Image from 'next/image'
+import Image from '@/components/SmartImage'
 import Link from 'next/link'
 import { artworks } from '@/lib/data'
 import { artists } from '@/lib/data'
 import type { Artwork } from '@/lib/types'
 import { useCart } from '@/components/CartContext'
 import Breadcrumb from '@/components/Breadcrumb'
+import { FadeIn, Stagger } from '@/components/Motion'
 
 function Container({ children, className = '' }: { children: React.ReactNode, className?: string }) {
   return <div className={`mx-auto w-full max-w-6xl px-6 ${className}`}>{children}</div>
@@ -27,53 +28,56 @@ function SectionTitle({ kicker, title, right }: { kicker?: string; title: string
 
 function Header({ onOpenCart }: { onOpenCart: () => void }) {
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-neutral-200/60 bg-white/70 backdrop-blur">
+    <header className="sticky top-0 z-40 w-full border-b border-line/70 bg-white/70 backdrop-blur">
       <Container className="py-3 flex items-center justify-between">
-        <a href="#" className="text-sm tracking-widest uppercase">Berecoouf</a>
+        <Link href="/" className="text-sm tracking-widest uppercase">Berecoouf</Link>
         <nav className="hidden gap-6 md:flex text-sm text-neutral-600">
-          <a href="#artists" className="hover:opacity-60">Artistes</a>
-          <a href="#gallery" className="hover:opacity-60">Galerie</a>
-          <a href="#about" className="hover:opacity-60">À propos</a>
+          <Link href="/artists" className="hover:underline underline-offset-4">Artistes</Link>
+          <Link href="/artworks" className="hover:underline underline-offset-4">Œuvres</Link>
+          <a href="#about" className="hover:underline underline-offset-4">À propos</a>
         </nav>
         <button onClick={onOpenCart} className="rounded-full border px-3 py-1 text-sm hover:bg-neutral-50">Panier</button>
       </Container>
     </header>
   )
 }
-
 function Hero() {
   return (
-    <section className="border-b border-neutral-200/60">
+    <section className="border-b border-line/60">
       <Container className="py-16 md:py-24">
         <div className="grid items-end gap-10 md:grid-cols-2">
-          <div>
-            <h1 className="text-4xl md:text-5xl font-medium tracking-tight leading-tight">
-              Éditions d&apos;art contemporaines
-              <span className="block text-neutral-500">en séries limitées</span>
-            </h1>
-            <p className="mt-6 max-w-prose text-neutral-600">
-              Une sélection pointue d&apos;illustrations originales et de tirages numérotés, réalisés par des artistes émergents et confirmés.
-            </p>
-            <div className="mt-8 flex gap-3">
-              <a href="#gallery" className="rounded-full border px-4 py-2 text-sm hover:bg-neutral-50">Découvrir</a>
-              <a href="#artists" className="rounded-full border px-4 py-2 text-sm hover:bg-neutral-50">Nos artistes</a>
+          <FadeIn>
+            <div>
+              <h1 className="text-4xl md:text-5xl font-medium tracking-tight leading-tight">
+                Éditions d&apos;art contemporaines
+                <span className="block text-neutral-500">en séries limitées</span>
+              </h1>
+              <p className="mt-6 max-w-prose text-neutral-600">
+                Une sélection pointue d&apos;illustrations originales et de tirages numérotés, réalisés par des artistes émergents et confirmés.
+              </p>
+              <div className="mt-8 flex gap-3">
+                <a href="#gallery" className="rounded-full border px-4 py-2 text-sm hover:bg-neutral-50">Découvrir</a>
+                <Link href="/artists" className="rounded-full border px-4 py-2 text-sm hover:bg-neutral-50">Nos artistes</Link>
+              </div>
             </div>
-          </div>
-          <div className="aspect-[4/3] overflow-hidden rounded-2xl border relative">
-            <Image src='/images/artworks/art12.webp' alt="Hero artwork" fill className="object-cover" />
-          </div>
+          </FadeIn>
+          <FadeIn delay={0.1}>
+            <div className="aspect-[4/3] overflow-hidden rounded-2xl border relative">
+              <Image src="/images/hero.jpg" alt="Hero artwork" fill className="object-cover" />
+            </div>
+          </FadeIn>
         </div>
       </Container>
     </section>
   )
 }
-
 function Artists() {
   return (
     <section id="artists" className="border-b border-neutral-200/60">
       <Container className="py-14 md:py-20">
         <SectionTitle kicker="sélection" title="Artistes publiés" />
         <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
+        <Stagger>
           {artists.map(a => (
             <Link key={a.id} href={`/artists/${a.slug}`} className="group">
               <div className="aspect-[4/3] overflow-hidden rounded-xl border relative">
@@ -89,6 +93,7 @@ function Artists() {
               <p className="mt-2 text-sm text-neutral-600 line-clamp-2">{a.bio}</p>
             </Link>
           ))}
+          </Stagger>
         </div>
       </Container>
     </section>
@@ -140,7 +145,9 @@ function Gallery() {
       <Container className="py-14 md:py-20">
         <SectionTitle kicker="catalogue" title="Galerie" />
         <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
+          <Stagger>
           {artworks.map(a => <ArtworkCard key={a.id} art={a} onAdd={add} />)}
+          </Stagger>
         </div>
       </Container>
     </section>
