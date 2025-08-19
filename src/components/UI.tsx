@@ -3,11 +3,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Image from '@/components/SmartImage'
 import Link from 'next/link'
-import { artworks } from '@/lib/data'
-import { artists } from '@/lib/data'
+import { artworks, artists } from '@/lib/data'
 import type { Artwork } from '@/lib/types'
 import { useCart } from '@/components/CartContext'
-import Breadcrumb from '@/components/Breadcrumb'
 import { FadeIn, Stagger } from '@/components/Motion'
 
 function Container({ children, className = '' }: { children: React.ReactNode, className?: string }) {
@@ -18,8 +16,8 @@ function SectionTitle({ kicker, title, right }: { kicker?: string; title: string
   return (
     <div className="mb-8 flex items-end justify-between gap-6">
       <div>
-        {kicker && <div className="text-xs uppercase tracking-widest text-neutral-500">{kicker}</div>}
-        <h2 className="mt-2 text-2xl font-medium tracking-tight">{title}</h2>
+        {kicker && <div className="font-serif text-sm tracking-wide text-neutral-500">{kicker}</div>}
+        <h2 className="mt-2 text-2xl md:text-[28px] font-medium tracking-tight">{title}</h2>
       </div>
       {right}
     </div>
@@ -41,9 +39,10 @@ function Header({ onOpenCart }: { onOpenCart: () => void }) {
     </header>
   )
 }
+
 function Hero() {
   return (
-    <section className="border-b border-line/60">
+    <section className="border-b border-neutral-200/60">
       <Container className="py-16 md:py-24">
         <div className="grid items-end gap-10 md:grid-cols-2">
           <FadeIn>
@@ -63,7 +62,7 @@ function Hero() {
           </FadeIn>
           <FadeIn delay={0.1}>
             <div className="aspect-[4/3] overflow-hidden rounded-2xl border relative">
-              <Image src="/images/hero.jpg" alt="Hero artwork" fill className="object-cover" />
+              <Image src="/images/artworks/art12.webp" alt="Hero artwork" fill className="object-cover" />
             </div>
           </FadeIn>
         </div>
@@ -71,28 +70,29 @@ function Hero() {
     </section>
   )
 }
+
 function Artists() {
   return (
     <section id="artists" className="border-b border-neutral-200/60">
       <Container className="py-14 md:py-20">
         <SectionTitle kicker="sélection" title="Artistes publiés" />
         <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
-        <Stagger>
-          {artists.map(a => (
-            <Link key={a.id} href={`/artists/${a.slug}`} className="group">
-              <div className="aspect-[4/3] overflow-hidden rounded-xl border relative">
-                <Image src={a.cover} alt={a.name} fill className="object-cover transition-transform duration-500 group-hover:scale-[1.02]" />
-              </div>
-              <div className="mt-3 flex items-center gap-3">
-                <Image src={a.avatar} alt="" width={32} height={32} className="rounded-full object-cover" />
-                <div>
-                  <div className="text-sm font-medium">{a.name}</div>
-                  <div className="text-xs text-neutral-500">{a.handle}</div>
+          <Stagger>
+            {artists.map(a => (
+              <Link key={a.id} href={`/artists/${a.slug}`} className="group block">
+                <div className="aspect-[4/3] overflow-hidden rounded-2xl border relative transition-all duration-300 group-hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)]">
+                  <Image src={a.cover} alt={a.name} fill className="object-cover transition-transform duration-500 group-hover:scale-[1.02]" />
                 </div>
-              </div>
-              <p className="mt-2 text-sm text-neutral-600 line-clamp-2">{a.bio}</p>
-            </Link>
-          ))}
+                <div className="mt-3 flex items-center gap-3">
+                  <Image src={a.avatar} alt="" width={32} height={32} className="rounded-full object-cover" />
+                  <div>
+                    <div className="text-sm font-medium">{a.name}</div>
+                    <div className="text-xs text-neutral-500">{a.handle}</div>
+                  </div>
+                </div>
+                <p className="mt-2 text-sm text-neutral-600 line-clamp-2">{a.bio}</p>
+              </Link>
+            ))}
           </Stagger>
         </div>
       </Container>
@@ -106,16 +106,12 @@ function ArtworkCard({ art, onAdd }: { art: Artwork; onAdd: (a: Artwork, f: any)
 
   return (
     <div className="group">
-      <div className="aspect-[4/5] overflow-hidden rounded-xl border relative">
-        <Link href={`/artworks/${art.slug}`} className="absolute inset-0">
-          <Image src={art.image} alt={art.title} fill className="object-cover transition-transform duration-500 group-hover:scale-[1.02]" />
-        </Link>
+      <div className="aspect-[4/5] overflow-hidden rounded-2xl border relative transition-all duration-300 group-hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)]">
+        <Image src={art.image} alt={art.title} fill className="object-cover transition-transform duration-500 group-hover:scale-[1.02]" />
       </div>
       <div className="mt-3 flex items-start justify-between gap-4">
         <div>
-          <div className="text-sm font-medium">
-            <Link href={`/artworks/${art.slug}`}>{art.title}</Link>
-          </div>
+          <div className="text-sm font-medium">{art.title}</div>
           <div className="text-xs text-neutral-500">{artistName(art.artistId)}</div>
         </div>
         <div className="text-sm tabular-nums">€{(selected?.price ?? art.price).toFixed(0)}</div>
@@ -146,7 +142,7 @@ function Gallery() {
         <SectionTitle kicker="catalogue" title="Galerie" />
         <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
           <Stagger>
-          {artworks.map(a => <ArtworkCard key={a.id} art={a} onAdd={add} />)}
+            {artworks.map(a => <ArtworkCard key={a.id} art={a} onAdd={add} />)}
           </Stagger>
         </div>
       </Container>
@@ -250,18 +246,13 @@ function artistName(id: string) {
 export default function Site() {
   const [open, setOpen] = useState(false)
   return (
-   
-      <div className="min-h-screen bg-white text-neutral-900 antialiased">
-        <Header onOpenCart={() => setOpen(true)} />
-          <Container className="pt-6">
-  <Breadcrumb items={[{ label: 'Accueil' }]} />
-</Container>
-        <Hero />
-        <Artists />
-        <Gallery />
-        <Footer />
-        <CartDrawer open={open} onClose={() => setOpen(false)} />
-      </div>
-    
+    <div className="min-h-screen bg-white text-neutral-900 antialiased">
+      <Header onOpenCart={() => setOpen(true)} />
+      <Hero />
+      <Artists />
+      <Gallery />
+      <Footer />
+      <CartDrawer open={open} onClose={() => setOpen(false)} />
+    </div>
   )
 }
