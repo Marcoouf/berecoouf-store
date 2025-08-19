@@ -9,7 +9,8 @@ import { useCart } from '@/components/CartContext'
 import { FadeIn, Stagger } from '@/components/Motion'
 import { motion, useScroll, useSpring } from 'framer-motion'
 
-function Container({ children, className = '' }: { children: React.ReactNode, className?: string }) {
+// === Container local (on NE l'importe PAS) ===
+function Container({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return <div className={`mx-auto w-full max-w-6xl px-6 ${className}`}>{children}</div>
 }
 
@@ -32,8 +33,8 @@ function SectionTitle({ kicker, title, right }: { kicker?: string; title: string
     </div>
   )
 }
+
 function Header({ onOpenCart }: { onOpenCart: () => void }) {
-  // Hooks framer-motion pour suivre/scaler la progression
   const { scrollYProgress } = useScroll()
   const scaleX = useSpring(scrollYProgress, { stiffness: 120, damping: 30, restDelta: 0.001 })
 
@@ -64,7 +65,29 @@ function Header({ onOpenCart }: { onOpenCart: () => void }) {
     </header>
   )
 }
+
 function Hero() {
+  const [src, setSrc] = useState<string | null>(null)
+  const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    let active = true
+
+    // Récupère la liste des images et en choisit une au hasard
+    fetch('/api/hero-images')
+      .then(r => r.json())
+      .then(({ files }) => {
+        if (!active || !Array.isArray(files) || files.length === 0) return
+        const i = Math.floor(Math.random() * files.length)
+        // reset du loader quand on change d'image
+        setReady(false)
+        setSrc(files[i])
+      })
+      .catch(() => {})
+
+    return () => { active = false }
+  }, [])
+
   return (
     <section className="border-b border-neutral-200/60">
       <Container className="py-16 md:py-24">
@@ -78,25 +101,53 @@ function Hero() {
               <p className="mt-6 max-w-prose text-neutral-600">
                 Une sélection pointue d&apos;illustrations originales et de tirages numérotés, réalisés par des artistes émergents et confirmés.
               </p>
-             <div className="mt-8 flex gap-3">
-  <Link
-    href="#gallery"
-    className="rounded-full bg-accent hover:bg-accent-dark text-ink font-medium px-4 py-2 text-sm shadow-sm transition"
-  >
-    Découvrir
-  </Link>
-  <Link
-    href="/artists"
-    className="rounded-full bg-accent hover:bg-accent-dark text-ink font-medium px-4 py-2 text-sm shadow-sm transition"
-  >
-    Nos artistes
-  </Link>
-</div>
+
+              {/* Boutons identiques (accent) */}
+              <div className="mt-8 flex gap-3">
+                <Link
+                  href="#gallery"
+                  className="rounded-full bg-accent hover:bg-accent-dark text-ink font-medium px-4 py-2 text-sm shadow-sm transition"
+                >
+                  Découvrir
+                </Link>
+                <Link
+                  href="/artists"
+                  className="rounded-full bg-accent hover:bg-accent-dark text-ink font-medium px-4 py-2 text-sm shadow-sm transition"
+                >
+                  Nos artistes
+                </Link>
+              </div>
             </div>
           </FadeIn>
+
           <FadeIn delay={0.1}>
-            <div className="aspect-[4/3] overflow-hidden rounded-2xl border relative">
-              <Image src="/images/artworks/art12.webp" alt="Hero artwork" fill className="object-cover" />
+            {/* Conteneur invisible mais stable (ratio + min-height) */}
+            <div
+              className="relative aspect-[4/3] min-h-[320px] md:min-h-[420px] lg:min-h-[520px] overflow-hidden flex items-center justify-center"
+              aria-busy={!ready}
+            >
+              {/* Image : fade-in une fois chargée */}
+              {src && (
+                <Image
+                  src={src}
+                  alt="Hero artwork"
+                  fill
+                  className={`object-contain transition-opacity duration-500 ${ready ? 'opacity-100' : 'opacity-0'}`}
+                  sizes="(min-width: 1024px) 40vw, (min-width: 768px) 50vw, 100vw"
+                  priority
+                  onLoadingComplete={() => {
+                    // Petite latence pour voir le skeleton même si l'image est en cache
+                    setTimeout(() => setReady(true), 150)
+                  }}
+                />
+              )}
+
+              {/* Loader subtil (skeleton pulse) tant que l'image n'est pas prête */}
+              {!ready && (
+                <div className="absolute inset-0">
+                  <div className="h-full w-full bg-mist animate-pulse" aria-hidden="true" />
+                </div>
+              )}
             </div>
           </FadeIn>
         </div>
@@ -104,7 +155,6 @@ function Hero() {
     </section>
   )
 }
-
 function Artists() {
   return (
     <section id="artists" className="border-b border-neutral-200/60">
@@ -136,37 +186,23 @@ function Artists() {
 
 function ArtworkCard({ art, onAdd }: { art: Artwork; onAdd: (a: Artwork, f: any) => void }) {
   const [formatId, setFormatId] = useState(art.formats?.[0]?.id ?? null)
-  const selected = useMemo(
-    () => art.formats?.find(f => f.id === formatId) ?? null,
-    [formatId, art.formats]
-  )
+  const selected = useMemo(() => art.formats?.find(f => f.id === formatId) ?? null, [formatId, art.formats])
 
   return (
     <div className="group flex h-full flex-col">
-      {/* Visuel */}
       <div className="aspect-[4/5] overflow-hidden rounded-2xl border relative transition-all duration-300 group-hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)]">
-        <Image
-          src={art.image}
-          alt={art.title}
-          fill
-          className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-        />
+        <Image src={art.image} alt={art.title} fill className="object-cover transition-transform duration-500 group-hover:scale-[1.02]" />
       </div>
 
-      {/* Titre / Prix */}
       <div className="mt-3 flex items-start justify-between gap-4">
         <div>
-          <div className="text-sm font-medium group-hover:text-accent transition">
-            {art.title}
-          </div>
+          <div className="text-sm font-medium group-hover:text-accent transition">{art.title}</div>
           <div className="text-xs text-neutral-500">{artistName(art.artistId)}</div>
         </div>
-        <div className="text-sm tabular-nums">
-          €{(selected?.price ?? art.price).toFixed(0)}
-        </div>
+        <div className="text-sm tabular-nums">€{(selected?.price ?? art.price).toFixed(0)}</div>
       </div>
 
-      {/* Formats : grille responsive, hauteur stable, taille uniforme */}
+      {/* Formats uniformes */}
       <div className="mt-2 min-h-[72px] grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-2">
         {art.formats?.map(f => {
           const isSel = f.id === formatId
@@ -189,7 +225,6 @@ function ArtworkCard({ art, onAdd }: { art: Artwork; onAdd: (a: Artwork, f: any)
         }) ?? null}
       </div>
 
-      {/* CTA aligné en bas */}
       <div className="mt-auto pt-3">
         <button
           onClick={() => onAdd(art, selected)}
