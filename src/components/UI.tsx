@@ -60,7 +60,7 @@ function Hero() {
             </div>
           </div>
           <div className="aspect-[4/3] overflow-hidden rounded-2xl border relative">
-            <Image src="https://images.unsplash.com/photo-1504198266285-165a18b9aa5b?q=80&w=1600&auto=format&fit=crop" alt="Hero artwork" fill className="object-cover" />
+            <Image src='/images/artworks/art12.webp' alt="Hero artwork" fill className="object-cover" />
           </div>
         </div>
       </Container>
