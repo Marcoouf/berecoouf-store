@@ -7,6 +7,7 @@ import { artworks, artists } from '@/lib/data'
 import type { Artwork } from '@/lib/types'
 import { useCart } from '@/components/CartContext'
 import { FadeIn, Stagger } from '@/components/Motion'
+import { motion, useScroll, useSpring } from 'framer-motion'
 
 function Container({ children, className = '' }: { children: React.ReactNode, className?: string }) {
   return <div className={`mx-auto w-full max-w-6xl px-6 ${className}`}>{children}</div>
@@ -14,17 +15,28 @@ function Container({ children, className = '' }: { children: React.ReactNode, cl
 
 function SectionTitle({ kicker, title, right }: { kicker?: string; title: string; right?: React.ReactNode }) {
   return (
-    <div className="mb-8 flex items-end justify-between gap-6">
-      <div>
-        {kicker && <div className="font-serif text-sm tracking-wide text-neutral-500">{kicker}</div>}
-        <h2 className="mt-2 text-2xl md:text-[28px] font-medium tracking-tight">{title}</h2>
+    <div className="mb-8">
+      {kicker && (
+        <div className="mb-2 inline-flex items-center gap-2">
+          <span className="h-[8px] w-[8px] rounded-full bg-accent" />
+          <span className="font-serif text-sm tracking-wide text-accent">{kicker}</span>
+        </div>
+      )}
+      <div className="flex items-end justify-between gap-6">
+        <div>
+          <h2 className="text-2xl md:text-[28px] font-medium tracking-tight">{title}</h2>
+          <div className="mt-2 h-[2px] w-12 rounded-full bg-accent" />
+        </div>
+        {right}
       </div>
-      {right}
     </div>
   )
 }
-
 function Header({ onOpenCart }: { onOpenCart: () => void }) {
+  // Hooks framer-motion pour suivre/scaler la progression
+  const { scrollYProgress } = useScroll()
+  const scaleX = useSpring(scrollYProgress, { stiffness: 120, damping: 30, restDelta: 0.001 })
+
   return (
     <header className="sticky top-0 z-40 w-full border-b border-line/70 bg-white/70 backdrop-blur">
       <Container className="py-3 flex items-center justify-between">
@@ -34,12 +46,24 @@ function Header({ onOpenCart }: { onOpenCart: () => void }) {
           <Link href="/artworks" className="hover:underline underline-offset-4">Œuvres</Link>
           <a href="#about" className="hover:underline underline-offset-4">À propos</a>
         </nav>
-        <button onClick={onOpenCart} className="rounded-full border px-3 py-1 text-sm hover:bg-neutral-50">Panier</button>
+        <button
+          onClick={onOpenCart}
+          className="rounded-full border border-accent px-3 py-1 text-sm text-accent hover:bg-accent-light transition"
+        >
+          Panier
+        </button>
       </Container>
+
+      {/* Progress bar collée sous le header */}
+      <div className="relative h-[3px] bg-accent/25">
+        <motion.div
+          className="absolute left-0 top-0 h-[3px] w-full bg-accent origin-left shadow-[0_1px_0_rgba(0,0,0,0.06)]"
+          style={{ scaleX }}
+        />
+      </div>
     </header>
   )
 }
-
 function Hero() {
   return (
     <section className="border-b border-neutral-200/60">
@@ -54,10 +78,20 @@ function Hero() {
               <p className="mt-6 max-w-prose text-neutral-600">
                 Une sélection pointue d&apos;illustrations originales et de tirages numérotés, réalisés par des artistes émergents et confirmés.
               </p>
-              <div className="mt-8 flex gap-3">
-                <a href="#gallery" className="rounded-full border px-4 py-2 text-sm hover:bg-neutral-50">Découvrir</a>
-                <Link href="/artists" className="rounded-full border px-4 py-2 text-sm hover:bg-neutral-50">Nos artistes</Link>
-              </div>
+             <div className="mt-8 flex gap-3">
+  <Link
+    href="#gallery"
+    className="rounded-full bg-accent hover:bg-accent-dark text-ink font-medium px-4 py-2 text-sm shadow-sm transition"
+  >
+    Découvrir
+  </Link>
+  <Link
+    href="/artists"
+    className="rounded-full bg-accent hover:bg-accent-dark text-ink font-medium px-4 py-2 text-sm shadow-sm transition"
+  >
+    Nos artistes
+  </Link>
+</div>
             </div>
           </FadeIn>
           <FadeIn delay={0.1}>
@@ -86,7 +120,7 @@ function Artists() {
                 <div className="mt-3 flex items-center gap-3">
                   <Image src={a.avatar} alt="" width={32} height={32} className="rounded-full object-cover" />
                   <div>
-                    <div className="text-sm font-medium">{a.name}</div>
+                    <div className="text-sm font-medium group-hover:text-accent transition">{a.name}</div>
                     <div className="text-xs text-neutral-500">{a.handle}</div>
                   </div>
                 </div>
@@ -102,31 +136,65 @@ function Artists() {
 
 function ArtworkCard({ art, onAdd }: { art: Artwork; onAdd: (a: Artwork, f: any) => void }) {
   const [formatId, setFormatId] = useState(art.formats?.[0]?.id ?? null)
-  const selected = useMemo(() => art.formats?.find(f => f.id === formatId) ?? null, [formatId, art.formats])
+  const selected = useMemo(
+    () => art.formats?.find(f => f.id === formatId) ?? null,
+    [formatId, art.formats]
+  )
 
   return (
-    <div className="group">
+    <div className="group flex h-full flex-col">
+      {/* Visuel */}
       <div className="aspect-[4/5] overflow-hidden rounded-2xl border relative transition-all duration-300 group-hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)]">
-        <Image src={art.image} alt={art.title} fill className="object-cover transition-transform duration-500 group-hover:scale-[1.02]" />
+        <Image
+          src={art.image}
+          alt={art.title}
+          fill
+          className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+        />
       </div>
+
+      {/* Titre / Prix */}
       <div className="mt-3 flex items-start justify-between gap-4">
         <div>
-          <div className="text-sm font-medium">{art.title}</div>
+          <div className="text-sm font-medium group-hover:text-accent transition">
+            {art.title}
+          </div>
           <div className="text-xs text-neutral-500">{artistName(art.artistId)}</div>
         </div>
-        <div className="text-sm tabular-nums">€{(selected?.price ?? art.price).toFixed(0)}</div>
+        <div className="text-sm tabular-nums">
+          €{(selected?.price ?? art.price).toFixed(0)}
+        </div>
       </div>
-      {!!art.formats?.length && (
-        <div className="mt-2 flex flex-wrap gap-2">
-          {art.formats.map(f => (
-            <button key={f.id} onClick={() => setFormatId(f.id)} className={`rounded-full border px-3 py-1 text-xs ${f.id === formatId ? 'bg-black text-white' : 'hover:bg-neutral-50'}`}>
+
+      {/* Formats : grille responsive, hauteur stable, taille uniforme */}
+      <div className="mt-2 min-h-[72px] grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-2">
+        {art.formats?.map(f => {
+          const isSel = f.id === formatId
+          return (
+            <button
+              key={f.id}
+              onClick={() => setFormatId(f.id)}
+              className={[
+                'inline-flex h-8 w-full items-center justify-center rounded-full px-3',
+                'text-[12px] font-medium whitespace-nowrap',
+                'border transition-colors',
+                isSel
+                  ? 'bg-accent text-ink border-accent'
+                  : 'bg-white text-neutral-700 border-neutral-200 hover:bg-accent-light hover:border-accent hover:text-accent',
+              ].join(' ')}
+            >
               {f.label}
             </button>
-          ))}
-        </div>
-      )}
-      <div className="mt-3">
-        <button onClick={() => onAdd(art, selected)} className="w-full rounded-lg border px-3 py-2 text-sm hover:bg-neutral-50">
+          )
+        }) ?? null}
+      </div>
+
+      {/* CTA aligné en bas */}
+      <div className="mt-auto pt-3">
+        <button
+          onClick={() => onAdd(art, selected)}
+          className="w-full rounded-lg bg-accent hover:bg-accent-dark text-ink font-medium px-3 py-2 text-sm transition"
+        >
           Ajouter au panier
         </button>
       </div>
@@ -140,7 +208,7 @@ function Gallery() {
     <section id="gallery" className="border-b border-neutral-200/60">
       <Container className="py-14 md:py-20">
         <SectionTitle kicker="catalogue" title="Galerie" />
-        <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
+        <div className="grid items-stretch gap-6 sm:grid-cols-2 md:grid-cols-3">
           <Stagger>
             {artworks.map(a => <ArtworkCard key={a.id} art={a} onAdd={add} />)}
           </Stagger>
@@ -168,8 +236,11 @@ function CartDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
       <aside ref={ref} className="h-full w-full max-w-md border-l bg-white px-6 py-6">
         <div className="mb-6 flex items-center justify-between">
           <h3 className="text-lg font-medium">Panier</h3>
-          <button onClick={onClose} className="rounded-full border px-3 py-1 text-sm hover:bg-neutral-50">Fermer</button>
+          <button onClick={onClose} className="rounded-full border border-accent px-3 py-1 text-sm text-accent hover:bg-accent-light transition">
+            Fermer
+          </button>
         </div>
+
         {items.length === 0 ? (
           <p className="text-sm text-neutral-600">Votre panier est vide.</p>
         ) : (
@@ -183,21 +254,37 @@ function CartDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-start justify-between">
                       <div className="truncate text-sm font-medium">{i.artwork.title}</div>
-                      <button onClick={() => remove(i.key)} className="text-xs text-neutral-500 hover:underline">Retirer</button>
+                      <button onClick={() => remove(i.key)} className="text-xs text-neutral-500 hover:text-accent">Retirer</button>
                     </div>
-                    <div className="mt-0.5 text-xs text-neutral-500">{artistName(i.artwork.artistId)}{i.format ? ` — ${i.format.label}` : ''}</div>
+                    <div className="mt-0.5 text-xs text-neutral-500">
+                      {artistName(i.artwork.artistId)}{i.format ? ` — ${i.format.label}` : ''}
+                    </div>
                     <div className="mt-2 flex items-center gap-2">
-                      <input type="number" min={1} value={i.qty} onChange={(e) => updateQty(i.key, Math.max(1, Number(e.target.value)))} className="w-16 rounded border px-2 py-1 text-sm" />
+                      <input
+                        type="number"
+                        min={1}
+                        value={i.qty}
+                        onChange={(e) => updateQty(i.key, Math.max(1, Number(e.target.value)))}
+                        className="w-16 rounded border px-2 py-1 text-sm"
+                      />
                       <div className="ml-auto text-sm tabular-nums">€{((i.format?.price ?? i.artwork.price) * i.qty).toFixed(0)}</div>
                     </div>
                   </div>
                 </li>
               ))}
             </ul>
+
             <div className="mt-6 space-y-3 border-t pt-4">
-              <div className="flex justify-between text-sm"><span>Total</span><span className="tabular-nums">€{total.toFixed(0)}</span></div>
-              <button className="w-full rounded-lg border px-3 py-2 text-sm hover:bg-neutral-50">Procéder au paiement</button>
-              <button onClick={clear} className="w-full rounded-lg border px-3 py-2 text-xs text-neutral-500 hover:bg-neutral-50">Vider le panier</button>
+              <div className="flex justify-between text-sm">
+                <span>Total</span>
+                <span className="tabular-nums">€{total.toFixed(0)}</span>
+              </div>
+              <button className="w-full rounded-lg bg-accent hover:bg-accent-dark text-ink font-medium px-3 py-2 text-sm transition">
+                Procéder au paiement
+              </button>
+              <button onClick={clear} className="w-full rounded-lg border border-accent px-3 py-2 text-xs text-accent hover:bg-accent-light transition">
+                Vider le panier
+              </button>
             </div>
           </div>
         )}
@@ -218,17 +305,17 @@ function Footer() {
           <div>
             <div className="font-medium text-neutral-800">Aide</div>
             <ul className="mt-3 space-y-2">
-              <li><a href="#" className="hover:underline">FAQ</a></li>
-              <li><a href="#" className="hover:underline">Livraison & retours</a></li>
-              <li><a href="#" className="hover:underline">Contact</a></li>
+              <li><a href="#" className="hover:text-accent">FAQ</a></li>
+              <li><a href="#" className="hover:text-accent">Livraison & retours</a></li>
+              <li><a href="#" className="hover:text-accent">Contact</a></li>
             </ul>
           </div>
           <div>
             <div className="font-medium text-neutral-800">Légal</div>
             <ul className="mt-3 space-y-2">
-              <li><a href="#" className="hover:underline">Mentions légales</a></li>
-              <li><a href="#" className="hover:underline">CGV</a></li>
-              <li><a href="#" className="hover:underline">Confidentialité</a></li>
+              <li><a href="#" className="hover:text-accent">Mentions légales</a></li>
+              <li><a href="#" className="hover:text-accent">CGV</a></li>
+              <li><a href="#" className="hover:text-accent">Confidentialité</a></li>
             </ul>
           </div>
         </div>
