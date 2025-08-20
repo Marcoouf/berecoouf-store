@@ -11,22 +11,22 @@ export const artists: Artist[] = [
     cover: '/images/artworks/art5.webp',
   },
     {
-    id: 'a-Couf',
-    slug: 'Marcouf',
-    name: 'Marcouf Lebar',
-    handle: '@Marcouf',
+    id: 'b-Béré',
+    slug: 'Béré',
+    name: 'Bérénice Duchemain',
+    handle: '@Béré',
     bio: 'Textures brutes, encres profondes, géométries silencieuses.',
-    avatar: '/images/artists/marcouf-lebar.webp',
-    cover: '/images/artworks/art6.webp',
+    avatar: '/images/artists/bere.webp',
+    cover: '/images/artworks/art4.webp',
   },
   {
-    id: 'a-Couf',
-    slug: 'Marcouf',
-    name: 'Marcouf Lebar',
-    handle: '@Marcouf',
+    id: 'c-Cam',
+    slug: 'Cam',
+    name: 'Camille Dubois',
+    handle: '@Camille',
     bio: 'Textures brutes, encres profondes, géométries silencieuses.',
-    avatar: '/images/artists/marcouf-lebar.webp',
-    cover: '/images/artworks/art7.webp',
+    avatar: '/images/artists/cam.webp',
+    cover: '/images/artworks/art9.webp',
   },
 ]
 
@@ -48,7 +48,7 @@ export const artworks: Artwork[] = [
   {
     id: 'w-02',
     slug: 'mono-field-02',
-    artistId: 'a-kenji',
+    artistId: 'a-Couf',
     title: 'Mono Field 02',
     price: 140,
     formats: [
@@ -61,7 +61,7 @@ export const artworks: Artwork[] = [
   {
     id: 'w-03',
     slug: 'muted-wave',
-    artistId: 'a-lina',
+    artistId: 'a-Cam',
     title: 'Muted Wave',
     price: 160,
     formats: [
@@ -69,9 +69,67 @@ export const artworks: Artwork[] = [
       { id: 'f-a2', label: 'A2 — 420×594mm', price: 230 },
       { id: 'f-a1', label: 'A1 — 594×841mm', price: 310 },
     ],
-    image: '/images/artworks/art3.webp',
+    image: '/images/artworks/art11.webp',
     description: 'Ondes calmes et palette sourde. Tirage numéroté.',
   },
+    {
+    id: 'w-04',
+    slug: 'muted-wave',
+    artistId: 'a-Béré',
+    title: 'Soleil',
+    price: 160,
+    formats: [
+      { id: 'f-a3', label: 'A3 — 297×420mm', price: 160 },
+      { id: 'f-a2', label: 'A2 — 420×594mm', price: 230 },
+      { id: 'f-a1', label: 'A1 — 594×841mm', price: 310 },
+    ],
+    image: '/images/artworks/art4.webp',
+    description: 'Ondes calmes et palette sourde. Tirage numéroté.',
+  },
+  {
+    id: 'w-05',
+    slug: 'muted-wave',
+    artistId: 'a-Cam',
+    title: 'Muted Wave',
+    price: 160,
+    formats: [
+      { id: 'f-a3', label: 'A3 — 297×420mm', price: 160 },
+      { id: 'f-a2', label: 'A2 — 420×594mm', price: 230 },
+      { id: 'f-a1', label: 'A1 — 594×841mm', price: 310 },
+    ],
+    image: '/images/artworks/art12.webp',
+    description: 'Ondes calmes et palette sourde. Tirage numéroté.',
+  },
+  {
+    id: 'w-06',
+    slug: 'muted-wave',
+    artistId: 'a-Cam',
+    title: 'Quinéville',
+    price: 160,
+    formats: [
+      { id: 'f-a3', label: 'A3 — 297×420mm', price: 160 },
+      { id: 'f-a2', label: 'A2 — 420×594mm', price: 230 },
+      { id: 'f-a1', label: 'A1 — 594×841mm', price: 310 },
+    ],
+    image: '/images/artworks/art8.webp',
+    description: 'Ondes calmes et palette sourde. Tirage numéroté.',
+  },
+  {
+    id: 'w-07',
+    slug: 'muted-wave',
+    artistId: 'a-Béré',
+    title: 'Mouettes',
+    price: 160,
+    formats: [
+      { id: 'f-a3', label: 'A3 — 297×420mm', price: 160 },
+      { id: 'f-a2', label: 'A2 — 420×594mm', price: 230 },
+      { id: 'f-a1', label: 'A1 — 594×841mm', price: 310 },
+    ],
+    image: '/images/artworks/art2.webp',
+    description: 'Ondes calmes et palette sourde. Tirage numéroté.',
+  },
+
+
 ]
 
 // Helpers typés
