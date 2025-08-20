@@ -9,6 +9,7 @@ import { useCart } from '@/components/CartContext'
 import { FadeIn, Stagger } from '@/components/Motion'
 import { motion, useScroll, useSpring } from 'framer-motion'
 
+
 // === Container local (on NE l'importe PAS) ===
 function Container({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return <div className={`mx-auto w-full max-w-6xl px-6 ${className}`}>{children}</div>
@@ -184,50 +185,92 @@ function Artists() {
   )
 }
 
-function ArtworkCard({ art, onAdd }: { art: Artwork; onAdd: (a: Artwork, f: any) => void }) {
+function ArtworkCard({
+  art,
+  onAdd,
+}: {
+  art: Artwork
+  onAdd: (a: Artwork, f: any) => void
+}) {
   const [formatId, setFormatId] = useState(art.formats?.[0]?.id ?? null)
-  const selected = useMemo(() => art.formats?.find(f => f.id === formatId) ?? null, [formatId, art.formats])
+  const selected = useMemo(
+    () => art.formats?.find(f => f.id === formatId) ?? null,
+    [formatId, art.formats]
+  )
+
+  // Fallback si jamais un artwork n'a pas de slug
+  const slug = art.slug ?? art.id
 
   return (
     <div className="group flex h-full flex-col">
-      <div className="aspect-[4/5] overflow-hidden rounded-2xl border relative transition-all duration-300 group-hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)]">
-        <Image src={art.image} alt={art.title} fill className="object-cover transition-transform duration-500 group-hover:scale-[1.02]" />
-      </div>
+      {/* Visuel cliquable */}
+      <Link
+        href={`/artworks/${slug}`}
+        className="relative block aspect-[4/5] overflow-hidden rounded-2xl border transition-all duration-300 group-hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] focus:outline-none focus:ring-2 focus:ring-accent"
+        aria-label={`Voir l’œuvre ${art.title}`}
+      >
+        <Image
+          src={art.image}
+          alt={art.title}
+          fill
+          className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+          sizes="(min-width: 1024px) 30vw, (min-width: 768px) 45vw, 100vw"
+        />
+      </Link>
 
+      {/* Titre / Prix (titre cliquable aussi) */}
       <div className="mt-3 flex items-start justify-between gap-4">
         <div>
-          <div className="text-sm font-medium group-hover:text-accent transition">{art.title}</div>
+          <Link
+            href={`/artworks/${slug}`}
+            className="text-sm font-medium transition group-hover:text-accent hover:underline underline-offset-4 focus:outline-none focus:ring-2 focus:ring-accent rounded"
+          >
+            {art.title}
+          </Link>
           <div className="text-xs text-neutral-500">{artistName(art.artistId)}</div>
         </div>
-        <div className="text-sm tabular-nums">€{(selected?.price ?? art.price).toFixed(0)}</div>
+        <div className="text-sm tabular-nums">
+          €{(selected?.price ?? art.price).toFixed(0)}
+        </div>
       </div>
 
-      {/* Formats uniformes */}
-      <div className="mt-2 min-h-[72px] grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-2">
-        {art.formats?.map(f => {
-          const isSel = f.id === formatId
-          return (
-            <button
-              key={f.id}
-              onClick={() => setFormatId(f.id)}
-              className={[
-                'inline-flex h-8 w-full items-center justify-center rounded-full px-3',
-                'text-[12px] font-medium whitespace-nowrap',
-                'border transition-colors',
-                isSel
-                  ? 'bg-accent text-ink border-accent'
-                  : 'bg-white text-neutral-700 border-neutral-200 hover:bg-accent-light hover:border-accent hover:text-accent',
-              ].join(' ')}
-            >
-              {f.label}
-            </button>
-          )
-        }) ?? null}
-      </div>
+      {/* Formats — interactions locales (pas de navigation) */}
+      {!!art.formats?.length && (
+        <div className="mt-2 min-h-[72px] grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-2">
+          {art.formats.map(f => {
+            const isSel = f.id === formatId
+            return (
+              <button
+                key={f.id}
+                type="button"
+                onClick={e => {
+                  e.stopPropagation()
+                  setFormatId(f.id)
+                }}
+                className={[
+                  'inline-flex h-8 w-full items-center justify-center rounded-full px-3',
+                  'text-[12px] font-medium whitespace-nowrap',
+                  'border transition-colors',
+                  isSel
+                    ? 'bg-accent text-ink border-accent'
+                    : 'bg-white text-neutral-700 border-neutral-200 hover:bg-accent-light hover:border-accent hover:text-accent',
+                ].join(' ')}
+              >
+                {f.label}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
+      {/* CTA en bas */}
       <div className="mt-auto pt-3">
         <button
-          onClick={() => onAdd(art, selected)}
+          type="button"
+          onClick={e => {
+            e.stopPropagation()
+            onAdd(art, selected)
+          }}
           className="w-full rounded-lg bg-accent hover:bg-accent-dark text-ink font-medium px-3 py-2 text-sm transition"
         >
           Ajouter au panier
@@ -365,15 +408,24 @@ function artistName(id: string) {
   return a ? a.name : 'Artiste'
 }
 
-export default function Site() {
-  const [open, setOpen] = useState(false)
+
+export default function Site({ openCartOnLoad = false }: { openCartOnLoad?: boolean }) {
+  const [open, setOpen] = React.useState(false)
+
+  // Quand la page se charge, si on a ?cart=1 -> on ouvre le panier
+  React.useEffect(() => {
+    if (openCartOnLoad) setOpen(true)
+  }, [openCartOnLoad])
+
   return (
     <div className="min-h-screen bg-white text-neutral-900 antialiased">
-      <Header onOpenCart={() => setOpen(true)} />
+      {/* plus de Header ici, il est global via layout */}
       <Hero />
       <Artists />
       <Gallery />
       <Footer />
+
+      {/* Drawer panier */}
       <CartDrawer open={open} onClose={() => setOpen(false)} />
     </div>
   )

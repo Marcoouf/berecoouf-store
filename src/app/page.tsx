@@ -1,7 +1,11 @@
-import dynamic from 'next/dynamic'
+// src/app/page.tsx
+import Site from '@/components/UI'
 
-const Site = dynamic(() => import('@/components/UI'), { ssr: false })
-
-export default function Page() {
-  return <Site />
+export default function Page({
+  searchParams,
+}: {
+  searchParams?: { cart?: string }
+}) {
+  const openCart = searchParams?.cart === '1'
+  return <Site openCartOnLoad={openCart} />
 }
