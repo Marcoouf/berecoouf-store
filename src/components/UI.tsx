@@ -42,7 +42,7 @@ function Header({ onOpenCart }: { onOpenCart: () => void }) {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-line/70 bg-white/70 backdrop-blur">
       <Container className="py-3 flex items-center justify-between">
-        <Link href="/" className="text-sm tracking-widest uppercase">Berecoouf</Link>
+        <Link href="/" className="text-sm tracking-widest uppercase">Point Bleu</Link>
         <nav className="hidden gap-6 md:flex text-sm text-neutral-600">
           <Link href="/artists" className="hover:underline underline-offset-4">Artistes</Link>
           <Link href="/artworks" className="hover:underline underline-offset-4">Œuvres</Link>
@@ -377,7 +377,7 @@ function Footer() {
       <Container className="py-10 md:py-16 text-sm text-neutral-600">
         <div className="grid gap-8 md:grid-cols-4">
           <div className="md:col-span-2">
-            <div className="text-sm tracking-widest uppercase text-neutral-800">Berecoouf</div>
+            <div className="text-sm tracking-widest uppercase text-neutral-800">Point Bleu</div>
             <p className="mt-3 max-w-sm">Éditions d&apos;art et galerie en ligne. Tirages numérotés, impression fine art.</p>
           </div>
           <div>
@@ -397,7 +397,7 @@ function Footer() {
             </ul>
           </div>
         </div>
-        <div className="mt-10 text-xs text-neutral-500">© {new Date().getFullYear()} Berecoouf. Tous droits réservés.</div>
+        <div className="mt-10 text-xs text-neutral-500">© {new Date().getFullYear()} Point Bleu. Tous droits réservés.</div>
       </Container>
     </footer>
   )
