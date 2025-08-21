@@ -30,17 +30,17 @@ export default function RelatedCarousel({ items }: { items: Item[] }) {
   return (
     <div className="relative">
       {/* Boutons */}
-      <div className="pointer-events-none absolute inset-y-0 left-0 right-0 z-10 flex items-center justify-between px-2">
+      <div className="pointer-events-none absolute inset-y-0 left-0 right-0 z-10 flex items-center justify-between px-4 sm:px-6">
         <button
           onClick={() => scrollByAmount('left')}
-          className="pointer-events-auto hidden md:inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 ring-1 ring-line hover:bg-white"
+          className="pointer-events-auto hidden md:flex h-9 w-9 items-center justify-center rounded-full bg-white/90 ring-1 ring-line hover:bg-white"
           aria-label="Faire défiler vers la gauche"
         >
           ‹
         </button>
         <button
           onClick={() => scrollByAmount('right')}
-          className="pointer-events-auto hidden md:inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/90 ring-1 ring-line hover:bg-white"
+          className="pointer-events-auto hidden md:flex h-9 w-9 items-center justify-center rounded-full bg-white/90 ring-1 ring-line hover:bg-white"
           aria-label="Faire défiler vers la droite"
         >
           ›
@@ -50,7 +50,7 @@ export default function RelatedCarousel({ items }: { items: Item[] }) {
       {/* Piste scrollable */}
       <div
         ref={ref}
-        className="flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory px-1 pb-2 [-ms-overflow-style:none] [scrollbar-width:none]"
+        className="flex gap-4 overflow-x-auto scroll-smooth snap-x snap-mandatory px-4 sm:px-6 -mx-4 sm:-mx-6 [-ms-overflow-style:none] [scrollbar-width:none]"
       >
         {/* Hide default scrollbar Chrome/Safari */}
         <style jsx>{`
@@ -58,8 +58,8 @@ export default function RelatedCarousel({ items }: { items: Item[] }) {
         `}</style>
 
         {items.map((w) => (
-          <div key={w.id} className="snap-start shrink-0 w-[72%] sm:w-[48%] md:w-[32%]">
-            <div className="group">
+          <div key={w.id} className="snap-start shrink-0 w-[80%] sm:w-[45%] md:w-[30%]">
+            <div className="group hover:shadow-lg hover:scale-[1.03] transition-transform duration-300">
               <div className="relative overflow-hidden rounded-xl border aspect-[4/5]">
                 <Link href={`/artworks/${w.slug}`} className="absolute inset-0" aria-label={`Voir ${w.title}`}>
                   <Image

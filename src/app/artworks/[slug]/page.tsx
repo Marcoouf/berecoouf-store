@@ -5,6 +5,7 @@ import { notFound } from 'next/navigation'
 import Breadcrumb from '@/components/Breadcrumb'
 import { headers } from 'next/headers'
 import ArtworkPurchase from '@/components/ArtworkPurchase'
+import { euro } from '@/lib/format';
 
 // important : ne pas figer au build
 export const dynamic = 'force-dynamic' // Next 13/14
@@ -27,6 +28,23 @@ type Catalog = {
     edition?: string
     formats?: { id: string; label: string; price: number }[]
   }[]
+}
+
+function displayPriceFor(w: Catalog['artworks'][number]) {
+  // Normalise "formats" pour éviter undefined
+  const formats = Array.isArray(w.formats) ? w.formats : []
+
+  // Convertit proprement en nombres
+  const formatPrices = formats
+    .map(f => Number(f.price))
+    .filter(n => Number.isFinite(n))
+
+  // Si on a des formats, on prend le min ; sinon, le prix de base
+  const base = formatPrices.length > 0
+    ? Math.min(...formatPrices)
+    : (Number.isFinite(Number(w.price)) ? Number(w.price) : 0)
+
+  return euro(base)
 }
 
 async function getCatalog(): Promise<Catalog> {
@@ -176,9 +194,9 @@ export default async function Page({ params }: { params: { slug: string } }) {
                     </div>
                     {artist && <div className="text-xs text-neutral-500">{artist.name}</div>}
                   </div>
-                  <div className="text-sm tabular-nums">
-                    {(w.formats?.[0]?.price ?? w.price).toFixed(0)} €
-                  </div>
+<div className="text-sm tabular-nums">
+  {displayPriceFor(w)}
+</div>
                 </div>
               </div>
             ))}

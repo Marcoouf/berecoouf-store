@@ -6,6 +6,7 @@ import ScrollProgress from '@/components/ScrollProgress'
 import HeaderGlobal from '@/components/Header'
 import CustomCursor from '@/components/CustomCursor'
 import GlobalCartDrawer from '@/components/GlobalCartDrawer'
+import ScrollToTop from '@/components/ScrollToTop'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
 const garamond = EB_Garamond({ subsets: ['latin'], variable: '--font-serif' })
@@ -23,6 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="fr">
       <body className={`${inter.variable} ${garamond.variable} font-sans bg-white text-neutral-900 antialiased`}>
         <Providers>
+        <ScrollToTop />
           <HeaderGlobal />
           <CustomCursor />
           {children}

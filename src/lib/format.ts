@@ -1,9 +1,11 @@
 // src/lib/format.ts
-/** Prix au format "1 200 €" avec espace insécable */
-export function euro(value: number) {
+export function euro(v: number | null | undefined) {
+  const n = Number(v)
+  if (!Number.isFinite(n)) return '—'
   return new Intl.NumberFormat('fr-FR', {
     style: 'currency',
     currency: 'EUR',
+    minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(value); // => "1 200 €"
+  }).format(n)
 }
