@@ -112,34 +112,34 @@ export default async function Page({ params }: { params: { slug: string } }) {
           {(artwork.year || artwork.technique || artwork.paper || artwork.size || artwork.edition) && (
             <div className="mt-6 rounded-xl border p-4">
               <div className="text-sm font-medium mb-3">Détails d’impression</div>
-              <ul className="grid gap-2 text-sm text-neutral-700 sm:grid-cols-2">
+              <ul className="grid gap-3 text-sm text-neutral-700 sm:grid-cols-2">
                 {artwork.year && (
-                  <li className="flex justify-between gap-3">
-                    <span className="text-neutral-500">Année</span>
+                  <li>
+                    <span className="block text-neutral-500">Année</span>
                     <span>{artwork.year}</span>
                   </li>
                 )}
                 {artwork.technique && (
-                  <li className="flex justify-between gap-3">
-                    <span className="text-neutral-500">Technique</span>
+                  <li>
+                    <span className="block text-neutral-500">Technique</span>
                     <span>{artwork.technique}</span>
                   </li>
                 )}
                 {artwork.paper && (
-                  <li className="flex justify-between gap-3">
-                    <span className="text-neutral-500">Papier</span>
+                  <li>
+                    <span className="block text-neutral-500">Papier</span>
                     <span>{artwork.paper}</span>
                   </li>
                 )}
                 {artwork.size && (
-                  <li className="flex justify-between gap-3">
-                    <span className="text-neutral-500">Dimensions</span>
+                  <li>
+                    <span className="block text-neutral-500">Dimensions</span>
                     <span>{artwork.size}</span>
                   </li>
                 )}
                 {artwork.edition && (
-                  <li className="flex justify-between gap-3 md:col-span-2">
-                    <span className="text-neutral-500">Édition</span>
+                  <li className="sm:col-span-2">
+                    <span className="block text-neutral-500">Édition</span>
                     <span>{artwork.edition}</span>
                   </li>
                 )}
