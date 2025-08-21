@@ -34,3 +34,59 @@ input[type="text"], input[type="email"], input[type="search"],
 input[type="password"], textarea {
   cursor: text !important;
 }
+
+/* === Components maison (utilise @apply) === */
+@layer components {
+  /* Liens avec soulignement animé */
+  .link-underline {
+    position: relative;
+  }
+  .link-underline::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: -2px;
+    height: 2px;
+    width: 100%;
+    background: theme('colors.accent.300');
+    transform-origin: left center;
+    transform: scaleX(0);
+    transition: transform .25s ease;
+  }
+  .link-underline:hover::after,
+  .link-underline:focus-visible::after {
+    transform: scaleX(1);
+  }
+
+  /* Boutons primaires cohérents */
+  .btn {
+    @apply inline-flex items-center justify-center rounded-lg px-4 py-2 text-sm font-medium
+           transition focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-400
+           disabled:opacity-60 disabled:pointer-events-none;
+  }
+  .btn-primary {
+    @apply btn bg-accent-300 text-ink hover:bg-accent-400 active:scale-[.98] shadow-sm;
+  }
+  .btn-outline {
+    @apply btn border border-accent-300 text-accent-700 hover:bg-accent-100;
+  }
+
+  /* Cartes : hover subtil */
+  .card {
+    @apply rounded-2xl border bg-white transition;
+  }
+  .card-hover {
+    @apply hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] hover:ring-1 hover:ring-accent-200;
+  }
+}
+
+/* === Rythme vertical simple === */
+:root {
+  --lead-tight: 1.1;
+  --lead-normal: 1.35;
+}
+h1 { line-height: var(--lead-tight); }
+h2, h3 { line-height: var(--lead-tight); }
+p, li { line-height: var(--lead-normal); }
+
+.tabular-nums { font-variant-numeric: tabular-nums; }

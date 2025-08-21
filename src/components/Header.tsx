@@ -1,7 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { motion, useScroll, useSpring } from 'framer-motion'
+import { motion, useScroll, useSpring, useReducedMotion } from 'framer-motion'
+import { useCart } from '@/components/CartContext'
+import { usePathname } from 'next/navigation'
 
 function Container({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return <div className={`mx-auto w-full max-w-6xl px-6 ${className}`}>{children}</div>
@@ -11,6 +13,13 @@ export default function HeaderGlobal() {
   const { scrollYProgress } = useScroll()
   const scaleX = useSpring(scrollYProgress, { stiffness: 120, damping: 30, restDelta: 0.001 })
 
+  const prefersReduced = useReducedMotion()
+  const pathname = usePathname()
+  const is = (p: string) => (pathname ?? '').startsWith(p)
+
+  // Cart infos pour l'anim + compteur
+  const { itemCount, lastAdded, toggleCart, open } = useCart()
+
   return (
     <header className="sticky top-0 z-40 w-full border-b border-line/70 bg-white/70 backdrop-blur">
       <Container className="py-3 flex items-center justify-between">
@@ -19,28 +28,38 @@ export default function HeaderGlobal() {
           <motion.span
             aria-hidden
             className="h-2.5 w-2.5 rounded-full bg-accent group-hover:bg-accent-dark"
-            animate={{ scale: [1, 1.15, 1] }}
-            transition={{ duration: 2, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' }}
-            // Accessibilité : pas d’animation si l’utilisateur préfère réduire les animations
+            animate={prefersReduced ? { scale: 1 } : { scale: [1, 1.15, 1] }}
+            transition={prefersReduced ? undefined : { duration: 2, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' }}
             style={{ willChange: 'transform' }}
           />
           <span>Point Bleu</span>
         </Link>
 
         {/* Navigation */}
-        <nav className="hidden gap-6 md:flex text-sm text-neutral-600">
-          <Link href="/artists" className="hover:underline underline-offset-4">Artistes</Link>
-          <Link href="/artworks" className="hover:underline underline-offset-4">Œuvres</Link>
-          <a href="/#about" className="hover:underline underline-offset-4">À propos</a>
+        <nav className="hidden gap-6 md:flex text-sm text-neutral-700">
+          <Link href="/artists"  className={`link-underline hover:text-accent-700 ${is('/artists') ? 'text-accent-700' : ''}`}>Artistes</Link>
+          <Link href="/artworks" className={`link-underline hover:text-accent-700 ${is('/artworks') ? 'text-accent-700' : ''}`}>Œuvres</Link>
+          <a    href="/#about"   className={`link-underline hover:text-accent-700 ${is('/#about') ? 'text-accent-700' : ''}`}>À propos</a>
         </nav>
 
-        {/* Panier */}
-        <Link
-          href="/?cart=1"
-          className="rounded-full border border-accent px-3 py-1 text-sm text-accent hover:bg-accent-light transition"
+        {/* Panier animé à chaque ajout */}
+        <motion.div
+          key={lastAdded}                       // relance l'anim à chaque ajout
+          initial={{ scale: 1 }}
+          animate={prefersReduced ? { scale: 1 } : { scale: [1, 1.12, 1] }}
+          transition={prefersReduced ? undefined : { duration: 0.35, ease: 'easeOut' }}
         >
-          Panier
-        </Link>
+          <button
+            type="button"
+            onClick={toggleCart}
+            className="btn-outline"
+            aria-label="Ouvrir le panier"
+            aria-expanded={open}
+            aria-controls="cart-drawer"
+          >
+            Panier{itemCount > 0 ? ` (${itemCount})` : ''}
+          </button>
+        </motion.div>
       </Container>
 
       {/* Progress bar sous le header */}

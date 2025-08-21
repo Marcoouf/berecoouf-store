@@ -1,0 +1,34 @@
+{
+  "artists": [],
+  "artworks": [
+    {
+      "id": "w-scxbic",
+      "slug": "melange-d-immeubles-2",
+      "title": "Mélange d'immeubles",
+      "artistId": "c-Cam",
+      "image": "/images/artworks/2025-08-21T18-52-05-799Z-972a2d6e-whatsapp-image-2025-05-08-at-10-08-41-7.webp",
+      "price": 120,
+      "description": "Mélange d'immeubles par Camille Dubois",
+      "year": 2020,
+      "technique": "Sérigraphie",
+      "paper": "250gr",
+      "formats": [
+        {
+          "id": "f-6a8h8f",
+          "label": "A3 — 297×420mm",
+          "price": 120
+        },
+        {
+          "id": "f-ki8066",
+          "label": "A2 — 420×594mm",
+          "price": 180
+        },
+        {
+          "id": "f-whlbwa",
+          "label": "A1 — 594×841mm",
+          "price": 220
+        }
+      ]
+    }
+  ]
+}

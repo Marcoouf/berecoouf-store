@@ -5,12 +5,13 @@ import { Inter, EB_Garamond } from 'next/font/google'
 import ScrollProgress from '@/components/ScrollProgress'
 import HeaderGlobal from '@/components/Header'
 import CustomCursor from '@/components/CustomCursor'
+import GlobalCartDrawer from '@/components/GlobalCartDrawer'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
 const garamond = EB_Garamond({ subsets: ['latin'], variable: '--font-serif' })
 
 export const metadata: Metadata = {
-  title: 'Berecoouf — Éditions d’art',
+  title: 'Point bleu — Éditions d’art',
   description: 'Galerie en ligne d’illustrations contemporaines en séries limitées.',
   icons: {
     icon: "/favicon.png",
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <HeaderGlobal />
           <CustomCursor />
           {children}
+          <GlobalCartDrawer />
           </Providers>
       </body>
     </html>

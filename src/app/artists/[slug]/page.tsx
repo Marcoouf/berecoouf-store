@@ -9,7 +9,7 @@ type Props = { params: { slug: string } }
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const artist = findArtistBySlug(params.slug)
   return {
-    title: artist ? `${artist.name} — Berecoouf` : 'Artiste — Berecoouf',
+    title: artist ? `${artist.name} — Point Bleu` : 'Artiste — Point Bleu',
     description: artist?.bio,
   }
 }

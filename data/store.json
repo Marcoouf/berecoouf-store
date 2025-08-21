@@ -1,0 +1,66 @@
+{
+  "artworks": [
+    {
+      "id": "w-iqh8ts",
+      "slug": "melange-d-immeubles",
+      "title": "Mélange d'immeubles",
+      "artistId": "c-Cam",
+      "image": "/images/artworks/2025-08-21T18-15-59-236Z-1ec196ca-whatsapp-image-2025-05-08-at-10-08-41-7.webp",
+      "price": 117,
+      "description": "Mélange d'immeubles vu par Camille Dubois",
+      "year": 2020,
+      "technique": "Sérigraphie",
+      "paper": "250g",
+      "size": "",
+      "edition": "",
+      "formats": [
+        {
+          "id": "f-hr9ecr",
+          "label": "A3 — 297×420mm",
+          "price": 120
+        },
+        {
+          "id": "f-sehz97",
+          "label": "A2 — 420×594mm",
+          "price": 180
+        },
+        {
+          "id": "f-ilofq8",
+          "label": "A1 — 594×841mm",
+          "price": 220
+        }
+      ]
+    },
+    {
+      "id": "w-hlvk3v",
+      "slug": "melange-d-immeubles-2",
+      "title": "Mélange d'immeubles",
+      "artistId": "a-Couf",
+      "image": "/images/artworks/2025-08-21T18-28-02-648Z-6c7c4c66-whatsapp-image-2025-05-08-at-10-08-41-7.webp",
+      "price": 120,
+      "description": "Mélange d'immeubles vu par Camille Dubois",
+      "year": 2020,
+      "technique": "Sérigraphie",
+      "paper": "250 gr",
+      "size": "",
+      "edition": "",
+      "formats": [
+        {
+          "id": "f-zmjize",
+          "label": "A3 — 297×420mm",
+          "price": 120
+        },
+        {
+          "id": "f-sj4n1i",
+          "label": "A2 — 420×594mm",
+          "price": 180
+        },
+        {
+          "id": "f-0xkrx2",
+          "label": "A1 — 594×841mm",
+          "price": 220
+        }
+      ]
+    }
+  ]
+}

@@ -3,12 +3,11 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Image from '@/components/SmartImage'
 import Link from 'next/link'
-import { artworks, artists } from '@/lib/data'
-import type { Artwork } from '@/lib/types'
+import type { Artwork, Artist } from '@/lib/types'
 import { useCart } from '@/components/CartContext'
 import { FadeIn, Stagger } from '@/components/Motion'
 import { motion, useScroll, useSpring } from 'framer-motion'
-
+import { euro } from '@/lib/format';
 
 // === Container local (on NE l'importe PAS) ===
 function Container({ children, className = '' }: { children: React.ReactNode; className?: string }) {
@@ -74,15 +73,14 @@ function Hero() {
   useEffect(() => {
     let active = true
 
-    // Récupère la liste des images et en choisit une au hasard
+    // Récupère la liste des images héro et en choisit une au hasard
     fetch('/api/hero-images')
       .then(r => r.json())
       .then(({ files }) => {
         if (!active || !Array.isArray(files) || files.length === 0) return
         const i = Math.floor(Math.random() * files.length)
-        // reset du loader quand on change d'image
-        setReady(false)
-        setSrc(files[i])
+        setReady(false) // reset du loader quand on change d'image
+        setSrc(files[i] as string)
       })
       .catch(() => {})
 
@@ -137,7 +135,7 @@ function Hero() {
                   sizes="(min-width: 1024px) 40vw, (min-width: 768px) 50vw, 100vw"
                   priority
                   onLoadingComplete={() => {
-                    // Petite latence pour voir le skeleton même si l'image est en cache
+                    // Laisse un petit délai pour voir le skeleton même si l'image est en cache
                     setTimeout(() => setReady(true), 150)
                   }}
                 />
@@ -156,7 +154,7 @@ function Hero() {
     </section>
   )
 }
-function Artists() {
+function Artists({ artists }: { artists: Artist[] }) {
   return (
     <section id="artists" className="border-b border-neutral-200/60">
       <Container className="py-14 md:py-20">
@@ -185,20 +183,14 @@ function Artists() {
   )
 }
 
-function ArtworkCard({
-  art,
-  onAdd,
-}: {
-  art: Artwork
-  onAdd: (a: Artwork, f: any) => void
-}) {
+function ArtworkCard({ art, onAdd, artistsById }: { art: Artwork; onAdd: (a: Artwork, f: any) => void; artistsById: Record<string, string> }) {
   const [formatId, setFormatId] = useState(art.formats?.[0]?.id ?? null)
   const selected = useMemo(
-    () => art.formats?.find(f => f.id === formatId) ?? null,
+    () => art.formats?.find((f) => f.id === formatId) ?? null,
     [formatId, art.formats]
   )
 
-  // Fallback si jamais un artwork n'a pas de slug
+  // Fallback si un artwork n'a pas de slug
   const slug = art.slug ?? art.id
 
   return (
@@ -206,7 +198,7 @@ function ArtworkCard({
       {/* Visuel cliquable */}
       <Link
         href={`/artworks/${slug}`}
-        className="relative block aspect-[4/5] overflow-hidden rounded-2xl border transition-all duration-300 group-hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] focus:outline-none focus:ring-2 focus:ring-accent"
+        className="relative block aspect-[4/5] overflow-hidden rounded-2xl border transition-all duration-300 group-hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] focus:outline-none focus:ring-2 focus:ring-accent-300"
         aria-label={`Voir l’œuvre ${art.title}`}
       >
         <Image
@@ -215,35 +207,35 @@ function ArtworkCard({
           fill
           className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
           sizes="(min-width: 1024px) 30vw, (min-width: 768px) 45vw, 100vw"
+          priority={false}
         />
       </Link>
 
-      {/* Titre / Prix (titre cliquable aussi) */}
+      {/* Titre / Prix */}
       <div className="mt-3 flex items-start justify-between gap-4">
         <div>
           <Link
             href={`/artworks/${slug}`}
-            className="text-sm font-medium transition group-hover:text-accent hover:underline underline-offset-4 focus:outline-none focus:ring-2 focus:ring-accent rounded"
+            className="text-sm font-medium transition group-hover:text-accent-700 hover:underline underline-offset-4 focus:outline-none focus:ring-2 focus:ring-accent-300 rounded"
           >
             {art.title}
           </Link>
-          <div className="text-xs text-neutral-500">{artistName(art.artistId)}</div>
+          <div className="text-xs text-neutral-500">{artistsById[art.artistId] ?? 'Artiste'}</div>
         </div>
-        <div className="text-sm tabular-nums">
-          €{(selected?.price ?? art.price).toFixed(0)}
-        </div>
-      </div>
+<div className="text-sm tabular-nums">
+  {euro(selected?.price ?? art.price)}
+</div>      </div>
 
-      {/* Formats — interactions locales (pas de navigation) */}
+      {/* Formats — interactions locales */}
       {!!art.formats?.length && (
         <div className="mt-2 min-h-[72px] grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-2">
-          {art.formats.map(f => {
+          {art.formats.map((f) => {
             const isSel = f.id === formatId
             return (
               <button
                 key={f.id}
                 type="button"
-                onClick={e => {
+                onClick={(e) => {
                   e.stopPropagation()
                   setFormatId(f.id)
                 }}
@@ -252,8 +244,8 @@ function ArtworkCard({
                   'text-[12px] font-medium whitespace-nowrap',
                   'border transition-colors',
                   isSel
-                    ? 'bg-accent text-ink border-accent'
-                    : 'bg-white text-neutral-700 border-neutral-200 hover:bg-accent-light hover:border-accent hover:text-accent',
+                    ? 'bg-accent-300 text-ink border-accent-300'
+                    : 'bg-white text-neutral-700 border-neutral-200 hover:bg-accent-100 hover:border-accent-300 hover:text-accent-700',
                 ].join(' ')}
               >
                 {f.label}
@@ -267,11 +259,11 @@ function ArtworkCard({
       <div className="mt-auto pt-3">
         <button
           type="button"
-          onClick={e => {
+          onClick={(e) => {
             e.stopPropagation()
             onAdd(art, selected)
           }}
-          className="w-full rounded-lg bg-accent hover:bg-accent-dark text-ink font-medium px-3 py-2 text-sm transition"
+          className="w-full rounded-lg bg-accent-300 hover:bg-accent-400 text-ink font-medium px-3 py-2 text-sm transition"
         >
           Ajouter au panier
         </button>
@@ -280,7 +272,7 @@ function ArtworkCard({
   )
 }
 
-function Gallery() {
+function Gallery({ artworks, artistsById }: { artworks: Artwork[]; artistsById: Record<string, string> }) {
   const { add } = useCart()
   return (
     <section id="gallery" className="border-b border-neutral-200/60">
@@ -288,7 +280,9 @@ function Gallery() {
         <SectionTitle kicker="catalogue" title="Galerie" />
         <div className="grid items-stretch gap-6 sm:grid-cols-2 md:grid-cols-3">
           <Stagger>
-            {artworks.map(a => <ArtworkCard key={a.id} art={a} onAdd={add} />)}
+            {artworks.map(a => (
+              <ArtworkCard key={a.id} art={a} onAdd={add} artistsById={artistsById} />
+            ))}
           </Stagger>
         </div>
       </Container>
@@ -296,17 +290,17 @@ function Gallery() {
   )
 }
 
-function CartDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { items, total, updateQty, remove, clear } = useCart()
+function CartDrawer({ artistsById }: { artistsById: Record<string, string> }) {
+  const { items, total, updateQty, remove, clear, open, closeCart } = useCart()
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const handle = (e: MouseEvent) => {
-      if (open && ref.current && !ref.current.contains(e.target as Node)) onClose()
+      if (open && ref.current && !ref.current.contains(e.target as Node)) closeCart()
     }
     document.addEventListener('mousedown', handle)
     return () => document.removeEventListener('mousedown', handle)
-  }, [open, onClose])
+  }, [open, closeCart])
 
   if (!open) return null
   return (
@@ -314,7 +308,7 @@ function CartDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
       <aside ref={ref} className="h-full w-full max-w-md border-l bg-white px-6 py-6">
         <div className="mb-6 flex items-center justify-between">
           <h3 className="text-lg font-medium">Panier</h3>
-          <button onClick={onClose} className="rounded-full border border-accent px-3 py-1 text-sm text-accent hover:bg-accent-light transition">
+          <button onClick={closeCart} className="rounded-full border border-accent px-3 py-1 text-sm text-accent hover:bg-accent-light transition">
             Fermer
           </button>
         </div>
@@ -335,7 +329,7 @@ function CartDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
                       <button onClick={() => remove(i.key)} className="text-xs text-neutral-500 hover:text-accent">Retirer</button>
                     </div>
                     <div className="mt-0.5 text-xs text-neutral-500">
-                      {artistName(i.artwork.artistId)}{i.format ? ` — ${i.format.label}` : ''}
+                      {artistsById[i.artwork.artistId] ?? 'Artiste'}{i.format ? ` — ${i.format.label}` : ''}
                     </div>
                     <div className="mt-2 flex items-center gap-2">
                       <input
@@ -345,7 +339,9 @@ function CartDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
                         onChange={(e) => updateQty(i.key, Math.max(1, Number(e.target.value)))}
                         className="w-16 rounded border px-2 py-1 text-sm"
                       />
-                      <div className="ml-auto text-sm tabular-nums">€{((i.format?.price ?? i.artwork.price) * i.qty).toFixed(0)}</div>
+                      <div className="ml-auto text-sm tabular-nums">
+                        {euro((i.format?.price ?? i.artwork.price) * i.qty)}
+                      </div>
                     </div>
                   </div>
                 </li>
@@ -355,8 +351,14 @@ function CartDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
             <div className="mt-6 space-y-3 border-t pt-4">
               <div className="flex justify-between text-sm">
                 <span>Total</span>
-                <span className="tabular-nums">€{total.toFixed(0)}</span>
+                <span className="tabular-nums">{euro(total)}</span>
               </div>
+              <Link
+                href="/cart"
+                className="w-full inline-flex items-center justify-center rounded-lg border px-3 py-2 text-sm hover:bg-neutral-50"
+              >
+                Voir le panier complet
+              </Link>
               <button className="w-full rounded-lg bg-accent hover:bg-accent-dark text-ink font-medium px-3 py-2 text-sm transition">
                 Procéder au paiement
               </button>
@@ -403,30 +405,40 @@ function Footer() {
   )
 }
 
-function artistName(id: string) {
-  const a = artists.find(x => x.id === id)
-  return a ? a.name : 'Artiste'
-}
+
 
 
 export default function Site({ openCartOnLoad = false }: { openCartOnLoad?: boolean }) {
-  const [open, setOpen] = React.useState(false)
+  const { openCart } = useCart()
+  const [artistsState, setArtistsState] = React.useState<Artist[]>([])
+  const [artworksState, setArtworksState] = React.useState<Artwork[]>([])
 
-  // Quand la page se charge, si on a ?cart=1 -> on ouvre le panier
   React.useEffect(() => {
-    if (openCartOnLoad) setOpen(true)
-  }, [openCartOnLoad])
+    if (openCartOnLoad) openCart()
+  }, [openCartOnLoad, openCart])
+
+  React.useEffect(() => {
+    let active = true
+    fetch('/api/catalog')
+      .then(r => r.json())
+      .then((data) => {
+        if (!active) return
+        setArtistsState(Array.isArray(data.artists) ? data.artists : [])
+        setArtworksState(Array.isArray(data.artworks) ? data.artworks : [])
+      })
+      .catch(console.error)
+    return () => { active = false }
+  }, [])
+
+  const artistsById = React.useMemo(() => Object.fromEntries(artistsState.map(a => [a.id, a.name])), [artistsState])
 
   return (
     <div className="min-h-screen bg-white text-neutral-900 antialiased">
-      {/* plus de Header ici, il est global via layout */}
       <Hero />
-      <Artists />
-      <Gallery />
+      <Artists artists={artistsState} />
+      <Gallery artworks={artworksState} artistsById={artistsById} />
       <Footer />
-
-      {/* Drawer panier */}
-      <CartDrawer open={open} onClose={() => setOpen(false)} />
+      <CartDrawer artistsById={artistsById} />
     </div>
   )
 }

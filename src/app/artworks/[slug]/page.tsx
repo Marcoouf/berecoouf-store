@@ -1,37 +1,66 @@
-'use client'
-
-import Image from '@/components/SmartImage'
+// src/app/artworks/[slug]/page.tsx
 import Link from 'next/link'
-import { findArtworkBySlug, artists, artworksByArtist } from '@/lib/data'
-import { useState, useMemo } from 'react'
-import { useCart } from '@/components/CartContext'
+import Image from '@/components/SmartImage'
+import { notFound } from 'next/navigation'
 import Breadcrumb from '@/components/Breadcrumb'
+import { headers } from 'next/headers'
+import ArtworkPurchase from '@/components/ArtworkPurchase'
 
-type Props = { params: { slug: string } }
+// important : ne pas figer au build
+export const dynamic = 'force-dynamic' // Next 13/14
+// (équivalent possible : export const revalidate = 0)
 
-export default function ArtworkPage({ params }: Props) {
-  const artwork = findArtworkBySlug(params.slug)
+type Catalog = {
+  artists: { id: string; name: string; slug: string }[]
+  artworks: {
+    id: string
+    slug: string
+    title: string
+    image: string
+    artistId: string
+    price: number
+    description?: string
+    year?: number
+    technique?: string
+    paper?: string
+    size?: string
+    edition?: string
+    formats?: { id: string; label: string; price: number }[]
+  }[]
+}
+
+async function getCatalog(): Promise<Catalog> {
+  // Construit une URL absolue fiable (dev, prod, Vercel) pour l'appel serveur → serveur
+  const h = headers()
+  const host = h.get('x-forwarded-host') ?? h.get('host')
+  const proto = h.get('x-forwarded-proto') ?? 'http'
+  const base = (process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '')) || `${proto}://${host}`
+
+  const res = await fetch(`${base}/api/catalog`, {
+    cache: 'no-store',
+  })
+  if (!res.ok) throw new Error('catalog fetch failed')
+  return res.json()
+}
+
+export default async function Page({ params }: { params: { slug: string } }) {
+  const { slug } = params
+  const catalog = await getCatalog()
+
+  // on cherche l’œuvre côté runtime
+  const artwork = catalog.artworks.find(a => a.slug === slug)
   if (!artwork) {
-    return <div className="mx-auto max-w-3xl px-6 py-20">Œuvre introuvable.</div>
+    // si rien => 404 propre
+    notFound()
   }
 
-  const artist = artists.find(a => a.id === artwork.artistId) ?? null
-
-  const [formatId, setFormatId] = useState(artwork.formats?.[0]?.id ?? null)
-  const selected = useMemo(
-    () => artwork.formats?.find(f => f.id === formatId) ?? null,
-    [formatId, artwork.formats]
-  )
-
-  const { add } = useCart()
-
-  const related = (artist ? artworksByArtist(artist.id) : [])
-    .filter(w => w.id !== artwork.id)
+  const artist = catalog.artists.find(a => a.id === artwork.artistId) ?? null
+  const related = catalog.artworks
+    .filter(w => w.artistId === artwork.artistId && w.id !== artwork.id)
     .slice(0, 3)
 
   return (
     <div className="mx-auto max-w-6xl px-6">
-      {/* Fil d’Ariane */}
       <div className="pt-6">
         <Breadcrumb
           items={[
@@ -43,28 +72,11 @@ export default function ArtworkPage({ params }: Props) {
         />
       </div>
 
-      {/* Grille principale */}
       <div className="grid gap-8 py-10 md:grid-cols-2 md:py-16">
-        {/* Visuel — toujours entier */}
-        <div
-          className="
-            relative overflow-hidden rounded-2xl border bg-mist
-            aspect-[4/5] md:aspect-[3/4]
-            lg:aspect-auto lg:h-[72vh]
-            flex items-center justify-center
-          "
-        >
-          <Image
-            src={artwork.image}
-            alt={artwork.title}
-            fill
-            className="object-contain"
-            sizes="(min-width: 1280px) 50vw, (min-width: 768px) 50vw, 100vw"
-            priority={false}
-          />
+        <div className="relative overflow-hidden rounded-2xl border aspect-[4/5]">
+          <Image src={artwork.image} alt={artwork.title} fill className="object-contain" />
         </div>
 
-        {/* Panneau d’infos */}
         <div className="md:pl-6">
           <Link
             href={artist ? `/artists/${artist.slug}` : '#'}
@@ -75,55 +87,67 @@ export default function ArtworkPage({ params }: Props) {
 
           <h1 className="mt-2 text-3xl font-medium tracking-tight">{artwork.title}</h1>
 
-          <div className="mt-2 text-lg tabular-nums">
-            €{(selected?.price ?? artwork.price).toFixed(0)}
-          </div>
-
           {artwork.description && (
             <p className="mt-4 max-w-prose text-neutral-700">{artwork.description}</p>
           )}
 
-          {!!artwork.formats?.length && (
-            <div className="mt-6">
-              <div className="text-sm font-medium">Format</div>
-              <div className="mt-2 flex flex-wrap gap-2">
-                {artwork.formats.map(f => {
-                  const isSel = f.id === formatId
-                  return (
-                    <button
-                      key={f.id}
-                      onClick={() => setFormatId(f.id)}
-                      className={[
-                        'rounded-full px-3 py-1 text-xs border transition',
-                        isSel
-                          ? 'bg-accent text-ink border-accent'
-                          : 'bg-white text-neutral-700 border-neutral-200 hover:bg-accent-light hover:border-accent hover:text-accent',
-                      ].join(' ')}
-                    >
-                      {f.label}
-                    </button>
-                  )
-                })}
-              </div>
+          {(artwork.year || artwork.technique || artwork.paper || artwork.size || artwork.edition) && (
+            <div className="mt-6 rounded-xl border p-4">
+              <div className="text-sm font-medium mb-3">Détails d’impression</div>
+              <ul className="grid gap-2 text-sm text-neutral-700 md:grid-cols-2">
+                {artwork.year && (
+                  <li className="flex justify-between gap-3">
+                    <span className="text-neutral-500">Année</span>
+                    <span>{artwork.year}</span>
+                  </li>
+                )}
+                {artwork.technique && (
+                  <li className="flex justify-between gap-3">
+                    <span className="text-neutral-500">Technique</span>
+                    <span>{artwork.technique}</span>
+                  </li>
+                )}
+                {artwork.paper && (
+                  <li className="flex justify-between gap-3">
+                    <span className="text-neutral-500">Papier</span>
+                    <span>{artwork.paper}</span>
+                  </li>
+                )}
+                {artwork.size && (
+                  <li className="flex justify-between gap-3">
+                    <span className="text-neutral-500">Dimensions</span>
+                    <span>{artwork.size}</span>
+                  </li>
+                )}
+                {artwork.edition && (
+                  <li className="flex justify-between gap-3 md:col-span-2">
+                    <span className="text-neutral-500">Édition</span>
+                    <span>{artwork.edition}</span>
+                  </li>
+                )}
+              </ul>
             </div>
           )}
 
-          <div className="mt-6">
-            <button
-              onClick={() => add(artwork as any, selected as any)}
-              className="rounded-lg bg-accent hover:bg-accent-dark text-ink font-medium px-4 py-2 text-sm transition md:w-auto"
-            >
-              Ajouter au panier
-            </button>
-          </div>
+          <ArtworkPurchase
+            artwork={{
+              id: artwork.id,
+              title: artwork.title,
+              image: artwork.image,
+              price: artwork.price,
+              artistId: artwork.artistId,
+              formats: artwork.formats,
+            }}
+          />
 
           <div className="mt-8">
-            <Link href="/" className="text-sm hover:underline">← Retour à l’accueil</Link>
+            <Link href="/" className="text-sm hover:underline">
+              ← Retour à l’accueil
+            </Link>
           </div>
         </div>
       </div>
 
-      {/* Plus d’œuvres du même artiste */}
       {related.length > 0 && (
         <section className="border-t border-neutral-200/60 py-10 md:py-16">
           <h2 className="mb-6 text-xl font-medium tracking-tight">
@@ -133,7 +157,7 @@ export default function ArtworkPage({ params }: Props) {
             {related.map(w => (
               <div key={w.id} className="group">
                 <div className="relative overflow-hidden rounded-xl border aspect-[4/5]">
-                  <Link href={`/artworks/${w.slug}`} className="absolute inset-0">
+                  <Link href={`/artworks/${w.slug}`} className="absolute inset-0" aria-label={`Voir ${w.title}`}>
                     <Image
                       src={w.image}
                       alt={w.title}
@@ -151,7 +175,9 @@ export default function ArtworkPage({ params }: Props) {
                     </div>
                     {artist && <div className="text-xs text-neutral-500">{artist.name}</div>}
                   </div>
-                  <div className="text-sm tabular-nums">€{w.price.toFixed(0)}</div>
+                  <div className="text-sm tabular-nums">
+                    {(w.formats?.[0]?.price ?? w.price).toFixed(0)} €
+                  </div>
                 </div>
               </div>
             ))}
