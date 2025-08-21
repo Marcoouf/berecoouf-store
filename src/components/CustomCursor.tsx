@@ -12,10 +12,13 @@ export default function CustomCursor() {
     }
     window.addEventListener("mousemove", move)
 
-    // Surveille le survol d’éléments interactifs
     const handleMouseOver = (e: MouseEvent) => {
       const target = e.target as HTMLElement
-      if (target.closest("a, button, [role='button'], label, input, select, textarea, summary, [tabindex]:not([tabindex='-1'])")) {
+      if (
+        target.closest(
+          "a, button, [role='button'], label, input, select, textarea, summary, [tabindex]:not([tabindex='-1'])"
+        )
+      ) {
         setHovering(true)
       } else {
         setHovering(false)
@@ -32,10 +35,14 @@ export default function CustomCursor() {
 
   return (
     <div
-      className={`pointer-events-none fixed top-0 left-0 z-[9999] h-4 w-4 rounded-full transform -translate-x-1/2 -translate-y-1/2 transition-colors duration-200 ${
-        hovering ? "bg-blue-500" : "bg-[#a3d9ff]"
+      className={`pointer-events-none fixed top-0 left-0 z-[9999] rounded-full -translate-x-1/2 -translate-y-1/2 transition-all duration-200 ease-out backdrop-blur-sm ${
+        hovering
+          ? "bg-blue-500/80 scale-150"
+          : "bg-[#a3d9ff]/70 scale-100"
       }`}
       style={{
+        width: "16px",
+        height: "16px",
         transform: `translate(${position.x}px, ${position.y}px)`,
       }}
     />

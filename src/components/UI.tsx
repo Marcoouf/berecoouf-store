@@ -11,7 +11,7 @@ import { euro } from '@/lib/format';
 
 // === Container local (on NE l'importe PAS) ===
 function Container({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <div className={`mx-auto w-full max-w-6xl px-6 ${className}`}>{children}</div>
+  return <div className={`mx-auto w-full max-w-6xl px-4 sm:px-6 ${className}`}>{children}</div>
 }
 
 function SectionTitle({ kicker, title, right }: { kicker?: string; title: string; right?: React.ReactNode }) {
@@ -23,10 +23,10 @@ function SectionTitle({ kicker, title, right }: { kicker?: string; title: string
           <span className="font-serif text-sm tracking-wide text-accent">{kicker}</span>
         </div>
       )}
-      <div className="flex items-end justify-between gap-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h2 className="text-2xl md:text-[28px] font-medium tracking-tight">{title}</h2>
-          <div className="mt-2 h-[2px] w-12 rounded-full bg-accent" />
+          <div className="mt-2 h-[2px] w-10 sm:w-12 rounded-full bg-accent" />
         </div>
         {right}
       </div>
@@ -89,7 +89,7 @@ function Hero() {
 
   return (
     <section className="border-b border-neutral-200/60">
-      <Container className="py-16 md:py-24">
+      <Container className="py-12 md:py-24">
         <div className="grid items-end gap-10 md:grid-cols-2">
           <FadeIn>
             <div>
@@ -102,7 +102,7 @@ function Hero() {
               </p>
 
               {/* Boutons identiques (accent) */}
-              <div className="mt-8 flex gap-3">
+              <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Link
                   href="#gallery"
                   className="rounded-full bg-accent hover:bg-accent-dark text-ink font-medium px-4 py-2 text-sm shadow-sm transition"
@@ -122,7 +122,7 @@ function Hero() {
           <FadeIn delay={0.1}>
             {/* Conteneur invisible mais stable (ratio + min-height) */}
             <div
-              className="relative aspect-[4/3] min-h-[320px] md:min-h-[420px] lg:min-h-[520px] overflow-hidden flex items-center justify-center"
+              className="relative aspect-[4/3] min-h-[260px] sm:min-h-[320px] md:min-h-[420px] lg:min-h-[520px] overflow-hidden flex items-center justify-center"
               aria-busy={!ready}
             >
               {/* Image : fade-in une fois chargée */}
@@ -164,10 +164,10 @@ function Artists({ artists }: { artists: Artist[] }) {
             {artists.map(a => (
               <Link key={a.id} href={`/artists/${a.slug}`} className="group block">
                 <div className="aspect-[4/3] overflow-hidden rounded-2xl border relative transition-all duration-300 group-hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)]">
-                  <Image src={a.cover} alt={a.name} fill className="object-cover transition-transform duration-500 group-hover:scale-[1.02]" />
+                  <Image src={a.cover} alt={a.name} fill className="object-cover transition-transform duration-500 group-hover:scale-[1.02]" sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw" />
                 </div>
                 <div className="mt-3 flex items-center gap-3">
-                  <Image src={a.avatar} alt="" width={32} height={32} className="rounded-full object-cover" />
+                  <Image src={a.avatar} alt="" width={32} height={32} className="rounded-full object-cover" sizes="32px" />
                   <div>
                     <div className="text-sm font-medium group-hover:text-accent transition">{a.name}</div>
                     <div className="text-xs text-neutral-500">{a.handle}</div>
@@ -206,7 +206,7 @@ function ArtworkCard({ art, onAdd, artistsById }: { art: Artwork; onAdd: (a: Art
           alt={art.title}
           fill
           className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-          sizes="(min-width: 1024px) 30vw, (min-width: 768px) 45vw, 100vw"
+          sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw"
           priority={false}
         />
       </Link>
@@ -228,7 +228,7 @@ function ArtworkCard({ art, onAdd, artistsById }: { art: Artwork; onAdd: (a: Art
 
       {/* Formats — interactions locales */}
       {!!art.formats?.length && (
-        <div className="mt-2 min-h-[72px] grid grid-cols-[repeat(auto-fit,minmax(140px,1fr))] gap-2">
+        <div className="mt-2 min-h-[72px] grid grid-cols-2 gap-2 xs:grid-cols-[repeat(auto-fit,minmax(140px,1fr))]">
           {art.formats.map((f) => {
             const isSel = f.id === formatId
             return (
@@ -276,9 +276,9 @@ function Gallery({ artworks, artistsById }: { artworks: Artwork[]; artistsById: 
   const { add } = useCart()
   return (
     <section id="gallery" className="border-b border-neutral-200/60">
-      <Container className="py-14 md:py-20">
+      <Container className="py-10 sm:py-14 md:py-20">
         <SectionTitle kicker="catalogue" title="Galerie" />
-        <div className="grid items-stretch gap-6 sm:grid-cols-2 md:grid-cols-3">
+        <div className="grid items-stretch gap-5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
           <Stagger>
             {artworks.map(a => (
               <ArtworkCard key={a.id} art={a} onAdd={add} artistsById={artistsById} />
@@ -304,8 +304,8 @@ function CartDrawer({ artistsById }: { artistsById: Record<string, string> }) {
 
   if (!open) return null
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/20 backdrop-blur-sm">
-      <aside ref={ref} className="h-full w-full max-w-md border-l bg-white px-6 py-6">
+    <div className="fixed inset-0 z-50 flex md:justify-end bg-black/20 backdrop-blur-sm">
+      <aside ref={ref} className="h-full w-full md:max-w-md md:border-l bg-white px-4 sm:px-6 py-5">
         <div className="mb-6 flex items-center justify-between">
           <h3 className="text-lg font-medium">Panier</h3>
           <button onClick={closeCart} className="rounded-full border border-accent px-3 py-1 text-sm text-accent hover:bg-accent-light transition">
@@ -376,8 +376,8 @@ function CartDrawer({ artistsById }: { artistsById: Record<string, string> }) {
 function Footer() {
   return (
     <footer id="about" className="bg-neutral-50/60">
-      <Container className="py-10 md:py-16 text-sm text-neutral-600">
-        <div className="grid gap-8 md:grid-cols-4">
+      <Container className="py-8 sm:py-10 md:py-16 text-sm text-neutral-600">
+        <div className="grid gap-6 sm:gap-8 md:grid-cols-4">
           <div className="md:col-span-2">
             <div className="text-sm tracking-widest uppercase text-neutral-800">Point Bleu</div>
             <p className="mt-3 max-w-sm">Éditions d&apos;art et galerie en ligne. Tirages numérotés, impression fine art.</p>
@@ -433,7 +433,7 @@ export default function Site({ openCartOnLoad = false }: { openCartOnLoad?: bool
   const artistsById = React.useMemo(() => Object.fromEntries(artistsState.map(a => [a.id, a.name])), [artistsState])
 
   return (
-    <div className="min-h-screen bg-white text-neutral-900 antialiased">
+    <div className="min-h-screen bg-white text-neutral-900 antialiased pb-12 sm:pb-0">
       <Hero />
       <Artists artists={artistsState} />
       <Gallery artworks={artworksState} artistsById={artistsById} />

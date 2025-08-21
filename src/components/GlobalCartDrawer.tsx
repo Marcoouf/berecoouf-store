@@ -21,8 +21,8 @@ export default function GlobalCartDrawer() {
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/20 backdrop-blur-sm">
-      <aside id="cart-drawer" role="dialog" aria-modal="true" ref={ref} className="h-full w-full max-w-md border-l bg-white px-6 py-6">
+    <div className="fixed inset-0 z-50 flex md:justify-end bg-black/20 backdrop-blur-sm">
+      <aside id="cart-drawer" role="dialog" aria-modal="true" ref={ref} className="h-full w-full md:max-w-md md:border-l bg-white px-4 sm:px-6 py-5 flex flex-col">
         <div className="mb-6 flex items-center justify-between">
           <h3 className="text-lg font-medium">Panier</h3>
           <button
@@ -66,7 +66,7 @@ export default function GlobalCartDrawer() {
               ))}
             </ul>
 
-            <div className="mt-6 space-y-3 border-t pt-4">
+            <div className="sticky bottom-0 -mx-4 sm:-mx-6 bg-white/90 supports-[backdrop-filter]:bg-white/60 backdrop-blur border-t px-4 sm:px-6 pt-4 pb-4 space-y-3">
               <div className="flex justify-between text-sm">
                 <span>Total</span>
                 <span className="tabular-nums">{euro(total)}</span>

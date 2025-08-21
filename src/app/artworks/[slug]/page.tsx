@@ -60,7 +60,7 @@ export default async function Page({ params }: { params: { slug: string } }) {
     .slice(0, 3)
 
   return (
-    <div className="mx-auto max-w-6xl px-6">
+    <div className="mx-auto max-w-6xl px-4 sm:px-6">
       <div className="pt-6">
         <Breadcrumb
           items={[
@@ -72,9 +72,9 @@ export default async function Page({ params }: { params: { slug: string } }) {
         />
       </div>
 
-      <div className="grid gap-8 py-10 md:grid-cols-2 md:py-16">
-        <div className="relative overflow-hidden rounded-2xl border aspect-[4/5]">
-          <Image src={artwork.image} alt={artwork.title} fill className="object-contain" />
+      <div className="grid gap-6 md:gap-8 py-8 sm:py-10 md:py-16 md:grid-cols-2">
+        <div className="relative overflow-hidden rounded-2xl border aspect-[4/5] min-h-[240px] sm:min-h-[320px] bg-neutral-50">
+          <Image src={artwork.image} alt={artwork.title} fill sizes="(min-width: 1024px) 50vw, 100vw" className="object-contain" />
         </div>
 
         <div className="md:pl-6">
@@ -85,7 +85,7 @@ export default async function Page({ params }: { params: { slug: string } }) {
             {artist ? artist.name : 'Artiste'}
           </Link>
 
-          <h1 className="mt-2 text-3xl font-medium tracking-tight">{artwork.title}</h1>
+          <h1 className="mt-2 text-2xl sm:text-3xl font-medium tracking-tight">{artwork.title}</h1>
 
           {artwork.description && (
             <p className="mt-4 max-w-prose text-neutral-700">{artwork.description}</p>
@@ -94,7 +94,7 @@ export default async function Page({ params }: { params: { slug: string } }) {
           {(artwork.year || artwork.technique || artwork.paper || artwork.size || artwork.edition) && (
             <div className="mt-6 rounded-xl border p-4">
               <div className="text-sm font-medium mb-3">Détails d’impression</div>
-              <ul className="grid gap-2 text-sm text-neutral-700 md:grid-cols-2">
+              <ul className="grid gap-2 text-sm text-neutral-700 sm:grid-cols-2">
                 {artwork.year && (
                   <li className="flex justify-between gap-3">
                     <span className="text-neutral-500">Année</span>
@@ -162,6 +162,7 @@ export default async function Page({ params }: { params: { slug: string } }) {
                       src={w.image}
                       alt={w.title}
                       fill
+                      sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw"
                       className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
                     />
                   </Link>

@@ -4,9 +4,10 @@ import Link from 'next/link'
 import { motion, useScroll, useSpring, useReducedMotion } from 'framer-motion'
 import { useCart } from '@/components/CartContext'
 import { usePathname } from 'next/navigation'
+import { useState } from 'react'
 
 function Container({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <div className={`mx-auto w-full max-w-6xl px-6 ${className}`}>{children}</div>
+  return <div className={`mx-auto w-full max-w-6xl px-4 sm:px-6 ${className}`}>{children}</div>
 }
 
 export default function HeaderGlobal() {
@@ -19,6 +20,7 @@ export default function HeaderGlobal() {
 
   // Cart infos pour l'anim + compteur
   const { itemCount, lastAdded, toggleCart, open } = useCart()
+  const [menuOpen, setMenuOpen] = useState(false)
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-line/70 bg-white/70 backdrop-blur">
@@ -34,6 +36,26 @@ export default function HeaderGlobal() {
           />
           <span>Point Bleu</span>
         </Link>
+
+        {/* Burger (mobile) */}
+        <button
+          type="button"
+          className="md:hidden flex flex-col justify-center items-center gap-1 rounded-md px-2 py-1"
+          onClick={() => setMenuOpen(v => !v)}
+          aria-expanded={menuOpen}
+          aria-controls="mobile-menu"
+          aria-label={menuOpen ? 'Fermer le menu' : 'Ouvrir le menu'}
+        >
+          <span
+            className={`block h-0.5 w-6 bg-neutral-700 transition-transform duration-300 ease-in-out origin-left ${menuOpen ? 'rotate-45 translate-y-1.5' : ''}`}
+          />
+          <span
+            className={`block h-0.5 w-6 bg-neutral-700 transition-opacity duration-300 ease-in-out ${menuOpen ? 'opacity-0' : 'opacity-100'}`}
+          />
+          <span
+            className={`block h-0.5 w-6 bg-neutral-700 transition-transform duration-300 ease-in-out origin-left ${menuOpen ? '-rotate-45 -translate-y-1.5' : ''}`}
+          />
+        </button>
 
         {/* Navigation */}
         <nav className="hidden gap-6 md:flex text-sm text-neutral-700">
@@ -61,6 +83,35 @@ export default function HeaderGlobal() {
           </button>
         </motion.div>
       </Container>
+
+      {/* Mobile menu */}
+      {menuOpen && (
+        <div id="mobile-menu" className="md:hidden border-t border-line/70 bg-white">
+          <Container className="py-3 flex flex-col gap-2 text-sm text-center">
+            <Link
+              href="/artists"
+              onClick={() => setMenuOpen(false)}
+              className="py-2 hover:text-accent-700 transition-colors"
+            >
+              Artistes
+            </Link>
+            <Link
+              href="/artworks"
+              onClick={() => setMenuOpen(false)}
+              className="py-2 hover:text-accent-700 transition-colors"
+            >
+              Œuvres
+            </Link>
+            <a
+              href="/#about"
+              onClick={() => setMenuOpen(false)}
+              className="py-2 hover:text-accent-700 transition-colors"
+            >
+              À propos
+            </a>
+          </Container>
+        </div>
+      )}
 
       {/* Progress bar sous le header */}
       <div className="relative h-[3px] bg-accent/25">
