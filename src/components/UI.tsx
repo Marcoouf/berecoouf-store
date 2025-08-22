@@ -198,6 +198,7 @@ function ArtworkCard({ art, onAdd, artistsById }: { art: Artwork; onAdd: (a: Art
       {/* Visuel cliquable */}
       <Link
         href={`/artworks/${slug}`}
+        scroll
         className="relative block aspect-[4/5] overflow-hidden rounded-2xl border transition-all duration-300 group-hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] focus:outline-none focus:ring-2 focus:ring-accent-300"
         aria-label={`Voir l’œuvre ${art.title}`}
       >
@@ -216,6 +217,7 @@ function ArtworkCard({ art, onAdd, artistsById }: { art: Artwork; onAdd: (a: Art
         <div>
           <Link
             href={`/artworks/${slug}`}
+            scroll
             className="text-sm font-medium transition group-hover:text-accent-700 hover:underline underline-offset-4 focus:outline-none focus:ring-2 focus:ring-accent-300 rounded"
           >
             {art.title}

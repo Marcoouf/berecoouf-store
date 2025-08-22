@@ -136,6 +136,7 @@ export const artworks: Artwork[] = [
       { id: 'f-a1', label: 'A1 — 594×841mm', price: 310 },
     ],
     image: '/images/artworks/art8.webp',
+    mockup: '/images/artworks/mockups/art8-mockup.webp',
     description: 'Ondes calmes et palette sourde. Tirage numéroté.',
     year: 2020,
     technique: 'Sérigraphie',

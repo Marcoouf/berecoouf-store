@@ -5,6 +5,7 @@ export type Artwork = {
   slug: string
   title: string
   image: string
+  mockup?: string
   artistId: string
   price: number
   description?: string

@@ -18,6 +18,7 @@ type Catalog = {
     slug: string
     title: string
     image: string
+    mockup?: string
     artistId: string
     price: number
     description?: string
@@ -77,6 +78,9 @@ export default async function Page({ params }: { params: { slug: string } }) {
     .filter(w => w.artistId === artwork.artistId && w.id !== artwork.id)
     .slice(0, 3)
 
+  const mockupSrc = artwork.mockup ?? artwork.image
+  const originalSrc = artwork.image
+
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6">
       <div className="pt-6">
@@ -91,8 +95,25 @@ export default async function Page({ params }: { params: { slug: string } }) {
       </div>
 
       <div className="grid gap-6 md:gap-8 py-8 sm:py-10 md:py-16 md:grid-cols-2">
-        <div className="relative overflow-hidden rounded-2xl border aspect-[4/5] min-h-[240px] sm:min-h-[320px] bg-neutral-50">
-          <Image src={artwork.image} alt={artwork.title} fill sizes="(min-width: 1024px) 50vw, 100vw" className="object-contain" />
+        <div className="group relative overflow-hidden rounded-2xl border aspect-[4/5] min-h-[240px] sm:min-h-[320px] bg-neutral-50">
+          {/* Mockup visible par défaut */}
+          <Image
+            src={mockupSrc}
+            alt={`${artwork.title} — mockup`}
+            fill
+            sizes="(min-width: 1024px) 50vw, 100vw"
+            className="object-contain transition-opacity duration-500 ease-out opacity-100 group-hover:opacity-0"
+            priority
+          />
+          {/* Visuel original au survol */}
+          <Image
+            src={originalSrc}
+            alt={artwork.title}
+            fill
+            sizes="(min-width: 1024px) 50vw, 100vw"
+            className="object-contain absolute inset-0 transition-opacity duration-500 ease-out opacity-0 group-hover:opacity-100"
+            priority
+          />
         </div>
 
         <div className="md:pl-6">
@@ -175,7 +196,7 @@ export default async function Page({ params }: { params: { slug: string } }) {
             {related.map(w => (
               <div key={w.id} className="group">
                 <div className="relative overflow-hidden rounded-xl border aspect-[4/5]">
-                  <Link href={`/artworks/${w.slug}`} className="absolute inset-0" aria-label={`Voir ${w.title}`}>
+                  <Link href={`/artworks/${w.slug}`} scroll className="absolute inset-0" aria-label={`Voir ${w.title}`}>
                     <Image
                       src={w.image}
                       alt={w.title}
@@ -188,7 +209,7 @@ export default async function Page({ params }: { params: { slug: string } }) {
                 <div className="mt-3 flex items-start justify-between gap-4">
                   <div>
                     <div className="text-sm font-medium">
-                      <Link href={`/artworks/${w.slug}`} className="hover:underline">
+                      <Link href={`/artworks/${w.slug}`} scroll className="hover:underline">
                         {w.title}
                       </Link>
                     </div>
