@@ -15,6 +15,7 @@ export const dynamic = 'force-dynamic'
 // --- helpers d'env ---
 const isProd = () => process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
 const BLOB_KEY = 'data/catalog.json' // clé stable dans le bucket
+const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN
 
 // Types légers
 type Format = { id: string; label: string; price: number }
@@ -63,11 +64,10 @@ async function ensureCatalog(): Promise<Catalog> {
       throw new Error('blob_token_missing')
     }
     // Dernière version dans Blob
-    const { blobs } = await list({ prefix: BLOB_KEY })
-    const latest =
-      (blobs as any[]).toSorted?.(
-        (a, b) => (b.uploadedAt?.getTime?.() ?? 0) - (a.uploadedAt?.getTime?.() ?? 0)
-      )[0] || blobs[0]
+    const { blobs } = await list({ prefix: BLOB_KEY, token: BLOB_TOKEN })
+    const latest = [...(blobs as any[])].sort(
+      (a: any, b: any) => (b.uploadedAt?.getTime?.() ?? 0) - (a.uploadedAt?.getTime?.() ?? 0)
+    )[0]
 
     if (latest?.url) {
       const res = await fetch(latest.url, { cache: 'no-store' })
@@ -85,6 +85,7 @@ async function ensureCatalog(): Promise<Catalog> {
       access: 'public',
       contentType: 'application/json',
       addRandomSuffix: false,
+      token: BLOB_TOKEN,
     })
     return seed
   }
@@ -114,6 +115,7 @@ async function writeCatalog(data: Catalog) {
       access: 'public',
       contentType: 'application/json',
       addRandomSuffix: false,
+      token: BLOB_TOKEN,
     })
     return
   }
