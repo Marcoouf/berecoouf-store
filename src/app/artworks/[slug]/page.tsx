@@ -7,6 +7,7 @@ import ArtworkPurchase from '@/components/ArtworkPurchase'
 import { euro } from '@/lib/format'
 import { getCatalog } from '@/lib/getCatalog'
 import type { Catalog } from '@/lib/getCatalog'
+import AdaptiveFrame from '@/components/AdaptiveFrame'
 
 // important : ne pas figer au build
 export const dynamic = 'force-dynamic'
@@ -80,37 +81,27 @@ export default async function Page({ params }: { params: { slug: string } }) {
       </div>
 
       <div className="grid gap-6 md:gap-8 py-8 sm:py-10 md:py-16 md:grid-cols-2">
-        <div className="group relative overflow-hidden rounded-2xl border aspect-[4/5] min-h-[240px] sm:min-h-[320px] bg-neutral-50">
-          {artwork.mockup ? (
-            <>
-              <Image
-                src={artwork.mockup}
-                alt={`${artwork.title} — mockup de mise en situation`}
-                fill
-                sizes="(min-width: 1024px) 50vw, 100vw"
-                className="object-contain motion-safe:transition-opacity motion-safe:duration-500 md:opacity-100 md:group-hover:opacity-0"
-                priority
-              />
-              <Image
-                src={artwork.image}
-                alt={artwork.title}
-                fill
-                sizes="(min-width: 1024px) 50vw, 100vw"
-                className="object-contain absolute inset-0 motion-safe:transition-opacity motion-safe:duration-500 md:opacity-0 md:group-hover:opacity-100"
-                priority
-              />
-            </>
-          ) : (
-            <Image
-              src={artwork.image}
-              alt={artwork.title}
-              fill
-              sizes="(min-width: 1024px) 50vw, 100vw"
-              className="object-contain"
-              priority
-            />
-          )}
-        </div>
+<div className="group rounded-2xl border bg-neutral-50">
+  {/* mockup au-dessus, original dessous, avec fondu au hover sur desktop */}
+  <div className="relative">
+    <AdaptiveFrame
+      src={mockupSrc}
+      alt={`${artwork.title} — mockup de mise en situation`}
+      fallbackRatio={4/5}
+      className="rounded-2xl"
+      sizes="(min-width:1024px) 50vw, 100vw"
+      priority
+    />
+    <AdaptiveFrame
+      src={originalSrc}
+      alt={artwork.title}
+      fallbackRatio={4/5}
+      className="rounded-2xl absolute inset-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
+      sizes="(min-width:1024px) 50vw, 100vw"
+      priority
+    />
+  </div>
+</div>
 
         <div className="md:pl-6">
           <Link
