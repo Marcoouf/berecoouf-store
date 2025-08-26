@@ -1,3 +1,5 @@
+import { rateLimit } from "@/lib/rateLimit"
+import { assertAdmin, assertMethod } from "@/lib/adminAuth"
 // src/app/api/admin/save-artwork/route.ts
 import { NextResponse } from 'next/server'
 import { promises as fs } from 'node:fs'
@@ -15,6 +17,7 @@ type Artwork = {
   title: string
   artistId: string
   image: string
+  mockup?: string
   price: number
   description?: string
   year?: number
@@ -69,14 +72,16 @@ async function writeCatalog(data: Catalog) {
 }
 
 export async function POST(req: Request) {
-  try {
-    // Auth optionnelle via ?adminkey=... et process.env.ADMIN_KEY
-    const url = new URL(req.url)
-    const key = url.searchParams.get('adminkey')
-    if (process.env.ADMIN_KEY && key !== process.env.ADMIN_KEY) {
-      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-    }
+  const badMethod = assertMethod(req, ['POST'])
+  if (badMethod) return badMethod
 
+  const notAdmin = assertAdmin(req)
+  if (notAdmin) return notAdmin
+
+  if (!rateLimit(req, 10, 60_000)) {
+    return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
+  }
+  try {
     const body = (await req.json()) as Partial<Artwork>
 
     // Validation minimale
@@ -119,6 +124,7 @@ export async function POST(req: Request) {
       title: String(body.title),
       artistId: String(body.artistId),
       image: String(body.image),
+      mockup: body.mockup ? String((body as any).mockup) : undefined,
       price,
       description: body.description ? String(body.description) : undefined,
       year: body.year != null ? toNumber(body.year) : undefined,
@@ -152,34 +158,45 @@ export async function GET() {
   return NextResponse.json(catalog, { status: 200 })
 }
 export async function DELETE(req: Request) {
+  const badMethod = assertMethod(req, ['DELETE'])
+  if (badMethod) return badMethod
+
+  const notAdmin = assertAdmin(req)
+  if (notAdmin) return notAdmin
+
+  if (!rateLimit(req, 10, 60_000)) {
+    return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
+  }
   try {
     const url = new URL(req.url)
-    const key = url.searchParams.get('adminkey')
-    if (process.env.ADMIN_KEY && key !== process.env.ADMIN_KEY) {
-      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-    }
 
     const id = url.searchParams.get('id')
-    if (!id) {
-      return NextResponse.json({ ok: false, error: 'id manquant' }, { status: 400 })
+    const slug = url.searchParams.get('slug')
+    if (!id && !slug) {
+      return NextResponse.json({ ok: false, error: 'id ou slug manquant' }, { status: 400 })
     }
 
-    // lire le catalog
     const raw = await fs.readFile(CATALOG_PATH, 'utf8').catch(() => '{}')
     const json = JSON.parse(raw || '{}')
     const artworks: any[] = Array.isArray(json.artworks) ? json.artworks : []
 
-    const next = artworks.filter(a => a.id !== id)
-    if (next.length === artworks.length) {
+    const before = artworks.length
+    const next = artworks.filter(a => (id ? a.id !== id : true) && (slug ? a.slug !== slug : true))
+
+    if (next.length === before) {
       return NextResponse.json({ ok: false, error: 'Œuvre introuvable' }, { status: 404 })
     }
 
     json.artworks = next
     await fs.writeFile(CATALOG_PATH, JSON.stringify(json, null, 2), 'utf8')
 
-    return NextResponse.json({ ok: true, deleted: id })
+    return NextResponse.json({ ok: true, deleted: id || slug })
   } catch (e) {
     console.error('DELETE SAVE-ARTWORK ERROR', e)
     return NextResponse.json({ ok: false, error: 'Erreur serveur' }, { status: 500 })
   }
+}
+
+export function OPTIONS() {
+  return NextResponse.json({ ok: true })
 }

@@ -9,13 +9,14 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@vercel/blob": "^1.1.1",
     "framer-motion": "^12.23.12",
     "next": "^14.2.32",
     "react": "18.2.0",
     "react-dom": "18.2.0"
   },
   "devDependencies": {
-    "@types/node": "20.12.12",
+    "@types/node": "^20.12.12",
     "@types/react": "18.2.66",
     "autoprefixer": "10.4.19",
     "eslint": "8.57.0",

@@ -35,18 +35,30 @@ export async function getCatalog(): Promise<Catalog> {
   const base = getBaseUrl()
   const url = `${base}/api/catalog`
 
-  const res = await fetch(url, {
-    // On ne met pas en cache: la page d’accueil lit des données qui peuvent changer
-    cache: 'no-store',
-    // Recommandé également par Next pour désactiver la revalidation ISR côté serveur
-    next: { revalidate: 0 },
-    // Si Vercel Protection est active, on envoie le header
-    headers: getBypassHeaders(),
-  })
+  try {
+    const res = await fetch(url, {
+      // On ne met pas en cache: la page d’accueil lit des données qui peuvent changer
+      cache: 'no-store',
+      // Recommandé également par Next pour désactiver la revalidation ISR côté serveur
+      next: { revalidate: 0 },
+      // Si Vercel Protection est active, on envoie le header
+      headers: getBypassHeaders(),
+    })
 
-  if (!res.ok) {
-    throw new Error(`Échec du chargement du catalogue: ${res.status} ${res.statusText}`)
+    if (!res.ok) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn(`Échec du chargement du catalogue (${res.status} ${res.statusText}), utilisation du fallback local.`)
+        return { artists: [], artworks: [] }
+      }
+      throw new Error(`Échec du chargement du catalogue: ${res.status} ${res.statusText}`)
+    }
+
+    return (await res.json()) as Catalog
+  } catch (error) {
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn(`Erreur lors du fetch du catalogue, utilisation du fallback local.`, error)
+      return { artists: [], artworks: [] }
+    }
+    throw error
   }
-
-  return (await res.json()) as Catalog
 }

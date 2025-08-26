@@ -10,7 +10,9 @@ function base() {
 export default function robots() {
   const b = base()
   return {
-    rules: { userAgent: '*', allow: '/' },
+    rules: [
+      { userAgent: '*', disallow: ['/admin', '/api/admin'] },
+    ],
     sitemap: `${b}/sitemap.xml`,
   }
 }
