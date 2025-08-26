@@ -10,10 +10,11 @@ import type { Catalog } from '@/lib/getCatalog'
 
 // important : ne pas figer au build
 export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 function displayPriceFor(w: Catalog['artworks'][number]) {
   const formats = Array.isArray(w.formats) ? w.formats : []
-  const formatPrices = formats.map(f => Number(f.price)).filter(n => Number.isFinite(n))
+  const formatPrices = formats.map((f: { price: any }) => Number(f.price)).filter((n: unknown) => Number.isFinite(n))
   const base = formatPrices.length > 0
     ? Math.min(...formatPrices)
     : (Number.isFinite(Number(w.price)) ? Number(w.price) : 0)
@@ -21,14 +22,16 @@ function displayPriceFor(w: Catalog['artworks'][number]) {
 }
 
 export async function generateMetadata({ params }: { params: { slug: string } }) {
-  // SEO automatique basé sur l'œuvre
   const catalog = await getCatalog()
   const artwork = catalog.artworks.find(a => a.slug === params.slug)
   if (!artwork) return {}
   const artist = catalog.artists.find(a => a.id === artwork.artistId) || null
+
   const title = `${artwork.title}${artist ? ` — ${artist.name}` : ''}`
   const description = artwork.description || 'Œuvre disponible en édition limitée.'
-  const ogImage = artwork.mockup || artwork.image
+  const site = (process.env.NEXT_PUBLIC_SITE_URL || '').replace(/\/$/, '')
+  const imgPath = artwork.mockup || artwork.image
+  const ogImage = /^https?:\/\//i.test(imgPath) ? imgPath : (site ? `${site}${imgPath}` : imgPath)
 
   return {
     title,
@@ -78,24 +81,35 @@ export default async function Page({ params }: { params: { slug: string } }) {
 
       <div className="grid gap-6 md:gap-8 py-8 sm:py-10 md:py-16 md:grid-cols-2">
         <div className="group relative overflow-hidden rounded-2xl border aspect-[4/5] min-h-[240px] sm:min-h-[320px] bg-neutral-50">
-          {/* Mockup visible par défaut, swap uniquement si le support gère le hover */}
-          <Image
-            src={mockupSrc}
-            alt={`${artwork.title} — mockup de mise en situation`}
-            fill
-            sizes="(min-width: 1024px) 50vw, 100vw"
-            className="object-contain motion-safe:transition-opacity motion-safe:duration-500 supports-[hover:hover]:opacity-100 supports-[hover:hover]:group-hover:opacity-0"
-            priority
-          />
-          {/* Visuel original affiché au survol (sur desktop) */}
-          <Image
-            src={originalSrc}
-            alt={artwork.title}
-            fill
-            sizes="(min-width: 1024px) 50vw, 100vw"
-            className="object-contain absolute inset-0 supports-[hover:hover]:opacity-0 motion-safe:transition-opacity motion-safe:duration-500 supports-[hover:hover]:group-hover:opacity-100"
-            priority
-          />
+          {artwork.mockup ? (
+            <>
+              <Image
+                src={artwork.mockup}
+                alt={`${artwork.title} — mockup de mise en situation`}
+                fill
+                sizes="(min-width: 1024px) 50vw, 100vw"
+                className="object-contain motion-safe:transition-opacity motion-safe:duration-500 md:opacity-100 md:group-hover:opacity-0"
+                priority
+              />
+              <Image
+                src={artwork.image}
+                alt={artwork.title}
+                fill
+                sizes="(min-width: 1024px) 50vw, 100vw"
+                className="object-contain absolute inset-0 motion-safe:transition-opacity motion-safe:duration-500 md:opacity-0 md:group-hover:opacity-100"
+                priority
+              />
+            </>
+          ) : (
+            <Image
+              src={artwork.image}
+              alt={artwork.title}
+              fill
+              sizes="(min-width: 1024px) 50vw, 100vw"
+              className="object-contain"
+              priority
+            />
+          )}
         </div>
 
         <div className="md:pl-6">
@@ -205,23 +219,28 @@ export default async function Page({ params }: { params: { slug: string } }) {
         </section>
       )}
 
-      {/* JSON-LD minimal pour SEO */}
-      <script
-        type="application/ld+json"
-        // eslint-disable-next-line react/no-danger
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify({
-            '@context': 'https://schema.org',
-            '@type': 'VisualArtwork',
-            name: artwork.title,
-            image: artwork.mockup || artwork.image,
-            creator: artist ? { '@type': 'Person', name: artist.name } : undefined,
-            url: `/artworks/${artwork.slug}`,
-            artform: artwork.technique || undefined,
-            material: artwork.paper || undefined,
-          }),
-        }}
-      />
+      {(() => {
+        const site = (process.env.NEXT_PUBLIC_SITE_URL || '').replace(/\/$/, '')
+        const img = artwork.mockup || artwork.image
+        const imageAbs = /^https?:\/\//i.test(img) ? img : (site ? `${site}${img}` : img)
+        const urlAbs = site ? `${site}/artworks/${artwork.slug}` : `/artworks/${artwork.slug}`
+        const jsonLd = {
+          '@context': 'https://schema.org',
+          '@type': 'VisualArtwork',
+          name: artwork.title,
+          image: imageAbs,
+          creator: artist ? { '@type': 'Person', name: artist.name } : undefined,
+          url: urlAbs,
+          artform: artwork.technique || undefined,
+          material: artwork.paper || undefined,
+        }
+        return (
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          />
+        )
+      })()}
     </div>
   )
 }

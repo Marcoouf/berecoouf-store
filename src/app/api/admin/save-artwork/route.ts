@@ -1,302 +1,134 @@
-import { rateLimit } from "@/lib/rateLimit"
-// ⬇️ on n'utilise plus la version header; on passe par le cookie guard
-import { assertAdmin as assertAdminCookie } from "@/lib/adminGuard"
-import { assertMethod } from "@/lib/adminAuth" // on garde pour le 405
 import { NextResponse } from 'next/server'
-import { promises as fs } from 'node:fs'
-import path from 'node:path'
-import { put, list } from '@vercel/blob'
-
-const NO_STORE = { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' }
+import { list, put } from '@vercel/blob'
+import { assertAdmin, assertMethod } from '@/lib/adminAuth'
+import { rateLimit } from '@/lib/rateLimit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-// --- helpers d'env ---
-const isProd = () => process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
-const BLOB_KEY = process.env.CATALOG_BLOB_KEY?.trim() || 'data/catalog.json' // clé stable dans le bucket (même que getCatalog)
-const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN
-
-// Types légers
 type Format = { id: string; label: string; price: number }
 type Artwork = {
-  id: string
-  slug: string
-  title: string
-  artistId: string
-  image: string
-  mockup?: string
-  price: number
-  description?: string
-  year?: number
-  technique?: string
-  paper?: string
-  size?: string
-  edition?: string
-  formats?: Format[]
+  id: string; slug: string; title: string; artistId: string; image: string
+  mockup?: string; price: number; description?: string; year?: number
+  technique?: string; paper?: string; size?: string; edition?: string; formats?: Format[]
 }
 type Catalog = { artists: any[]; artworks: Artwork[] }
 
-const CATALOG_PATH = path.join(process.cwd(), 'data', 'catalog.json')
-
-// Utils
-function toNumber(n: any, fallback = 0) {
-  const v = Number(n)
-  return Number.isFinite(v) ? v : fallback
-}
-function slugify(input: string) {
-  return input
+function toNum(n: any, f = 0) { const v = Number(n); return Number.isFinite(v) ? v : f }
+function safeSlug(s: string) {
+  return (s || '')
     .normalize('NFKD')
-    .replace(/[^\w\s-]/g, '')
     .replace(/[\u0300-\u036f]/g, '')
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/(^-|-$)/g, '')
+    .replace(/[^\w\s-]/g, '')
+    .trim().toLowerCase().replace(/\s+/g, '-').replace(/-+/g, '-').replace(/(^-|-$)/g, '')
 }
 
-// ---------- lecture/écriture du catalogue ----------
-async function ensureCatalog(): Promise<Catalog> {
-  if (isProd()) {
-    // Vérif token blob
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
-      throw new Error('blob_token_missing')
-    }
-    // Dernière version dans Blob
-    const { blobs } = await list({ prefix: BLOB_KEY, mode: 'expanded', token: BLOB_TOKEN })
-    // Cherche d'abord l'entrée EXACTE (pathname === BLOB_KEY)
-    let item = (blobs as any[]).find((b: any) => b?.pathname === BLOB_KEY)
-    // Sinon, prend le plus récent parmi ceux qui matchent le prefix
-    if (!item) {
-      item = [...(blobs as any[])].sort((a: any, b: any) => {
-        const ta = a?.uploadedAt ? new Date(a.uploadedAt).getTime() : 0
-        const tb = b?.uploadedAt ? new Date(b.uploadedAt).getTime() : 0
-        return tb - ta
-      })[0]
-    }
-
-    if (item?.url) {
-      const res = await fetch(item.url, { cache: 'no-store' })
-      if (res.ok) {
-        const json = await res.json()
-        return {
-          artists: Array.isArray(json?.artists) ? json.artists : [],
-          artworks: Array.isArray(json?.artworks) ? json.artworks : [],
-        }
-      }
-    }
-    // Seed
-    const seed: Catalog = { artists: [], artworks: [] }
-    await put(BLOB_KEY, JSON.stringify(seed, null, 2), {
-      access: 'public',
-      contentType: 'application/json',
-      addRandomSuffix: false,
-      allowOverwrite: true,
-      token: BLOB_TOKEN,
-    })
-    return seed
-  }
-
-  // DEV: fichier local
-  try {
-    const raw = await fs.readFile(CATALOG_PATH, 'utf8')
-    const json = JSON.parse(raw)
-    return {
-      artists: Array.isArray(json?.artists) ? json.artists : [],
-      artworks: Array.isArray(json?.artworks) ? json.artworks : [],
-    }
-  } catch {
-    const seed: Catalog = { artists: [], artworks: [] }
-    await fs.mkdir(path.dirname(CATALOG_PATH), { recursive: true })
-    await fs.writeFile(CATALOG_PATH, JSON.stringify(seed, null, 2), 'utf8')
-    return seed
-  }
+async function readBlobJSON<T = any>(key: string): Promise<T | null> {
+  const prefix = key.includes('/') ? key.split('/')[0] + '/' : key
+  const it: any = await list({ prefix })
+  const hit = it.blobs?.find((b: any) => b.pathname === key) || it.items?.find((b: any) => b.pathname === key)
+  if (!hit?.url) return null
+  const res = await fetch(hit.url, { cache: 'no-store' })
+  if (!res.ok) return null
+  return (await res.json()) as T
 }
 
-async function writeCatalog(data: Catalog) {
-  if (isProd()) {
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
-      throw new Error('blob_token_missing')
-    }
-    await put(BLOB_KEY, JSON.stringify(data, null, 2), {
-      access: 'public',
-      contentType: 'application/json',
-      addRandomSuffix: false,
-      allowOverwrite: true,
-      token: BLOB_TOKEN,
-    })
-    return
-  }
-  await fs.mkdir(path.dirname(CATALOG_PATH), { recursive: true })
-  await fs.writeFile(CATALOG_PATH, JSON.stringify(data, null, 2), 'utf8')
+async function writeBlobJSON(key: string, json: any) {
+  const body = JSON.stringify(json, null, 2)
+  await put(key, new Blob([body], { type: 'application/json' }), {
+    access: 'public',
+    contentType: 'application/json',
+    cacheControlMaxAge: 0,
+    addRandomSuffix: false,
+    allowOverwrite: true,
+  })
 }
-// ----------------------------------------------------
 
 export async function POST(req: Request) {
-  const badMethod = assertMethod(req, ['POST'])
-  if (badMethod) return badMethod
-
-  // ⬇️ Auth via cookie (adminGuard) — jette si pas connecté
-  try {
-    assertAdminCookie()
-  } catch {
-    return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401, headers: NO_STORE })
-  }
-
-  if (!rateLimit(req, 10, 60_000)) {
-    return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429, headers: NO_STORE })
-  }
+  // sécurité de base
+  const m = assertMethod(req, ['POST']); if (m) return m
+  if (!rateLimit(req, 20, 60_000)) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
+  const a = assertAdmin(req); if (a) return a
 
   try {
-    const raw = await req.json()
-    const body = (typeof raw === 'object' && raw) ? (raw as Partial<Artwork>) : {}
-
-    const catalog = await ensureCatalog()
-
-    const idFromBody = String(body.id ?? '').trim()
-    const id = idFromBody || `w-${Date.now()}`
-    const existingIdx = catalog.artworks.findIndex(a => a.id === id)
-    const existing = existingIdx >= 0 ? catalog.artworks[existingIdx] : null
-
-    const title = String(body?.title ?? '').trim() || existing?.title || ''
-    const artistId = String(body?.artistId ?? '').trim() || existing?.artistId || ''
-
-    const imageFromBody = String(body?.image ?? '').trim()
-    const image = imageFromBody || existing?.image || ''
-
-    const mockup = (body.mockup !== undefined
-      ? (String(body.mockup).trim() || undefined)
-      : existing?.mockup)
-
-    if (!title || !artistId || !image) {
-      return NextResponse.json(
-        { ok: false, error: 'Champs requis manquants (title, image, artistId)' },
-        { status: 400, headers: NO_STORE }
-      )
+    const BODY = await req.json() as Partial<Artwork>
+    if (!BODY?.title || !BODY?.artistId) {
+      return NextResponse.json({ ok: false, error: 'missing_fields' }, { status: 400 })
     }
 
-    const baseProvided = String(body.slug ?? '').trim()
-    const base = slugify(baseProvided || title) || id || `art-${Date.now()}`
-    const taken = new Set(catalog.artworks.map(a => a.slug))
+    const key = (process.env.CATALOG_BLOB_KEY || '').replace(/^\/+/, '')
+    if (!key) return NextResponse.json({ ok: false, error: 'blob_key_missing' }, { status: 500 })
 
-    let slug = base
-    if (existingIdx < 0) {
-      let i = 2
-      while (taken.has(slug)) slug = `${base}-${i++}`
-    } else {
-      if (baseProvided) {
-        let next = slug
-        let i = 2
-        while (catalog.artworks.some(a => a.slug === next && a.id !== id)) next = `${base}-${i++}`
-        slug = next
-      } else {
-        slug = catalog.artworks[existingIdx].slug
-      }
+    // 1) lire catalogue courant (sinon seed)
+    let current = await readBlobJSON<Catalog>(key)
+    if (!current) current = { artists: [], artworks: [] }
+    current.artworks = Array.isArray(current.artworks) ? current.artworks : []
+
+    // --- identify previous item if any (prefer id, then slug) ---
+    const byId = BODY.id ? current.artworks.find(a => a.id === BODY.id) : undefined
+    const bySlug = BODY.slug ? current.artworks.find(a => a.slug === safeSlug(BODY.slug!)) : undefined
+    const prev = byId || bySlug
+
+    // --- compute id ---
+    const id = prev?.id || String(BODY.id || `w-${Date.now()}`)
+
+    // --- compute slug ---
+    const requestedSlug = safeSlug(BODY.slug || '')
+    const baseSlug = requestedSlug || safeSlug(prev?.slug || BODY.title || BODY.id || '')
+
+    // When editing, keep previous slug if not explicitly changed
+    let slug = prev ? (requestedSlug && requestedSlug !== prev.slug ? requestedSlug : prev.slug || baseSlug) : (baseSlug || `art-${Date.now()}`)
+
+    // ensure uniqueness (exclude previous slug if editing)
+    const taken = new Set(current.artworks.filter(a => !prev || a.slug !== prev.slug).map(a => a.slug))
+    if (taken.has(slug)) {
+      const root = slug
+      let n = 2
+      while (taken.has(`${root}-${n}`)) n++
+      slug = `${root}-${n}`
     }
 
-    // Formats (préserve l’existant si non fourni)
-    const incomingFormats: Format[] | undefined = Array.isArray(body.formats)
-      ? body.formats
-          .filter(f => !!f && typeof f === 'object' && String((f as any).label || '').trim())
-          .map((f, idx) => ({
-            id: String((f as any).id || `f-${idx + 1}`).trim(),
-            label: String((f as any).label).trim(),
-            price: toNumber((f as any).price, 0),
-          }))
-      : undefined
+    const price = toNum(BODY.price, Array.isArray(BODY.formats) && BODY.formats[0] ? toNum((BODY.formats as any)[0]?.price, 0) : 0)
 
-    const formats: Format[] = incomingFormats ?? (existing?.formats ?? [])
+    // normalize formats
+    const formats: Format[] = Array.isArray(BODY.formats)
+      ? BODY.formats
+          .filter(f => f && typeof f === 'object' && String(f.label || '').trim())
+          .map((f, i) => ({ id: String((f as any).id || `f-${i + 1}`), label: String((f as any).label), price: toNum((f as any).price) }))
+      : (prev?.formats || [])
 
-    const price = (body.price != null)
-      ? toNumber(body.price)
-      : (existing?.price ?? toNumber(formats[0]?.price, 0))
-
+    // build final artwork, preserving previous fields when not provided
     const artwork: Artwork = {
       id,
       slug,
-      title,
-      artistId,
-      image,
-      mockup,
+      title: String(BODY.title ?? prev?.title ?? ''),
+      artistId: String(BODY.artistId ?? prev?.artistId ?? ''),
+      image: BODY.image !== undefined ? String(BODY.image) : (prev?.image || ''),
+      mockup: BODY.mockup !== undefined ? (BODY.mockup ? String(BODY.mockup) : undefined) : prev?.mockup,
       price,
-      description: body.description != null ? (String(body.description).trim() || undefined) : (existing?.description),
-      year: body.year != null ? toNumber(body.year) : existing?.year,
-      technique: body.technique != null ? (String(body.technique).trim() || undefined) : existing?.technique,
-      paper: body.paper != null ? (String(body.paper).trim() || undefined) : existing?.paper,
-      size: body.size != null ? (String(body.size).trim() || undefined) : existing?.size,
-      edition: body.edition != null ? (String(body.edition).trim() || undefined) : existing?.edition,
+      description: BODY.description !== undefined ? (BODY.description as any as string) : prev?.description,
+      year: BODY.year !== undefined ? toNum(BODY.year) : prev?.year,
+      technique: BODY.technique !== undefined ? (BODY.technique as any as string) : prev?.technique,
+      paper: BODY.paper !== undefined ? (BODY.paper as any as string) : prev?.paper,
+      size: BODY.size !== undefined ? (BODY.size as any as string) : prev?.size,
+      edition: BODY.edition !== undefined ? (BODY.edition as any as string) : prev?.edition,
       formats,
     }
 
-    if (existingIdx >= 0) catalog.artworks[existingIdx] = artwork
-    else catalog.artworks.push(artwork)
+    // 3) upsert
+    const idx = current.artworks.findIndex(a => a.id === id || a.slug === slug)
+    if (idx >= 0) current.artworks[idx] = artwork
+    else current.artworks.push(artwork)
 
-    await writeCatalog(catalog)
+    // 4) backup horodaté puis écriture atomique
+    const ts = new Date().toISOString().replace(/[:.]/g, '-')
+    const backupKey = `catalog-backups/catalog-${ts}.json`
+    await writeBlobJSON(backupKey, current)
+    await writeBlobJSON(key, current)
 
-    return NextResponse.json(
-      { ok: true, message: existingIdx >= 0 ? 'Updated' : 'Created', artwork, counts: { artworks: catalog.artworks.length } },
-      { status: 200, headers: NO_STORE }
-    )
-  } catch (e: any) {
-    // erreurs parlantes
-    const msg = e?.message === 'blob_token_missing'
-      ? 'Blob token manquant (BLOB_READ_WRITE_TOKEN)'
-      : 'Erreur serveur'
-    console.error('SAVE_ARTWORK POST ERROR', e)
-    return NextResponse.json({ ok: false, error: msg }, { status: 500, headers: NO_STORE })
-  }
-}
-
-export async function PUT(req: Request) {
-  return POST(new Request(req.url, { method: 'POST', headers: req.headers, body: await req.text() }))
-}
-
-export async function GET() {
-  const catalog = await ensureCatalog()
-  return NextResponse.json(catalog, { status: 200, headers: NO_STORE })
-}
-
-export async function DELETE(req: Request) {
-  const badMethod = assertMethod(req, ['DELETE'])
-  if (badMethod) return badMethod
-
-  try {
-    assertAdminCookie()
-  } catch {
-    return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401, headers: NO_STORE })
-  }
-
-  if (!rateLimit(req, 10, 60_000)) {
-    return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429, headers: NO_STORE })
-  }
-
-  try {
-    const url = new URL(req.url)
-    const id = url.searchParams.get('id')
-    const slug = url.searchParams.get('slug')
-    if (!id && !slug) {
-      return NextResponse.json({ ok: false, error: 'id ou slug manquant' }, { status: 400, headers: NO_STORE })
-    }
-
-    const catalog = await ensureCatalog()
-    const before = catalog.artworks.length
-    catalog.artworks = catalog.artworks.filter(a =>
-      (id ? a.id !== id : true) && (slug ? a.slug !== slug : true)
-    )
-
-    if (catalog.artworks.length === before) {
-      return NextResponse.json({ ok: false, error: 'Œuvre introuvable' }, { status: 404, headers: NO_STORE })
-    }
-
-    await writeCatalog(catalog)
-    return NextResponse.json({ ok: true, deleted: id || slug }, { headers: NO_STORE })
+    return NextResponse.json({ ok: true, artwork, counts: { artworks: current.artworks.length } })
   } catch (e) {
-    console.error('DELETE SAVE-ARTWORK ERROR', e)
-    return NextResponse.json({ ok: false, error: 'Erreur serveur' }, { status: 500, headers: NO_STORE })
+    console.error('SAVE_ARTWORK POST ERROR', e)
+    return NextResponse.json({ ok: false, error: 'server_error' }, { status: 500 })
   }
-}
-
-export function OPTIONS() {
-  return NextResponse.json({ ok: true })
 }
