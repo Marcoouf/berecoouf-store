@@ -1,14 +1,18 @@
 import { rateLimit } from "@/lib/rateLimit"
 import { assertAdmin, assertMethod } from "@/lib/adminAuth"
-// src/app/api/admin/save-artwork/route.ts
 import { NextResponse } from 'next/server'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
+import { put, list } from '@vercel/blob'   // ⬅️ ajout
 
 const NO_STORE = { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' }
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+
+// --- helpers d'env ---
+const isProd = () => process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
+const BLOB_KEY = 'data/catalog.json' // clé stable dans le bucket
 
 // Types légers
 type Format = { id: string; label: string; price: number }
@@ -33,7 +37,7 @@ type Catalog = { artists: any[]; artworks: Artwork[] }
 
 const CATALOG_PATH = path.join(process.cwd(), 'data', 'catalog.json')
 
-// Helpers
+// Fallback num
 function toNumber(n: any, fallback = 0) {
   const v = Number(n)
   return Number.isFinite(v) ? v : fallback
@@ -51,7 +55,35 @@ function slugify(input: string) {
     .replace(/(^-|-$)/g, '')
 }
 
+// ---------- lecture/écriture du catalogue ----------
 async function ensureCatalog(): Promise<Catalog> {
+  if (isProd()) {
+    // 1) on cherche la dernière version dans Blob
+    const { blobs } = await list({ prefix: BLOB_KEY })
+    const latest = blobs.toSorted?.((a, b) => (b.uploadedAt?.getTime() ?? 0) - (a.uploadedAt?.getTime() ?? 0))[0] || blobs[0]
+    if (latest?.url) {
+      try {
+        const res = await fetch(latest.url, { cache: 'no-store' })
+        if (res.ok) {
+          const json = await res.json()
+          return {
+            artists: Array.isArray(json?.artists) ? json.artists : [],
+            artworks: Array.isArray(json?.artworks) ? json.artworks : [],
+          }
+        }
+      } catch { /* ignore, on seed si besoin */ }
+    }
+    // 2) seed vide si rien trouvé
+    const seed: Catalog = { artists: [], artworks: [] }
+    await put(BLOB_KEY, JSON.stringify(seed, null, 2), {
+      access: 'public',
+      contentType: 'application/json',
+      addRandomSuffix: false, // garder l'URL stable
+    })
+    return seed
+  }
+
+  // --- DEV : fichier local ---
   try {
     const raw = await fs.readFile(CATALOG_PATH, 'utf8')
     const json = JSON.parse(raw)
@@ -68,9 +100,18 @@ async function ensureCatalog(): Promise<Catalog> {
 }
 
 async function writeCatalog(data: Catalog) {
+  if (isProd()) {
+    await put(BLOB_KEY, JSON.stringify(data, null, 2), {
+      access: 'public',
+      contentType: 'application/json',
+      addRandomSuffix: false,
+    })
+    return
+  }
   await fs.mkdir(path.dirname(CATALOG_PATH), { recursive: true })
   await fs.writeFile(CATALOG_PATH, JSON.stringify(data, null, 2), 'utf8')
 }
+// ----------------------------------------------------
 
 export async function POST(req: Request) {
   const badMethod = assertMethod(req, ['POST'])
@@ -100,24 +141,18 @@ export async function POST(req: Request) {
 
     const catalog = await ensureCatalog()
 
-    // Slug: si fourni on le normalise, sinon on dérive du titre. On ne force la déduplication que si on crée.
+    // Slug
     const baseProvided = String(body.slug ?? '').trim()
     const base = slugify(baseProvided || title) || String(body.id || '') || `art-${Date.now()}`
-
-    // ID: conserve si fourni sinon nouveau
     const id = String(body.id ?? '').trim() || `w-${Date.now()}`
-
-    // Cherche si l’œuvre existe (update)
     const existingIdx = catalog.artworks.findIndex(a => a.id === id)
     const taken = new Set(catalog.artworks.map(a => a.slug))
 
     let slug = base
     if (existingIdx < 0) {
-      // création → on garantit l’unicité
       let i = 2
       while (taken.has(slug)) slug = `${base}-${i++}`
     } else {
-      // update → si slug spécifique fourni on le normalise et on évite les collisions avec d’autres ids
       if (baseProvided) {
         let next = slug
         let i = 2
@@ -128,10 +163,10 @@ export async function POST(req: Request) {
       }
     }
 
-    // Formats nettoyés
+    // Formats
     const formats: Format[] = Array.isArray(body.formats)
       ? body.formats
-          .filter(f => !!f && typeof f === 'object' && String(f.label || '').trim())
+          .filter(f => !!f && typeof f === 'object' && String((f as any).label || '').trim())
           .map((f, idx) => ({
             id: String((f as any).id || `f-${idx + 1}`).trim(),
             label: String((f as any).label).trim(),
@@ -174,15 +209,14 @@ export async function POST(req: Request) {
 }
 
 export async function PUT(req: Request) {
-  // même logique que POST (upsert), simplement autre verbe pour clarté REST
   return POST(new Request(req.url, { method: 'POST', headers: req.headers, body: await req.text() }))
 }
 
 export async function GET() {
-  // Optionnel: permet de vérifier rapidement le contenu depuis le navigateur
   const catalog = await ensureCatalog()
   return NextResponse.json(catalog, { status: 200, headers: NO_STORE })
 }
+
 export async function DELETE(req: Request) {
   const badMethod = assertMethod(req, ['DELETE'])
   if (badMethod) return badMethod
@@ -193,29 +227,24 @@ export async function DELETE(req: Request) {
   if (!rateLimit(req, 10, 60_000)) {
     return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429, headers: NO_STORE })
   }
+
   try {
     const url = new URL(req.url)
-
     const id = url.searchParams.get('id')
     const slug = url.searchParams.get('slug')
     if (!id && !slug) {
       return NextResponse.json({ ok: false, error: 'id ou slug manquant' }, { status: 400, headers: NO_STORE })
     }
 
-    const raw = await fs.readFile(CATALOG_PATH, 'utf8').catch(() => '{}')
-    const json = JSON.parse(raw || '{}')
-    const artworks: any[] = Array.isArray(json.artworks) ? json.artworks : []
+    const catalog = await ensureCatalog()
+    const before = catalog.artworks.length
+    catalog.artworks = catalog.artworks.filter(a => (id ? a.id !== id : true) && (slug ? a.slug !== slug : true))
 
-    const before = artworks.length
-    const next = artworks.filter(a => (id ? a.id !== id : true) && (slug ? a.slug !== slug : true))
-
-    if (next.length === before) {
+    if (catalog.artworks.length === before) {
       return NextResponse.json({ ok: false, error: 'Œuvre introuvable' }, { status: 404, headers: NO_STORE })
     }
 
-    json.artworks = next
-    await fs.writeFile(CATALOG_PATH, JSON.stringify(json, null, 2), 'utf8')
-
+    await writeCatalog(catalog)
     return NextResponse.json({ ok: true, deleted: id || slug }, { headers: NO_STORE })
   } catch (e) {
     console.error('DELETE SAVE-ARTWORK ERROR', e)
