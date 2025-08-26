@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { Suspense, useEffect, useMemo, useState } from 'react'
 import { euro } from '@/lib/format'
 
 type ArtistLite = { id: string; name: string }
@@ -18,7 +18,7 @@ type ArtworkLite = {
   edition?: string
 }
 
-export default function AdminRecapPage() {
+function AdminRecapPageInner() {
   const [artistsState, setArtistsState] = useState<ArtistLite[]>([])
   const [artworksState, setArtworksState] = useState<ArtworkLite[]>([])
   const [loading, setLoading] = useState(true)
@@ -171,6 +171,14 @@ export default function AdminRecapPage() {
         Astuce : tape un mot-clé (ex. “sérigraphie”, “Hahnemühle”, un artiste…), puis “Copier CSV”.
       </p>
     </div>
+  )
+}
+
+export default function AdminRecapPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-neutral-500">Chargement…</div>}>
+      <AdminRecapPageInner />
+    </Suspense>
   )
 }
 

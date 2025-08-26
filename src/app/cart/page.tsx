@@ -1,11 +1,12 @@
 'use client'
 
+import { Suspense } from 'react'
 import Link from 'next/link'
 import Image from '@/components/SmartImage'
 import { useCart } from '@/components/CartContext'
 import { euro } from '@/lib/format'
 
-export default function CartPage() {
+function CartPageInner() {
   const { items, updateQty, remove, clear, total } = useCart()
 
   const isEmpty = items.length === 0
@@ -129,5 +130,13 @@ export default function CartPage() {
         </div>
       )}
     </div>
+  )
+}
+
+export default function CartPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-neutral-500">Chargement…</div>}>
+      <CartPageInner />
+    </Suspense>
   )
 }

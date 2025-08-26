@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
@@ -21,7 +21,7 @@ function euro(n: number) {
   return `${Math.round(n)}\u00A0€`
 }
 
-export default function ArtworksPage() {
+function ArtworksPageInner() {
   // → on précharge avec les données statiques, puis on remplace par /api/catalog (permet de voir aussi les oeuvres créées depuis l'admin)
   const [artworks, setArtworks] = useState<any[]>(staticArtworks)
   const [artists, setArtists] = useState<any[]>(staticArtists)
@@ -214,5 +214,13 @@ export default function ArtworksPage() {
         )}
       </div>
     </div>
+  )
+}
+
+export default function ArtworksPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-neutral-500">Chargement…</div>}>
+      <ArtworksPageInner />
+    </Suspense>
   )
 }

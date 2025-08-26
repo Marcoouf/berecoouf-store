@@ -1,7 +1,9 @@
 'use client'
 
+import { Suspense } from 'react'
+
 import Link from 'next/link'
-export default function NotFound() {
+function NotFoundInner() {
   return (
     <>
       <div
@@ -43,5 +45,13 @@ export default function NotFound() {
         }
       `}</style>
     </>
+  )
+}
+
+export default function NotFound() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-neutral-500">Chargement…</div>}>
+      <NotFoundInner />
+    </Suspense>
   )
 }

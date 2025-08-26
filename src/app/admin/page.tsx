@@ -1,7 +1,7 @@
 'use client'
 export const dynamic = 'force-dynamic'
 
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -43,7 +43,7 @@ function uid(prefix = 'w') {
   return `${prefix}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-export default function AdminPage() {
+function AdminPageInner() {
   const isDev = process.env.NODE_ENV === 'development'
   const adminEnabled = process.env.NEXT_PUBLIC_ADMIN_ENABLED === 'true'
   if (!isDev && !adminEnabled) {
@@ -560,5 +560,13 @@ function Select({
         ))}
       </select>
     </div>
+  )
+}
+
+export default function AdminPage() {
+  return (
+    <Suspense fallback={<div className="p-6 text-sm text-neutral-500">Chargement…</div>}>
+      <AdminPageInner />
+    </Suspense>
   )
 }
