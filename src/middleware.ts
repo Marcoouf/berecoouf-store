@@ -1,14 +1,20 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-const ADMIN_PATHS = [/^\/admin(?!\/login)(\/.*)?$/, /^\/api\/admin(\/.*)?$/, /^\/api\/upload$/];
+const ADMIN_PATHS = [
+  /^\/admin(?!\/login)(\/.*)?$/,
+  /^\/api\/admin(?!\/login)(\/.*)?$/,  // exclut /api/admin/login
+  /^\/api\/upload$/
+];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
+  if (pathname === "/admin/login" || pathname === "/api/admin/login") {
+    return NextResponse.next();
+  }
+
   const isApi = pathname.startsWith('/api/')
   const isOptions = req.method === 'OPTIONS'
-
-  if (pathname === "/admin/login") return NextResponse.next();
 
   const isAdminZone = ADMIN_PATHS.some((re) => re.test(pathname));
   if (!isAdminZone) return NextResponse.next();
