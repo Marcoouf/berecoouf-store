@@ -2,6 +2,8 @@
 import 'server-only'
 import type { Artist, Artwork } from '@/lib/types'
 
+export const dynamic = 'force-dynamic'
+
 export type Catalog = {
   artists: Artist[]
   artworks: Artwork[]
@@ -20,12 +22,17 @@ function getBaseUrl(): string {
 }
 
 export async function getCatalog(): Promise<Catalog> {
-  const base = getBaseUrl()
-  const res = await fetch(`${base}/api/catalog`, {
-    cache: 'no-store', // or { next: { revalidate: 0 } }
-  })
-  if (!res.ok) {
-    throw new Error(`catalog fetch failed: ${res.status} ${res.statusText}`)
+  try {
+    const base = getBaseUrl()
+    const res = await fetch(`${base}/api/catalog`, {
+      cache: 'no-store',
+    })
+    if (!res.ok) {
+      throw new Error(`Échec du chargement du catalogue: ${res.status} ${res.statusText}`)
+    }
+    return res.json() as Promise<Catalog>
+  } catch (err) {
+    console.error('Erreur getCatalog:', err)
+    throw err
   }
-  return res.json() as Promise<Catalog>
 }
