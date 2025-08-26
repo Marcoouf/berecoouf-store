@@ -8,6 +8,7 @@ export default function AdminLoginPage() {
   const [key, setKey] = useState('')
   const [loading, setLoading] = useState(false)
   const [err, setErr] = useState<string | null>(null)
+  const [show, setShow] = useState(false)
   const router = useRouter()
   const sp = useSearchParams()
   const next = sp.get('next') || '/admin'
@@ -44,19 +45,29 @@ export default function AdminLoginPage() {
       <form onSubmit={onSubmit} className="mt-6 space-y-4">
         <div>
           <label className="mb-1 block text-sm font-medium">Clé admin</label>
-          <input
-            type="password"
-            className="w-full rounded-md border px-3 py-2 text-sm"
-            autoFocus
-            value={key}
-            onChange={e => setKey(e.target.value)}
-            placeholder="Entrez la clé…"
-            autoComplete="off"
-            spellCheck={false}
-            required
-            aria-invalid={!!err}
-            aria-describedby={err ? 'login-error' : undefined}
-          />
+          <div className="flex items-center">
+            <input
+              type={show ? 'text' : 'password'}
+              className="w-full rounded-md border px-3 py-2 text-sm"
+              autoFocus
+              value={key}
+              onChange={e => setKey(e.target.value)}
+              placeholder="Entrez la clé…"
+              autoComplete="off"
+              spellCheck={false}
+              required
+              aria-invalid={!!err}
+              aria-describedby={err ? 'login-error' : undefined}
+            />
+            <button
+              type="button"
+              onClick={() => setShow(!show)}
+              className="ml-2 rounded border px-2 py-1 text-sm select-none"
+              aria-label={show ? 'Masquer la clé' : 'Afficher la clé'}
+            >
+              {show ? '🙈' : '👁'}
+            </button>
+          </div>
         </div>
         {err && (
           <p id="login-error" role="alert" aria-live="polite" className="text-sm text-red-600">
