@@ -143,11 +143,25 @@ export async function POST(req: Request) {
 
   try {
     const raw = await req.json()
-    const body = (typeof raw === 'object' && raw) ? raw as Partial<Artwork> : {}
+    const body = (typeof raw === 'object' && raw) ? (raw as Partial<Artwork>) : {}
 
-    const title = String(body?.title ?? '').trim()
-    const artistId = String(body?.artistId ?? '').trim()
-    const image = String(body?.image ?? '').trim()
+    const catalog = await ensureCatalog()
+
+    const idFromBody = String(body.id ?? '').trim()
+    const id = idFromBody || `w-${Date.now()}`
+    const existingIdx = catalog.artworks.findIndex(a => a.id === id)
+    const existing = existingIdx >= 0 ? catalog.artworks[existingIdx] : null
+
+    const title = String(body?.title ?? '').trim() || existing?.title || ''
+    const artistId = String(body?.artistId ?? '').trim() || existing?.artistId || ''
+
+    const imageFromBody = String(body?.image ?? '').trim()
+    const image = imageFromBody || existing?.image || ''
+
+    const mockup = (body.mockup !== undefined
+      ? (String(body.mockup).trim() || undefined)
+      : existing?.mockup)
+
     if (!title || !artistId || !image) {
       return NextResponse.json(
         { ok: false, error: 'Champs requis manquants (title, image, artistId)' },
@@ -155,13 +169,8 @@ export async function POST(req: Request) {
       )
     }
 
-    const catalog = await ensureCatalog()
-
-    // Slug / id / update-or-create
     const baseProvided = String(body.slug ?? '').trim()
-    const base = slugify(baseProvided || title) || String(body.id || '') || `art-${Date.now()}`
-    const id = String(body.id ?? '').trim() || `w-${Date.now()}`
-    const existingIdx = catalog.artworks.findIndex(a => a.id === id)
+    const base = slugify(baseProvided || title) || id || `art-${Date.now()}`
     const taken = new Set(catalog.artworks.map(a => a.slug))
 
     let slug = base
@@ -179,18 +188,22 @@ export async function POST(req: Request) {
       }
     }
 
-    // Formats
-    const formats: Format[] = Array.isArray(body.formats)
+    // Formats (préserve l’existant si non fourni)
+    const incomingFormats: Format[] | undefined = Array.isArray(body.formats)
       ? body.formats
-        .filter(f => !!f && typeof f === 'object' && String((f as any).label || '').trim())
-        .map((f, idx) => ({
-          id: String((f as any).id || `f-${idx + 1}`).trim(),
-          label: String((f as any).label).trim(),
-          price: toNumber((f as any).price, 0),
-        }))
-      : []
+          .filter(f => !!f && typeof f === 'object' && String((f as any).label || '').trim())
+          .map((f, idx) => ({
+            id: String((f as any).id || `f-${idx + 1}`).trim(),
+            label: String((f as any).label).trim(),
+            price: toNumber((f as any).price, 0),
+          }))
+      : undefined
 
-    const price = toNumber(body.price, formats[0]?.price ?? 0)
+    const formats: Format[] = incomingFormats ?? (existing?.formats ?? [])
+
+    const price = (body.price != null)
+      ? toNumber(body.price)
+      : (existing?.price ?? toNumber(formats[0]?.price, 0))
 
     const artwork: Artwork = {
       id,
@@ -198,14 +211,14 @@ export async function POST(req: Request) {
       title,
       artistId,
       image,
-      mockup: body.mockup ? String(body.mockup).trim() : undefined,
+      mockup,
       price,
-      description: body.description ? String(body.description).trim() : undefined,
-      year: body.year != null ? toNumber(body.year) : undefined,
-      technique: body.technique ? String(body.technique).trim() : undefined,
-      paper: body.paper ? String(body.paper).trim() : undefined,
-      size: body.size ? String(body.size).trim() : undefined,
-      edition: body.edition ? String(body.edition).trim() : undefined,
+      description: body.description != null ? (String(body.description).trim() || undefined) : (existing?.description),
+      year: body.year != null ? toNumber(body.year) : existing?.year,
+      technique: body.technique != null ? (String(body.technique).trim() || undefined) : existing?.technique,
+      paper: body.paper != null ? (String(body.paper).trim() || undefined) : existing?.paper,
+      size: body.size != null ? (String(body.size).trim() || undefined) : existing?.size,
+      edition: body.edition != null ? (String(body.edition).trim() || undefined) : existing?.edition,
       formats,
     }
 

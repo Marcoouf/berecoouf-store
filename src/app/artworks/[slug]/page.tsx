@@ -4,41 +4,56 @@ import Image from '@/components/SmartImage'
 import { notFound } from 'next/navigation'
 import Breadcrumb from '@/components/Breadcrumb'
 import ArtworkPurchase from '@/components/ArtworkPurchase'
-import { euro } from '@/lib/format';
+import { euro } from '@/lib/format'
 import { getCatalog } from '@/lib/getCatalog'
 import type { Catalog } from '@/lib/getCatalog'
 
 // important : ne pas figer au build
-export const dynamic = 'force-dynamic' // Next 13/14
-// (équivalent possible : export const revalidate = 0)
+export const dynamic = 'force-dynamic'
 
 function displayPriceFor(w: Catalog['artworks'][number]) {
-  // Normalise "formats" pour éviter undefined
   const formats = Array.isArray(w.formats) ? w.formats : []
-
-  // Convertit proprement en nombres
-  const formatPrices = formats
-    .map(f => Number(f.price))
-    .filter(n => Number.isFinite(n))
-
-  // Si on a des formats, on prend le min ; sinon, le prix de base
+  const formatPrices = formats.map(f => Number(f.price)).filter(n => Number.isFinite(n))
   const base = formatPrices.length > 0
     ? Math.min(...formatPrices)
     : (Number.isFinite(Number(w.price)) ? Number(w.price) : 0)
-
   return euro(base)
+}
+
+export async function generateMetadata({ params }: { params: { slug: string } }) {
+  // SEO automatique basé sur l'œuvre
+  const catalog = await getCatalog()
+  const artwork = catalog.artworks.find(a => a.slug === params.slug)
+  if (!artwork) return {}
+  const artist = catalog.artists.find(a => a.id === artwork.artistId) || null
+  const title = `${artwork.title}${artist ? ` — ${artist.name}` : ''}`
+  const description = artwork.description || 'Œuvre disponible en édition limitée.'
+  const ogImage = artwork.mockup || artwork.image
+
+  return {
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      images: [{ url: ogImage }],
+      type: 'website',
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [ogImage],
+    },
+  }
 }
 
 export default async function Page({ params }: { params: { slug: string } }) {
   const { slug } = params
   const catalog = await getCatalog()
 
-  // on cherche l’œuvre côté runtime
   const artwork = catalog.artworks.find(a => a.slug === slug)
-  if (!artwork) {
-    // si rien => 404 propre
-    notFound()
-  }
+  if (!artwork) notFound()
 
   const artist = catalog.artists.find(a => a.id === artwork.artistId) ?? null
   const related = catalog.artworks
@@ -63,22 +78,22 @@ export default async function Page({ params }: { params: { slug: string } }) {
 
       <div className="grid gap-6 md:gap-8 py-8 sm:py-10 md:py-16 md:grid-cols-2">
         <div className="group relative overflow-hidden rounded-2xl border aspect-[4/5] min-h-[240px] sm:min-h-[320px] bg-neutral-50">
-          {/* Mockup visible par défaut */}
+          {/* Mockup visible par défaut, swap uniquement si le support gère le hover */}
           <Image
             src={mockupSrc}
-            alt={`${artwork.title} — mockup`}
+            alt={`${artwork.title} — mockup de mise en situation`}
             fill
             sizes="(min-width: 1024px) 50vw, 100vw"
-            className="object-contain transition-opacity duration-500 ease-out opacity-100 group-hover:opacity-0"
+            className="object-contain motion-safe:transition-opacity motion-safe:duration-500 supports-[hover:hover]:opacity-100 supports-[hover:hover]:group-hover:opacity-0"
             priority
           />
-          {/* Visuel original au survol */}
+          {/* Visuel original affiché au survol (sur desktop) */}
           <Image
             src={originalSrc}
             alt={artwork.title}
             fill
             sizes="(min-width: 1024px) 50vw, 100vw"
-            className="object-contain absolute inset-0 transition-opacity duration-500 ease-out opacity-0 group-hover:opacity-100"
+            className="object-contain absolute inset-0 supports-[hover:hover]:opacity-0 motion-safe:transition-opacity motion-safe:duration-500 supports-[hover:hover]:group-hover:opacity-100"
             priority
           />
         </div>
@@ -169,7 +184,7 @@ export default async function Page({ params }: { params: { slug: string } }) {
                       alt={w.title}
                       fill
                       sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw"
-                      className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                      className="object-cover motion-safe:transition-transform motion-safe:duration-500 group-hover:scale-[1.02]"
                     />
                   </Link>
                 </div>
@@ -182,15 +197,31 @@ export default async function Page({ params }: { params: { slug: string } }) {
                     </div>
                     {artist && <div className="text-xs text-neutral-500">{artist.name}</div>}
                   </div>
-<div className="text-sm tabular-nums">
-  {displayPriceFor(w)}
-</div>
+                  <div className="text-sm tabular-nums">{displayPriceFor(w)}</div>
                 </div>
               </div>
             ))}
           </div>
         </section>
       )}
+
+      {/* JSON-LD minimal pour SEO */}
+      <script
+        type="application/ld+json"
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            '@context': 'https://schema.org',
+            '@type': 'VisualArtwork',
+            name: artwork.title,
+            image: artwork.mockup || artwork.image,
+            creator: artist ? { '@type': 'Person', name: artist.name } : undefined,
+            url: `/artworks/${artwork.slug}`,
+            artform: artwork.technique || undefined,
+            material: artwork.paper || undefined,
+          }),
+        }}
+      />
     </div>
   )
 }
