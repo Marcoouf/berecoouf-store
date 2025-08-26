@@ -1,9 +1,11 @@
 import { rateLimit } from "@/lib/rateLimit"
-import { assertAdmin, assertMethod } from "@/lib/adminAuth"
+// ⬇️ on n'utilise plus la version header; on passe par le cookie guard
+import { assertAdmin as assertAdminCookie } from "@/lib/adminGuard"
+import { assertMethod } from "@/lib/adminAuth" // on garde pour le 405
 import { NextResponse } from 'next/server'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
-import { put, list } from '@vercel/blob'   // ⬅️ ajout
+import { put, list } from '@vercel/blob'
 
 const NO_STORE = { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' }
 
@@ -32,17 +34,15 @@ type Artwork = {
   edition?: string
   formats?: Format[]
 }
-
 type Catalog = { artists: any[]; artworks: Artwork[] }
 
 const CATALOG_PATH = path.join(process.cwd(), 'data', 'catalog.json')
 
-// Fallback num
+// Utils
 function toNumber(n: any, fallback = 0) {
   const v = Number(n)
   return Number.isFinite(v) ? v : fallback
 }
-
 function slugify(input: string) {
   return input
     .normalize('NFKD')
@@ -58,32 +58,38 @@ function slugify(input: string) {
 // ---------- lecture/écriture du catalogue ----------
 async function ensureCatalog(): Promise<Catalog> {
   if (isProd()) {
-    // 1) on cherche la dernière version dans Blob
-    const { blobs } = await list({ prefix: BLOB_KEY })
-    const latest = blobs.toSorted?.((a, b) => (b.uploadedAt?.getTime() ?? 0) - (a.uploadedAt?.getTime() ?? 0))[0] || blobs[0]
-    if (latest?.url) {
-      try {
-        const res = await fetch(latest.url, { cache: 'no-store' })
-        if (res.ok) {
-          const json = await res.json()
-          return {
-            artists: Array.isArray(json?.artists) ? json.artists : [],
-            artworks: Array.isArray(json?.artworks) ? json.artworks : [],
-          }
-        }
-      } catch { /* ignore, on seed si besoin */ }
+    // Vérif token blob
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      throw new Error('blob_token_missing')
     }
-    // 2) seed vide si rien trouvé
+    // Dernière version dans Blob
+    const { blobs } = await list({ prefix: BLOB_KEY })
+    const latest =
+      (blobs as any[]).toSorted?.(
+        (a, b) => (b.uploadedAt?.getTime?.() ?? 0) - (a.uploadedAt?.getTime?.() ?? 0)
+      )[0] || blobs[0]
+
+    if (latest?.url) {
+      const res = await fetch(latest.url, { cache: 'no-store' })
+      if (res.ok) {
+        const json = await res.json()
+        return {
+          artists: Array.isArray(json?.artists) ? json.artists : [],
+          artworks: Array.isArray(json?.artworks) ? json.artworks : [],
+        }
+      }
+    }
+    // Seed
     const seed: Catalog = { artists: [], artworks: [] }
     await put(BLOB_KEY, JSON.stringify(seed, null, 2), {
       access: 'public',
       contentType: 'application/json',
-      addRandomSuffix: false, // garder l'URL stable
+      addRandomSuffix: false,
     })
     return seed
   }
 
-  // --- DEV : fichier local ---
+  // DEV: fichier local
   try {
     const raw = await fs.readFile(CATALOG_PATH, 'utf8')
     const json = JSON.parse(raw)
@@ -101,6 +107,9 @@ async function ensureCatalog(): Promise<Catalog> {
 
 async function writeCatalog(data: Catalog) {
   if (isProd()) {
+    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+      throw new Error('blob_token_missing')
+    }
     await put(BLOB_KEY, JSON.stringify(data, null, 2), {
       access: 'public',
       contentType: 'application/json',
@@ -117,8 +126,12 @@ export async function POST(req: Request) {
   const badMethod = assertMethod(req, ['POST'])
   if (badMethod) return badMethod
 
-  const notAdmin = assertAdmin(req)
-  if (notAdmin) return notAdmin
+  // ⬇️ Auth via cookie (adminGuard) — jette si pas connecté
+  try {
+    assertAdminCookie()
+  } catch {
+    return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401, headers: NO_STORE })
+  }
 
   if (!rateLimit(req, 10, 60_000)) {
     return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429, headers: NO_STORE })
@@ -131,7 +144,6 @@ export async function POST(req: Request) {
     const title = String(body?.title ?? '').trim()
     const artistId = String(body?.artistId ?? '').trim()
     const image = String(body?.image ?? '').trim()
-
     if (!title || !artistId || !image) {
       return NextResponse.json(
         { ok: false, error: 'Champs requis manquants (title, image, artistId)' },
@@ -141,7 +153,7 @@ export async function POST(req: Request) {
 
     const catalog = await ensureCatalog()
 
-    // Slug
+    // Slug / id / update-or-create
     const baseProvided = String(body.slug ?? '').trim()
     const base = slugify(baseProvided || title) || String(body.id || '') || `art-${Date.now()}`
     const id = String(body.id ?? '').trim() || `w-${Date.now()}`
@@ -166,12 +178,12 @@ export async function POST(req: Request) {
     // Formats
     const formats: Format[] = Array.isArray(body.formats)
       ? body.formats
-          .filter(f => !!f && typeof f === 'object' && String((f as any).label || '').trim())
-          .map((f, idx) => ({
-            id: String((f as any).id || `f-${idx + 1}`).trim(),
-            label: String((f as any).label).trim(),
-            price: toNumber((f as any).price, 0),
-          }))
+        .filter(f => !!f && typeof f === 'object' && String((f as any).label || '').trim())
+        .map((f, idx) => ({
+          id: String((f as any).id || `f-${idx + 1}`).trim(),
+          label: String((f as any).label).trim(),
+          price: toNumber((f as any).price, 0),
+        }))
       : []
 
     const price = toNumber(body.price, formats[0]?.price ?? 0)
@@ -202,9 +214,13 @@ export async function POST(req: Request) {
       { ok: true, message: existingIdx >= 0 ? 'Updated' : 'Created', artwork, counts: { artworks: catalog.artworks.length } },
       { status: 200, headers: NO_STORE }
     )
-  } catch (e) {
+  } catch (e: any) {
+    // erreurs parlantes
+    const msg = e?.message === 'blob_token_missing'
+      ? 'Blob token manquant (BLOB_READ_WRITE_TOKEN)'
+      : 'Erreur serveur'
     console.error('SAVE_ARTWORK POST ERROR', e)
-    return NextResponse.json({ ok: false, error: 'Erreur serveur' }, { status: 500, headers: NO_STORE })
+    return NextResponse.json({ ok: false, error: msg }, { status: 500, headers: NO_STORE })
   }
 }
 
@@ -221,8 +237,11 @@ export async function DELETE(req: Request) {
   const badMethod = assertMethod(req, ['DELETE'])
   if (badMethod) return badMethod
 
-  const notAdmin = assertAdmin(req)
-  if (notAdmin) return notAdmin
+  try {
+    assertAdminCookie()
+  } catch {
+    return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401, headers: NO_STORE })
+  }
 
   if (!rateLimit(req, 10, 60_000)) {
     return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429, headers: NO_STORE })
@@ -238,7 +257,9 @@ export async function DELETE(req: Request) {
 
     const catalog = await ensureCatalog()
     const before = catalog.artworks.length
-    catalog.artworks = catalog.artworks.filter(a => (id ? a.id !== id : true) && (slug ? a.slug !== slug : true))
+    catalog.artworks = catalog.artworks.filter(a =>
+      (id ? a.id !== id : true) && (slug ? a.slug !== slug : true)
+    )
 
     if (catalog.artworks.length === before) {
       return NextResponse.json({ ok: false, error: 'Œuvre introuvable' }, { status: 404, headers: NO_STORE })
