@@ -165,8 +165,8 @@ async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
   setImgProgress(0)
   try {
     const json = await uploadWithProgress(f, 'artwork', setImgProgress)
-    if (!json?.ok) throw new Error(json?.error || 'Upload failed')
-    setField('image', (json.url as string) || (json.path as string) || '')
+    if (!json?.ok || !json.url) throw new Error(json?.error || "Upload failed (pas d'URL)")
+    setField('image', json.url)
     addToast('success', 'Image envoyée ✅')
   } catch (err: any) {
     const msg = err?.message || 'Erreur upload'
@@ -195,8 +195,8 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
   setMockProgress(0)
   try {
     const json = await uploadWithProgress(f, 'mockup', setMockProgress)
-    if (!json?.ok) throw new Error(json?.error || 'Upload failed')
-    setField('mockup', (json.url as string) || (json.path as string) || '')
+    if (!json?.ok || !json.url) throw new Error(json?.error || "Upload failed (pas d'URL)")
+    setField('mockup', json.url)
     addToast('success', 'Mockup envoyé ✅')
   } catch (err: any) {
     const msg = err?.message || 'Erreur upload'
@@ -247,8 +247,9 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
 
     const payload: ArtworkDraft = {
       ...value,
+      image: value.image,
+      mockup: value.mockup || undefined,
       slug: derivedSlug,
-      mockup: value.mockup || '',
       price:
         value.price && value.price > 0
           ? value.price
@@ -257,7 +258,7 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
         (value.formats ?? [])
           .filter(f => f.label.trim())
           .map(f => ({ ...f, price: Number(f.price || 0) })) || undefined,
-    }
+    } as any
 
     try {
       const res = await fetch('/api/admin/save-artwork', {
@@ -271,7 +272,6 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
       const j = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(j?.error || `HTTP ${res.status}`)
 
-      alert('Œuvre enregistrée ✅')
       addToast('success', 'Œuvre enregistrée ✅')
       await refreshExisting()
 
@@ -297,7 +297,6 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
         ],
       })
     } catch (err: any) {
-      alert(`Échec enregistrement ❌ — ${err?.message || err}`)
       addToast('error', err?.message || 'Échec enregistrement')
     }
   }
@@ -426,7 +425,7 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
                     { id: uid('f'), label: 'A1 — 594×841mm', price: 220 },
                   ],
                 })
-                alert('Œuvre supprimée ✅')
+                addToast('success', 'Œuvre supprimée ✅')
               }}
               className="rounded-md border px-3 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
               disabled={!editingId}
@@ -467,7 +466,7 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
                 <span className="inline-flex items-center rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] text-neutral-700">
                   Upload de l’image en cours…
                 </span>
-              ) : value.image ? (
+              ) : value.image?.startsWith('http') ? (
                 <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[11px] text-green-700">
                   Image prête ✅
                 </span>
@@ -517,7 +516,7 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
                   <span className="inline-flex items-center rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] text-neutral-700">
                     Upload du mockup en cours…
                   </span>
-                ) : value.mockup ? (
+                ) : value.mockup?.startsWith('http') ? (
                   <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[11px] text-green-700">
                     Mockup prêt ✅
                   </span>
