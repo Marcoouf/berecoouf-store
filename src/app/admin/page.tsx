@@ -44,19 +44,7 @@ function uid(prefix = 'w') {
 }
 
 function AdminPageInner() {
-  const isDev = process.env.NODE_ENV === 'development'
-  const adminEnabled = process.env.NEXT_PUBLIC_ADMIN_ENABLED === 'true'
-  const adminKey = process.env.NEXT_PUBLIC_ADMIN_CALL || ''
-  if (!isDev && !adminEnabled) {
-    return (
-      <div className="mx-auto max-w-3xl px-6 py-20">
-        <h1 className="text-2xl font-medium tracking-tight">Admin désactivée</h1>
-        <p className="mt-2 text-neutral-600">
-          Cette interface n’est pas disponible en production.
-        </p>
-      </div>
-    )
-  }
+  // Accès sécurisé côté serveur via middleware + cookie HttpOnly (voir /admin/login et middleware)
 
   const [value, set] = useState<ArtworkDraft>({
     id: uid(),
@@ -132,7 +120,6 @@ function AdminPageInner() {
       fd.append('kind', 'artwork')
       const r = await fetch('/api/upload', {
         method: 'POST',
-        headers: { 'x-admin-key': adminKey },
         body: fd,
       })
       const json = await r.json()
@@ -165,7 +152,6 @@ function AdminPageInner() {
       fd.append('kind', 'mockup')
       const r = await fetch('/api/upload', {
         method: 'POST',
-        headers: { 'x-admin-key': adminKey },
         body: fd,
       })
       const json = await r.json()
@@ -230,7 +216,6 @@ function AdminPageInner() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-admin-key': adminKey,
         },
         body: JSON.stringify(payload),
       })
@@ -361,7 +346,6 @@ function AdminPageInner() {
                 url.searchParams.set('id', editingId)
                 const res = await fetch(url.toString(), {
                   method: 'DELETE',
-                  headers: { 'x-admin-key': adminKey },
                 })
                 const j = await res.json().catch(() => ({}))
                 if (!res.ok || !j?.ok) {
