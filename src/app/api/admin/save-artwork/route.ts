@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic'
 
 // --- helpers d'env ---
 const isProd = () => process.env.VERCEL === '1' || process.env.NODE_ENV === 'production'
-const BLOB_KEY = 'data/catalog.json' // clé stable dans le bucket
+const BLOB_KEY = process.env.CATALOG_BLOB_KEY?.trim() || 'data/catalog.json' // clé stable dans le bucket (même que getCatalog)
 const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN
 
 // Types légers
@@ -64,13 +64,20 @@ async function ensureCatalog(): Promise<Catalog> {
       throw new Error('blob_token_missing')
     }
     // Dernière version dans Blob
-    const { blobs } = await list({ prefix: BLOB_KEY, token: BLOB_TOKEN })
-    const latest = [...(blobs as any[])].sort(
-      (a: any, b: any) => (b.uploadedAt?.getTime?.() ?? 0) - (a.uploadedAt?.getTime?.() ?? 0)
-    )[0]
+    const { blobs } = await list({ prefix: BLOB_KEY, mode: 'expanded', token: BLOB_TOKEN })
+    // Cherche d'abord l'entrée EXACTE (pathname === BLOB_KEY)
+    let item = (blobs as any[]).find((b: any) => b?.pathname === BLOB_KEY)
+    // Sinon, prend le plus récent parmi ceux qui matchent le prefix
+    if (!item) {
+      item = [...(blobs as any[])].sort((a: any, b: any) => {
+        const ta = a?.uploadedAt ? new Date(a.uploadedAt).getTime() : 0
+        const tb = b?.uploadedAt ? new Date(b.uploadedAt).getTime() : 0
+        return tb - ta
+      })[0]
+    }
 
-    if (latest?.url) {
-      const res = await fetch(latest.url, { cache: 'no-store' })
+    if (item?.url) {
+      const res = await fetch(item.url, { cache: 'no-store' })
       if (res.ok) {
         const json = await res.json()
         return {

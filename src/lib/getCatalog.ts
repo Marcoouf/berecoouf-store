@@ -1,5 +1,8 @@
 // src/lib/getCatalog.ts
 import 'server-only'
+import { list } from '@vercel/blob'
+import { promises as fs } from 'node:fs'
+import path from 'node:path'
 import type { Artist, Artwork } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
@@ -9,56 +12,43 @@ export type Catalog = {
   artworks: Artwork[]
 }
 
-// Construit une base URL absolue qui marche en local et sur Vercel
-function getBaseUrl(): string {
-  // 1) Si on a défini explicitement l'URL publique
-  const explicit = process.env.NEXT_PUBLIC_SITE_URL
-  if (explicit && explicit.trim()) return explicit.replace(/\/$/, '')
+// Emplacement du catalogue dans Vercel Blob (clé déterministe)
+const CATALOG_BLOB_KEY = 'catalog/catalog.json'
+const CATALOG_LOCAL = path.join(process.cwd(), 'data', 'catalog.json')
 
-  // 2) En prod/préprod Vercel, VERCEL_URL ne contient PAS le protocole
-  const vercel = process.env.VERCEL_URL
-  if (vercel && vercel.trim()) return `https://${vercel.replace(/\/$/, '')}`
-
-  // 3) Fallback: dev local
-  const port = process.env.PORT ?? '3000'
-  return `http://localhost:${port}`
-}
-
-// Ajoute l’en-tête de contournement si la « Deployment Protection » est activée
-function getBypassHeaders(): HeadersInit | undefined {
-  const secret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET
-  if (!secret) return undefined
-  return { 'x-vercel-protection-bypass': secret }
-}
-
+/**
+ * Lecture prioritaire depuis Vercel Blob.
+ * Fallback en dev: fichier local `data/catalog.json` si présent.
+ */
 export async function getCatalog(): Promise<Catalog> {
-  const base = getBaseUrl()
-  const url = `${base}/api/catalog`
-
+  // 1) PROD/Preview: essaye de lire le JSON depuis Vercel Blob
   try {
-    const res = await fetch(url, {
-      // On ne met pas en cache: la page d’accueil lit des données qui peuvent changer
-      cache: 'no-store',
-      // Recommandé également par Next pour désactiver la revalidation ISR côté serveur
-      next: { revalidate: 0 },
-      // Si Vercel Protection est active, on envoie le header
-      headers: getBypassHeaders(),
-    })
+    // Try to locate the catalog file in Vercel Blob
+    const { blobs } = await list({ prefix: CATALOG_BLOB_KEY, mode: 'expanded' })
+    let item = blobs.find(b => b.pathname === CATALOG_BLOB_KEY)
 
-    if (!res.ok) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.warn(`Échec du chargement du catalogue (${res.status} ${res.statusText}), utilisation du fallback local.`)
-        return { artists: [], artworks: [] }
-      }
-      throw new Error(`Échec du chargement du catalogue: ${res.status} ${res.statusText}`)
+    // Some SDK versions require a directory prefix; try listing the folder if needed
+    if (!item) {
+      const alt = await list({ prefix: 'catalog/', mode: 'expanded' })
+      item = alt.blobs.find(b => b.pathname === CATALOG_BLOB_KEY)
     }
 
-    return (await res.json()) as Catalog
-  } catch (error) {
+    if (item?.url) {
+      const res = await fetch(item.url, { cache: 'no-store' })
+      if (res.ok) return (await res.json()) as Catalog
+    }
+  } catch (e) {
     if (process.env.NODE_ENV !== 'production') {
-      console.warn(`Erreur lors du fetch du catalogue, utilisation du fallback local.`, error)
-      return { artists: [], artworks: [] }
+      console.warn('[getCatalog] lecture Blob impossible, fallback local:', e)
     }
-    throw error
+  }
+
+  // 2) DEV: fallback sur le fichier packagé si présent
+  try {
+    const raw = await fs.readFile(CATALOG_LOCAL, 'utf8')
+    return JSON.parse(raw) as Catalog
+  } catch {
+    // Fallback final: catalogue vide
+    return { artists: [], artworks: [] }
   }
 }
