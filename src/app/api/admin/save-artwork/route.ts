@@ -5,6 +5,7 @@ import { NextResponse } from 'next/server'
 import { promises as fs } from 'node:fs'
 import path from 'node:path'
 
+const NO_STORE = { 'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate' }
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -79,83 +80,108 @@ export async function POST(req: Request) {
   if (notAdmin) return notAdmin
 
   if (!rateLimit(req, 10, 60_000)) {
-    return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
+    return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429, headers: NO_STORE })
   }
-  try {
-    const body = (await req.json()) as Partial<Artwork>
 
-    // Validation minimale
-    if (!body?.title || !body?.image || !body?.artistId) {
+  try {
+    const raw = await req.json()
+    const body = (typeof raw === 'object' && raw) ? raw as Partial<Artwork> : {}
+
+    const title = String(body?.title ?? '').trim()
+    const artistId = String(body?.artistId ?? '').trim()
+    const image = String(body?.image ?? '').trim()
+
+    if (!title || !artistId || !image) {
       return NextResponse.json(
         { ok: false, error: 'Champs requis manquants (title, image, artistId)' },
-        { status: 400 }
+        { status: 400, headers: NO_STORE }
       )
     }
 
     const catalog = await ensureCatalog()
 
-    // Slug
-    const base = slugify(String(body.slug || body.title || '')) || String(body.id || '') || `art-${Date.now()}`
-    let slug = base
-    let i = 2
-    const taken = new Set(catalog.artworks.map(a => a.slug))
-    while (taken.has(slug)) slug = `${base}-${i++}`
+    // Slug: si fourni on le normalise, sinon on dérive du titre. On ne force la déduplication que si on crée.
+    const baseProvided = String(body.slug ?? '').trim()
+    const base = slugify(baseProvided || title) || String(body.id || '') || `art-${Date.now()}`
 
-    // ID
-    const id = String(body.id || `w-${Date.now()}`)
+    // ID: conserve si fourni sinon nouveau
+    const id = String(body.id ?? '').trim() || `w-${Date.now()}`
+
+    // Cherche si l’œuvre existe (update)
+    const existingIdx = catalog.artworks.findIndex(a => a.id === id)
+    const taken = new Set(catalog.artworks.map(a => a.slug))
+
+    let slug = base
+    if (existingIdx < 0) {
+      // création → on garantit l’unicité
+      let i = 2
+      while (taken.has(slug)) slug = `${base}-${i++}`
+    } else {
+      // update → si slug spécifique fourni on le normalise et on évite les collisions avec d’autres ids
+      if (baseProvided) {
+        let next = slug
+        let i = 2
+        while (catalog.artworks.some(a => a.slug === next && a.id !== id)) next = `${base}-${i++}`
+        slug = next
+      } else {
+        slug = catalog.artworks[existingIdx].slug
+      }
+    }
 
     // Formats nettoyés
     const formats: Format[] = Array.isArray(body.formats)
       ? body.formats
           .filter(f => !!f && typeof f === 'object' && String(f.label || '').trim())
           .map((f, idx) => ({
-            id: String(f.id || `f-${idx + 1}`),
-            label: String(f.label),
+            id: String((f as any).id || `f-${idx + 1}`).trim(),
+            label: String((f as any).label).trim(),
             price: toNumber((f as any).price, 0),
           }))
       : []
 
-    // Prix principal: utilise body.price ou le 1er format
     const price = toNumber(body.price, formats[0]?.price ?? 0)
 
     const artwork: Artwork = {
       id,
       slug,
-      title: String(body.title),
-      artistId: String(body.artistId),
-      image: String(body.image),
-      mockup: body.mockup ? String((body as any).mockup) : undefined,
+      title,
+      artistId,
+      image,
+      mockup: body.mockup ? String(body.mockup).trim() : undefined,
       price,
-      description: body.description ? String(body.description) : undefined,
+      description: body.description ? String(body.description).trim() : undefined,
       year: body.year != null ? toNumber(body.year) : undefined,
-      technique: body.technique ? String(body.technique) : undefined,
-      paper: body.paper ? String(body.paper) : undefined,
-      size: body.size ? String(body.size) : undefined,
-      edition: body.edition ? String(body.edition) : undefined,
+      technique: body.technique ? String(body.technique).trim() : undefined,
+      paper: body.paper ? String(body.paper).trim() : undefined,
+      size: body.size ? String(body.size).trim() : undefined,
+      edition: body.edition ? String(body.edition).trim() : undefined,
       formats,
     }
 
-    // Upsert par id
-    const idx = catalog.artworks.findIndex(a => a.id === artwork.id)
-    if (idx >= 0) catalog.artworks[idx] = artwork
+    if (existingIdx >= 0) catalog.artworks[existingIdx] = artwork
     else catalog.artworks.push(artwork)
 
     await writeCatalog(catalog)
 
     return NextResponse.json(
-      { ok: true, message: 'Saved', artwork, counts: { artworks: catalog.artworks.length } },
-      { status: 200 }
+      { ok: true, message: existingIdx >= 0 ? 'Updated' : 'Created', artwork, counts: { artworks: catalog.artworks.length } },
+      { status: 200, headers: NO_STORE }
     )
   } catch (e) {
-    console.error('SAVE_ARTWORK ERROR', e)
-    return NextResponse.json({ ok: false, error: 'Erreur serveur' }, { status: 500 })
+    console.error('SAVE_ARTWORK POST ERROR', e)
+    return NextResponse.json({ ok: false, error: 'Erreur serveur' }, { status: 500, headers: NO_STORE })
   }
+}
+
+export async function PUT(req: Request) {
+  // même logique que POST (upsert), simplement autre verbe pour clarté REST
+  return POST(new Request(req.url, { method: 'POST', headers: req.headers, body: await req.text() }))
 }
 
 export async function GET() {
   // Optionnel: permet de vérifier rapidement le contenu depuis le navigateur
   const catalog = await ensureCatalog()
-  return NextResponse.json(catalog, { status: 200 })
+  return NextResponse.json(catalog, { status: 200, headers: NO_STORE })
 }
 export async function DELETE(req: Request) {
   const badMethod = assertMethod(req, ['DELETE'])
@@ -165,7 +191,7 @@ export async function DELETE(req: Request) {
   if (notAdmin) return notAdmin
 
   if (!rateLimit(req, 10, 60_000)) {
-    return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
+    return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429, headers: NO_STORE })
   }
   try {
     const url = new URL(req.url)
@@ -173,7 +199,7 @@ export async function DELETE(req: Request) {
     const id = url.searchParams.get('id')
     const slug = url.searchParams.get('slug')
     if (!id && !slug) {
-      return NextResponse.json({ ok: false, error: 'id ou slug manquant' }, { status: 400 })
+      return NextResponse.json({ ok: false, error: 'id ou slug manquant' }, { status: 400, headers: NO_STORE })
     }
 
     const raw = await fs.readFile(CATALOG_PATH, 'utf8').catch(() => '{}')
@@ -184,16 +210,16 @@ export async function DELETE(req: Request) {
     const next = artworks.filter(a => (id ? a.id !== id : true) && (slug ? a.slug !== slug : true))
 
     if (next.length === before) {
-      return NextResponse.json({ ok: false, error: 'Œuvre introuvable' }, { status: 404 })
+      return NextResponse.json({ ok: false, error: 'Œuvre introuvable' }, { status: 404, headers: NO_STORE })
     }
 
     json.artworks = next
     await fs.writeFile(CATALOG_PATH, JSON.stringify(json, null, 2), 'utf8')
 
-    return NextResponse.json({ ok: true, deleted: id || slug })
+    return NextResponse.json({ ok: true, deleted: id || slug }, { headers: NO_STORE })
   } catch (e) {
     console.error('DELETE SAVE-ARTWORK ERROR', e)
-    return NextResponse.json({ ok: false, error: 'Erreur serveur' }, { status: 500 })
+    return NextResponse.json({ ok: false, error: 'Erreur serveur' }, { status: 500, headers: NO_STORE })
   }
 }
 

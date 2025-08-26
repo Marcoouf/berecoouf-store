@@ -120,6 +120,7 @@ function AdminPageInner() {
       fd.append('kind', 'artwork')
       const r = await fetch('/api/upload', {
         method: 'POST',
+        credentials: 'include',
         body: fd,
       })
       const json = await r.json()
@@ -152,6 +153,7 @@ function AdminPageInner() {
       fd.append('kind', 'mockup')
       const r = await fetch('/api/upload', {
         method: 'POST',
+        credentials: 'include',
         body: fd,
       })
       const json = await r.json()
@@ -214,6 +216,7 @@ function AdminPageInner() {
     try {
       const res = await fetch('/api/admin/save-artwork', {
         method: 'POST',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -405,7 +408,7 @@ function AdminPageInner() {
             <input
               ref={fileRef}
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp,image/avif,image/gif"
               className="hidden"
               onChange={onFileChange}
             />
@@ -431,7 +434,7 @@ function AdminPageInner() {
               <input
                 ref={mockupRef}
                 type="file"
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp,image/avif,image/gif"
                 className="hidden"
                 onChange={onMockupChange}
               />
@@ -445,7 +448,7 @@ function AdminPageInner() {
             <div className="rounded-xl border">
               <div className="relative aspect-[4/5] overflow-hidden rounded-xl">
                 {value.image ? (
-                  <Image src={value.image} alt="Aperçu image" fill className="object-cover" />
+                  <img src={value.image} alt="Aperçu image" className="absolute inset-0 h-full w-full object-cover" />
                 ) : (
                   <div className="absolute inset-0 grid place-items-center text-xs text-neutral-500">Aucun visuel</div>
                 )}
@@ -454,7 +457,7 @@ function AdminPageInner() {
             <div className="rounded-xl border">
               <div className="relative aspect-[4/5] overflow-hidden rounded-xl">
                 {value.mockup ? (
-                  <Image src={value.mockup} alt="Aperçu mockup" fill className="object-cover" />
+                  <img src={value.mockup} alt="Aperçu mockup" className="absolute inset-0 h-full w-full object-cover" />
                 ) : (
                   <div className="absolute inset-0 grid place-items-center text-[10px] text-neutral-500">Aucun mockup</div>
                 )}
