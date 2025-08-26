@@ -5,6 +5,7 @@ import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 import Link from 'next/link'
 
+type Toast = { id: string; kind: 'success' | 'error' | 'info'; msg: string }
 type FormatRow = { id: string; label: string; price: number }
 
 type ArtworkDraft = {
@@ -69,6 +70,21 @@ function AdminPageInner() {
 
   const [existing, setExisting] = useState<ArtworkDraft[]>([])
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+
+  // Toasts + progression upload
+  const [toasts, setToasts] = useState<Toast[]>([])
+  const [imgProgress, setImgProgress] = useState(0)
+  const [mockProgress, setMockProgress] = useState(0)
+
+function addToast(kind: Toast['kind'], msg: string) {
+  const id = Math.random().toString(36).slice(2, 8)
+  setToasts(t => [...t, { id, kind, msg }])
+  setTimeout(() => {
+    setToasts(t => t.filter(x => x.id !== id))
+  }, 4000)
+}
 
   useEffect(() => {
     let active = true
@@ -103,36 +119,65 @@ function AdminPageInner() {
 
   // Upload image -> appelle /api/upload
   const fileRef = useRef<HTMLInputElement>(null)
-  const [uploading, setUploading] = useState(false)
-  const [uploadError, setUploadError] = useState<string | null>(null)
 
+  async function uploadWithProgress(
+  file: File,
+  kind: 'artwork' | 'mockup',
+  onProgress: (p: number) => void
+) {
+  return new Promise<{ ok: boolean; url?: string; path?: string; error?: string }>((resolve) => {
+    const fd = new FormData()
+    fd.append('file', file)
+    fd.append('kind', kind)
+
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', '/api/upload', true)
+    xhr.withCredentials = true
+    xhr.upload.onprogress = (evt) => {
+      if (evt.lengthComputable) {
+        const p = Math.round((evt.loaded / evt.total) * 100)
+        onProgress(p)
+      }
+    }
+    xhr.onreadystatechange = () => {
+      if (xhr.readyState === 4) {
+        try {
+          const json = JSON.parse(xhr.responseText || '{}')
+          resolve(json)
+        } catch {
+          resolve({ ok: false, error: 'Réponse invalide' })
+        }
+      }
+    }
+    xhr.onerror = () => resolve({ ok: false, error: 'Erreur réseau' })
+    xhr.send(fd)
+  })
+}
+  
   function chooseFile() {
     fileRef.current?.click()
   }
-  async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0]
-    if (!f) return
-    setUploading(true)
-    setUploadError(null)
-    try {
-      const fd = new FormData()
-      fd.append('file', f)
-      fd.append('kind', 'artwork')
-      const r = await fetch('/api/upload', {
-        method: 'POST',
-        credentials: 'include',
-        body: fd,
-      })
-      const json = await r.json()
-      if (!r.ok || !json?.ok) throw new Error(json?.error || 'Upload failed')
-      setField('image', (json.url as string) || (json.path as string) || '')
-    } catch (err: any) {
-      setUploadError(err?.message || 'Erreur upload')
-    } finally {
-      setUploading(false)
-      if (fileRef.current) fileRef.current.value = ''
-    }
+async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  const f = e.target.files?.[0]
+  if (!f) return
+  setUploading(true)
+  setUploadError(null)
+  setImgProgress(0)
+  try {
+    const json = await uploadWithProgress(f, 'artwork', setImgProgress)
+    if (!json?.ok) throw new Error(json?.error || 'Upload failed')
+    setField('image', (json.url as string) || (json.path as string) || '')
+    addToast('success', 'Image envoyée ✅')
+  } catch (err: any) {
+    const msg = err?.message || 'Erreur upload'
+    setUploadError(msg)
+    addToast('error', msg)
+  } finally {
+    setUploading(false)
+    setTimeout(() => setImgProgress(0), 600)
+    if (fileRef.current) fileRef.current.value = ''
   }
+}
 
   // Upload mockup (optionnel) -> /api/upload
   const mockupRef = useRef<HTMLInputElement>(null)
@@ -142,30 +187,27 @@ function AdminPageInner() {
   function chooseMockup() {
     mockupRef.current?.click()
   }
-  async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0]
-    if (!f) return
-    setUploadingMockup(true)
-    setUploadErrorMockup(null)
-    try {
-      const fd = new FormData()
-      fd.append('file', f)
-      fd.append('kind', 'mockup')
-      const r = await fetch('/api/upload', {
-        method: 'POST',
-        credentials: 'include',
-        body: fd,
-      })
-      const json = await r.json()
-      if (!r.ok || !json?.ok) throw new Error(json?.error || 'Upload failed')
-      setField('mockup', (json.url as string) || (json.path as string) || '')
-    } catch (err: any) {
-      setUploadErrorMockup(err?.message || 'Erreur upload')
-    } finally {
-      setUploadingMockup(false)
-      if (mockupRef.current) mockupRef.current.value = ''
-    }
+async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
+  const f = e.target.files?.[0]
+  if (!f) return
+  setUploadingMockup(true)
+  setUploadErrorMockup(null)
+  setMockProgress(0)
+  try {
+    const json = await uploadWithProgress(f, 'mockup', setMockProgress)
+    if (!json?.ok) throw new Error(json?.error || 'Upload failed')
+    setField('mockup', (json.url as string) || (json.path as string) || '')
+    addToast('success', 'Mockup envoyé ✅')
+  } catch (err: any) {
+    const msg = err?.message || 'Erreur upload'
+    setUploadErrorMockup(msg)
+    addToast('error', msg)
+  } finally {
+    setUploadingMockup(false)
+    setTimeout(() => setMockProgress(0), 600)
+    if (mockupRef.current) mockupRef.current.value = ''
   }
+}
 
   // Formats
   function addFormat() {
@@ -197,6 +239,10 @@ function AdminPageInner() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
+    if (uploading || uploadingMockup) {
+      alert('Upload en cours — patiente avant d’enregistrer.')
+      return
+    }
     if (!canSubmit) return
 
     const payload: ArtworkDraft = {
@@ -226,6 +272,7 @@ function AdminPageInner() {
       if (!res.ok) throw new Error(j?.error || `HTTP ${res.status}`)
 
       alert('Œuvre enregistrée ✅')
+      addToast('success', 'Œuvre enregistrée ✅')
       await refreshExisting()
 
       // reset
@@ -251,6 +298,7 @@ function AdminPageInner() {
       })
     } catch (err: any) {
       alert(`Échec enregistrement ❌ — ${err?.message || err}`)
+      addToast('error', err?.message || 'Échec enregistrement')
     }
   }
 
@@ -405,6 +453,30 @@ function AdminPageInner() {
               </button>
               {uploadError && <span className="text-sm text-red-600">{uploadError}</span>}
             </div>
+            {imgProgress > 0 && (
+  <div className="mt-2 h-2 w-full rounded bg-neutral-100">
+    <div
+      className="h-2 rounded bg-accent transition-[width]"
+      style={{ width: `${imgProgress}%` }}
+      aria-label={`Progression upload image ${imgProgress}%`}
+    />
+  </div>
+)}
+            <div className="mt-1">
+              {uploading ? (
+                <span className="inline-flex items-center rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] text-neutral-700">
+                  Upload de l’image en cours…
+                </span>
+              ) : value.image ? (
+                <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[11px] text-green-700">
+                  Image prête ✅
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] text-neutral-600">
+                  Aucune image
+                </span>
+              )}
+            </div>
             <input
               ref={fileRef}
               type="file"
@@ -429,6 +501,30 @@ function AdminPageInner() {
                 </button>
                 {uploadErrorMockup && (
                   <span className="text-sm text-red-600">{uploadErrorMockup}</span>
+                )}
+              </div>
+              {mockProgress > 0 && (
+  <div className="mt-2 h-2 w-full rounded bg-neutral-100">
+    <div
+      className="h-2 rounded bg-accent transition-[width]"
+      style={{ width: `${mockProgress}%` }}
+      aria-label={`Progression upload mockup ${mockProgress}%`}
+    />
+  </div>
+)}
+              <div className="mt-1">
+                {uploadingMockup ? (
+                  <span className="inline-flex items-center rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] text-neutral-700">
+                    Upload du mockup en cours…
+                  </span>
+                ) : value.mockup ? (
+                  <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[11px] text-green-700">
+                    Mockup prêt ✅
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] text-neutral-600">
+                    Aucun mockup
+                  </span>
                 )}
               </div>
               <input
@@ -589,12 +685,31 @@ function AdminPageInner() {
           <button
             type="submit"
             disabled={!canSubmit || uploading || uploadingMockup}
+            title={uploading || uploadingMockup ? 'Veuillez attendre la fin des uploads' : undefined}
             className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-ink hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-60"
           >
             {uploading || uploadingMockup ? 'Patiente…' : 'Enregistrer l’œuvre'}
           </button>
         </div>
       </form>
+      {/* Toasts */}
+<div className="fixed bottom-4 right-4 z-50 space-y-2">
+  {toasts.map(t => (
+    <div
+      key={t.id}
+      className={[
+        'rounded-md px-3 py-2 text-sm shadow',
+        t.kind === 'success' ? 'bg-green-600 text-white' : '',
+        t.kind === 'error' ? 'bg-red-600 text-white' : '',
+        t.kind === 'info' ? 'bg-neutral-800 text-white' : '',
+      ].join(' ')}
+      role="status"
+      aria-live="polite"
+    >
+      {t.msg}
+    </div>
+  ))}
+</div>
     </div>
   )
 }
