@@ -2,7 +2,7 @@
 'use client'
 
 import { useState } from 'react'
-import Image from '@/components/SmartImage'
+import Image from 'next/image'
 
 type Props = {
   src: string
@@ -49,7 +49,6 @@ export default function AdaptiveFrame({
         className="object-contain"
         priority={priority}
         onLoadingComplete={(img) => {
-          // récupère les dimensions natives pour calculer le vrai ratio
           const w = img.naturalWidth || 0
           const h = img.naturalHeight || 0
           if (w > 0 && h > 0) setRatio(w / h)

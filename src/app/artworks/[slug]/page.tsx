@@ -81,14 +81,14 @@ export default async function Page({ params }: { params: { slug: string } }) {
       </div>
 
       <div className="grid gap-6 md:gap-8 py-8 sm:py-10 md:py-16 md:grid-cols-2">
-<div className="group rounded-2xl border bg-neutral-50">
+<div className="group rounded-2xl border bg-neutral-50 overflow-hidden">
   {/* mockup au-dessus, original dessous, avec fondu au hover sur desktop */}
   <div className="relative">
     <AdaptiveFrame
       src={mockupSrc}
       alt={`${artwork.title} — mockup de mise en situation`}
       fallbackRatio={4/5}
-      className="rounded-2xl"
+      className="rounded-2xl absolute inset-0 md:opacity-100 md:group-hover:opacity-0 transition-opacity"
       sizes="(min-width:1024px) 50vw, 100vw"
       priority
     />
@@ -98,7 +98,6 @@ export default async function Page({ params }: { params: { slug: string } }) {
       fallbackRatio={4/5}
       className="rounded-2xl absolute inset-0 md:opacity-0 md:group-hover:opacity-100 transition-opacity"
       sizes="(min-width:1024px) 50vw, 100vw"
-      priority
     />
   </div>
 </div>
