@@ -85,6 +85,7 @@ async function ensureCatalog(): Promise<Catalog> {
       access: 'public',
       contentType: 'application/json',
       addRandomSuffix: false,
+      allowOverwrite: true,
       token: BLOB_TOKEN,
     })
     return seed
@@ -115,6 +116,7 @@ async function writeCatalog(data: Catalog) {
       access: 'public',
       contentType: 'application/json',
       addRandomSuffix: false,
+      allowOverwrite: true,
       token: BLOB_TOKEN,
     })
     return
