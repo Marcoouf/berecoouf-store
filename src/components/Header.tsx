@@ -26,10 +26,10 @@ export default function HeaderGlobal() {
     <header className="sticky top-0 z-40 w-full border-b border-line/70 bg-white/70 backdrop-blur">
       <Container className="py-3 flex items-center justify-between">
         {/* Logo + point animé */}
-        <Link href="/" className="group flex items-center gap-2 text-sm tracking-widest uppercase">
+        <Link href="/" className="group site-brand flex items-center gap-2 text-sm tracking-widest uppercase" data-brand-dot>
           <motion.span
             aria-hidden
-            className="h-2.5 w-2.5 rounded-full bg-accent group-hover:bg-accent-dark"
+            className="brand-dot h-2.5 w-2.5 rounded-full bg-accent group-hover:bg-accent-dark"
             animate={prefersReduced ? { scale: 1 } : { scale: [1, 1.15, 1] }}
             transition={prefersReduced ? undefined : { duration: 2, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' }}
             style={{ willChange: 'transform' }}
