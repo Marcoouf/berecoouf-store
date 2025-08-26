@@ -14,6 +14,7 @@ export function middleware(req: NextRequest) {
   if (!isAdminZone) return NextResponse.next();
 
   if (process.env.ADMIN_ENABLED !== "true") {
+    console.warn("[middleware] Admin désactivé");
     if (isApi) {
       return NextResponse.json({ ok: false, error: 'admin_disabled' }, { status: 404 })
     }
@@ -23,6 +24,7 @@ export function middleware(req: NextRequest) {
 
   const session = req.cookies.get("pb_admin_session")?.value;
   if (session !== "ok") {
+    console.warn("[middleware] Session invalide ou absente");
     const bypass = req.headers.get("x-vercel-protection-bypass");
     if (bypass && bypass === process.env.VERCEL_AUTOMATION_BYPASS_SECRET) {
       return NextResponse.next();

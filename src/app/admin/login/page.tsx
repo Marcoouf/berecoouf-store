@@ -17,12 +17,16 @@ export default function AdminLoginPage() {
     setLoading(true)
     setErr(null)
     try {
+      const maskedKey = key.length > 2 ? '*'.repeat(key.length - 2) + key.slice(-2) : key
+      console.log('Tentative de connexion avec la clé :', maskedKey)
+
       const r = await fetch('/api/admin/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key }),
       })
       const j = await r.json().catch(() => ({}))
+      console.log('Réponse API:', { status: r.status, body: j })
       if (!r.ok || !j?.ok) {
         throw new Error(j?.error || `HTTP ${r.status}`)
       }

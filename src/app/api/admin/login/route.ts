@@ -15,8 +15,10 @@ export async function POST(req: Request) {
   }
   try {
     const { key } = await req.json().catch(() => ({}))
-    const ADMIN = process.env.ADMIN_KEY
-    if (!ADMIN || key !== ADMIN) {
+    const clientKey = (key || '').trim()
+    const ADMIN = (process.env.ADMIN_KEY || '').trim()
+    console.log('Login attempt', { clientKeyLength: clientKey.length, adminKeyLength: ADMIN.length })
+    if (!ADMIN || clientKey !== ADMIN) {
       return NextResponse.json({ ok: false, error: 'bad_credentials' }, { status: 401 })
     }
 
