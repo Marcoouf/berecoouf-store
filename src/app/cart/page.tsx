@@ -14,7 +14,7 @@ export default function CartPage() {
     <div className="mx-auto max-w-6xl px-6 py-10">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-medium tracking-tight">Votre panier</h1>
-        <Link href="/artworks" className="text-sm hover:underline underline-offset-4">
+        <Link href="/artworks" scroll className="text-sm hover:underline underline-offset-4">
           ← Continuer vos achats
         </Link>
       </div>
@@ -25,6 +25,7 @@ export default function CartPage() {
           <div className="mt-4">
             <Link
               href="/artworks"
+              scroll
               className="rounded-full bg-accent hover:bg-accent-dark text-ink px-4 py-2 text-sm font-medium"
             >
               Parcourir les œuvres
@@ -46,7 +47,7 @@ export default function CartPage() {
                     <div className="min-w-0">
                       <div className="truncate text-sm font-medium">
                         {i.artwork.slug ? (
-                          <Link href={`/artworks/${i.artwork.slug}`} className="hover:underline">
+                          <Link href={`/artworks/${i.artwork.slug}`} scroll className="hover:underline">
                             {i.artwork.title}
                           </Link>
                         ) : (

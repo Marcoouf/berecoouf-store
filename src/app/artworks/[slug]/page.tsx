@@ -3,33 +3,14 @@ import Link from 'next/link'
 import Image from '@/components/SmartImage'
 import { notFound } from 'next/navigation'
 import Breadcrumb from '@/components/Breadcrumb'
-import { headers } from 'next/headers'
 import ArtworkPurchase from '@/components/ArtworkPurchase'
 import { euro } from '@/lib/format';
+import { getCatalog } from '@/lib/getCatalog'
+import type { Catalog } from '@/lib/getCatalog'
 
 // important : ne pas figer au build
 export const dynamic = 'force-dynamic' // Next 13/14
 // (équivalent possible : export const revalidate = 0)
-
-type Catalog = {
-  artists: { id: string; name: string; slug: string }[]
-  artworks: {
-    id: string
-    slug: string
-    title: string
-    image: string
-    mockup?: string
-    artistId: string
-    price: number
-    description?: string
-    year?: number
-    technique?: string
-    paper?: string
-    size?: string
-    edition?: string
-    formats?: { id: string; label: string; price: number }[]
-  }[]
-}
 
 function displayPriceFor(w: Catalog['artworks'][number]) {
   // Normalise "formats" pour éviter undefined
@@ -46,20 +27,6 @@ function displayPriceFor(w: Catalog['artworks'][number]) {
     : (Number.isFinite(Number(w.price)) ? Number(w.price) : 0)
 
   return euro(base)
-}
-
-async function getCatalog(): Promise<Catalog> {
-  // Construit une URL absolue fiable (dev, prod, Vercel) pour l'appel serveur → serveur
-  const h = headers()
-  const host = h.get('x-forwarded-host') ?? h.get('host')
-  const proto = h.get('x-forwarded-proto') ?? 'http'
-  const base = (process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '')) || `${proto}://${host}`
-
-  const res = await fetch(`${base}/api/catalog`, {
-    cache: 'no-store',
-  })
-  if (!res.ok) throw new Error('catalog fetch failed')
-  return res.json()
 }
 
 export default async function Page({ params }: { params: { slug: string } }) {

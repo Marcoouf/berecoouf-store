@@ -1,20 +1,55 @@
 'use client'
 
-import React, { useMemo, useState } from 'react'
-import { artworks, artists } from '@/lib/data'
+import React, { useEffect, useMemo, useState } from 'react'
 import { euro } from '@/lib/format'
 
-function artistName(artistId: string) {
-  const a = artists.find(x => x.id === artistId)
-  return a ? a.name : 'Artiste'
+type ArtistLite = { id: string; name: string }
+
+type ArtworkLite = {
+  id: string
+  slug: string
+  title: string
+  artistId: string
+  price: number
+  year?: number
+  technique?: string
+  paper?: string
+  size?: string
+  edition?: string
 }
 
 export default function AdminRecapPage() {
+  const [artistsState, setArtistsState] = useState<ArtistLite[]>([])
+  const [artworksState, setArtworksState] = useState<ArtworkLite[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let active = true
+    setLoading(true)
+    fetch('/api/catalog')
+      .then(r => r.json())
+      .then((data) => {
+        if (!active) return
+        setArtistsState(Array.isArray(data.artists) ? data.artists : [])
+        setArtworksState(Array.isArray(data.artworks) ? data.artworks : [])
+      })
+      .catch(console.error)
+      .finally(() => { if (active) setLoading(false) })
+    return () => { active = false }
+  }, [])
+
   const [q, setQ] = useState('')
+
+  function artistNameFrom(list: ArtistLite[], artistId: string) {
+    const a = list.find(x => x.id === artistId)
+    return a ? a.name : 'Artiste'
+  }
 
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase()
-    return artworks
+    const aName = (id: string) => artistNameFrom(artistsState, id)
+
+    return artworksState
       .filter(w => {
         if (!needle) return true
         return [
@@ -25,7 +60,7 @@ export default function AdminRecapPage() {
           w.paper ?? '',
           w.size ?? '',
           w.edition ?? '',
-          artistName(w.artistId),
+          aName(w.artistId),
         ]
           .join(' ')
           .toLowerCase()
@@ -33,7 +68,7 @@ export default function AdminRecapPage() {
       })
       .map(w => ({
         title: w.title,
-        artist: artistName(w.artistId),
+        artist: aName(w.artistId),
         price: euro(w.price),
         year: w.year ?? '—',
         technique: w.technique ?? '—',
@@ -42,7 +77,7 @@ export default function AdminRecapPage() {
         edition: w.edition ?? '—',
         slug: w.slug,
       }))
-  }, [q])
+  }, [q, artworksState, artistsState])
 
   const copyCSV = async () => {
     const header = [
@@ -87,6 +122,10 @@ export default function AdminRecapPage() {
           </button>
         </div>
       </div>
+
+      {loading && (
+        <div className="p-6 text-sm text-neutral-500">Chargement…</div>
+      )}
 
       <div className="overflow-x-auto rounded-xl border">
         <table className="w-full border-collapse text-sm">

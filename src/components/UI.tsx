@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Image from '@/components/SmartImage'
 import Link from 'next/link'
 import type { Artwork, Artist } from '@/lib/types'
+import type { Catalog } from '@/lib/getCatalog'
 import { useCart } from '@/components/CartContext'
 import { FadeIn, Stagger } from '@/components/Motion'
 import { motion, useScroll, useSpring } from 'framer-motion'
@@ -410,16 +411,17 @@ function Footer() {
 
 
 
-export default function Site({ openCartOnLoad = false }: { openCartOnLoad?: boolean }) {
+export default function Site({ openCartOnLoad = false, catalog }: { openCartOnLoad?: boolean; catalog?: Catalog }) {
   const { openCart } = useCart()
-  const [artistsState, setArtistsState] = React.useState<Artist[]>([])
-  const [artworksState, setArtworksState] = React.useState<Artwork[]>([])
+  const [artistsState, setArtistsState] = React.useState<Artist[]>(catalog?.artists ?? [])
+  const [artworksState, setArtworksState] = React.useState<Artwork[]>(catalog?.artworks ?? [])
 
   React.useEffect(() => {
     if (openCartOnLoad) openCart()
   }, [openCartOnLoad, openCart])
 
   React.useEffect(() => {
+    if (catalog) return // si on a déjà reçu les données du serveur, pas de fetch client
     let active = true
     fetch('/api/catalog')
       .then(r => r.json())
@@ -430,7 +432,7 @@ export default function Site({ openCartOnLoad = false }: { openCartOnLoad?: bool
       })
       .catch(console.error)
     return () => { active = false }
-  }, [])
+  }, [catalog])
 
   const artistsById = React.useMemo(() => Object.fromEntries(artistsState.map(a => [a.id, a.name])), [artistsState])
 

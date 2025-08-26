@@ -1,37 +1,41 @@
 import Image from '@/components/SmartImage'
 import Link from 'next/link'
-import { findArtistBySlug, artworksByArtist } from '@/lib/data'
+import { getCatalog } from '@/lib/getCatalog'
 import type { Metadata } from 'next'
 import Breadcrumb from '@/components/Breadcrumb'
+
+export const dynamic = 'force-dynamic'
 
 type Props = { params: { slug: string } }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const artist = findArtistBySlug(params.slug)
+  const { artists } = await getCatalog()
+  const artist = artists.find(a => a.slug === params.slug)
   return {
     title: artist ? `${artist.name} — Point Bleu` : 'Artiste — Point Bleu',
     description: artist?.bio,
   }
 }
 
-export default function ArtistPage({ params }: Props) {
-  const artist = findArtistBySlug(params.slug)
+export default async function ArtistPage({ params }: Props) {
+  const { artists, artworks } = await getCatalog()
+  const artist = artists.find(a => a.slug === params.slug)
   if (!artist) {
     return <div className="mx-auto max-w-3xl px-6 py-20">Artiste introuvable.</div>
   }
-  const works = artworksByArtist(artist.id)
+  const works = artworks.filter(w => w.artistId === artist.id)
 
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6">
-<div className="pt-6">
-  <Breadcrumb
-    items={[
-      { label: 'Accueil', href: '/' },
-      { label: 'Artistes', href: '/artists' },
-      { label: artist.name },
-    ]}
-  />
-</div>
+      <div className="pt-6">
+        <Breadcrumb
+          items={[
+            { label: 'Accueil', href: '/' },
+            { label: 'Artistes', href: '/artists' },
+            { label: artist.name },
+          ]}
+        />
+      </div>
 
       <section className="py-6 sm:py-8 md:py-10">
         <div className="relative overflow-hidden rounded-2xl border aspect-[4/2] min-h-[180px] sm:min-h-[240px] md:min-h-[280px] bg-neutral-50">
@@ -53,14 +57,14 @@ export default function ArtistPage({ params }: Props) {
           {works.map(w => (
             <div key={w.id} className="group">
               <div className="aspect-[4/5] relative overflow-hidden rounded-xl border">
-                <Link href={`/artworks/${w.slug}`} className="absolute inset-0">
+                <Link href={`/artworks/${w.slug}`} scroll className="absolute inset-0">
                   <Image src={w.image} alt={w.title} fill sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw" className="object-cover transition-transform duration-500 group-hover:scale-[1.02]" />
                 </Link>
               </div>
               <div className="mt-3 flex items-start justify-between gap-4">
                 <div>
                   <div className="text-sm font-medium">
-                    <Link href={`/artworks/${w.slug}`}>{w.title}</Link>
+                    <Link href={`/artworks/${w.slug}`} scroll>{w.title}</Link>
                   </div>
                   <div className="text-xs text-neutral-500">{artist.name}</div>
                 </div>

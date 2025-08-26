@@ -1,3 +1,4 @@
+export const dynamic = 'force-dynamic'
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
@@ -187,7 +188,7 @@ export default function ArtworksPage() {
         {filtered.map(w => {
           const artist = artists.find((a: any) => a.id === w.artistId)
           return (
-            <Link key={w.id} href={`/artworks/${w.slug}`} className="group block">
+            <Link key={w.id} href={`/artworks/${w.slug}`} scroll className="group block">
               <div className="aspect-[4/5] relative overflow-hidden rounded-lg border">
                 <Image
                   src={w.image}

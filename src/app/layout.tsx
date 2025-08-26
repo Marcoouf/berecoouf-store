@@ -2,7 +2,6 @@ import type { Metadata } from 'next'
 import './globals.css'
 import Providers from './providers'
 import { Inter, EB_Garamond } from 'next/font/google'
-import ScrollProgress from '@/components/ScrollProgress'
 import HeaderGlobal from '@/components/Header'
 import CustomCursor from '@/components/CustomCursor'
 import GlobalCartDrawer from '@/components/GlobalCartDrawer'
@@ -14,7 +13,7 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
 const garamond = EB_Garamond({ subsets: ['latin'], variable: '--font-serif' })
 
 export const metadata: Metadata = {
-  title: 'Point bleu — Éditions d’art',
+  title: 'Point Bleu — Éditions d’art',
   description: 'Galerie en ligne d’illustrations contemporaines en séries limitées.',
   icons: {
     icon: "/favicon.png",
