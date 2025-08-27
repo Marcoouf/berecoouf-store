@@ -18,6 +18,8 @@ type Props = {
   priority?: boolean
   /** image utilisée uniquement pour mesurer le ratio */
   probeSrc?: string
+  /** Marge intérieure appliquée au calque enfants (ex: "6%", "12px" ou 12). Permet d'aligner l'illustration à l'intérieur de la "fenêtre" du mockup. */
+  contentInset?: number | string
   children?: React.ReactNode
 }
 
@@ -30,6 +32,7 @@ export default function AdaptiveFrame({
   imgClassName,
   priority,
   probeSrc,
+  contentInset,
   children,
 }: Props) {
   const [ratio, setRatio] = useState<number | null>(null)
@@ -76,7 +79,15 @@ export default function AdaptiveFrame({
         />
       )}
       {children && (
-        <div className="absolute inset-0">
+        <div
+          className="absolute"
+          style={
+            contentInset !== undefined
+              ? // number => px, string => valeur CSS (ex: "6%")
+                ({ inset: contentInset } as React.CSSProperties)
+              : ({ inset: 0 } as React.CSSProperties)
+          }
+        >
           {children}
         </div>
       )}

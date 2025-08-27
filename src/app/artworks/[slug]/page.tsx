@@ -82,11 +82,11 @@ export default async function Page({ params }: { params: { slug: string } }) {
 
       <div className="grid gap-6 md:gap-8 py-8 sm:py-10 md:py-16 md:grid-cols-2">
         <AdaptiveFrame
-          className="group relative rounded-2xl border bg-neutral-50 overflow-hidden"
+          className="group relative rounded-2xl border bg-neutral-50 overflow-hidden transition-colors duration-300 hover:border-transparent hover:bg-transparent"
           src={mockupSrc}
           alt={`${artwork.title} — mise en situation`}
           sizes="(min-width:1024px) 50vw, 100vw"
-          imgClassName="object-contain transition-opacity duration-300 group-hover:opacity-0"
+          imgClassName="object-contain transition-opacity duration-300 will-change-[opacity] group-hover:opacity-0"
         >
           <Image
             src={originalSrc}
