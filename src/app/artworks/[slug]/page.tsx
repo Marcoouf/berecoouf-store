@@ -1,13 +1,13 @@
 // src/app/artworks/[slug]/page.tsx
 import Link from 'next/link'
 import Image from '@/components/SmartImage'
+import AdaptiveFrame from '@/components/AdaptiveFrame'
 import { notFound } from 'next/navigation'
 import Breadcrumb from '@/components/Breadcrumb'
 import ArtworkPurchase from '@/components/ArtworkPurchase'
 import { euro } from '@/lib/format'
 import { getCatalog } from '@/lib/getCatalog'
 import type { Catalog } from '@/lib/getCatalog'
-import AdaptiveFrame from '@/components/AdaptiveFrame'
 
 // important : ne pas figer au build
 export const dynamic = 'force-dynamic'
@@ -81,28 +81,23 @@ export default async function Page({ params }: { params: { slug: string } }) {
       </div>
 
       <div className="grid gap-6 md:gap-8 py-8 sm:py-10 md:py-16 md:grid-cols-2">
-<div className="group rounded-2xl border bg-neutral-50 overflow-hidden">
-  {/* original pose la hauteur; mockup se superpose au même emplacement */}
-  <div className="relative">
-    {/* Base: original (non absolute) */}
-    <AdaptiveFrame
-      src={originalSrc}
-      alt={artwork.title}
-      fallbackRatio={4/5}
-      className="rounded-2xl"
-      sizes="(min-width:1024px) 50vw, 100vw"
-      priority
-    />
-    {/* Overlay: mockup (absolute, même emplacement) */}
-    <AdaptiveFrame
-      src={mockupSrc}
-      alt={`${artwork.title} — mockup de mise en situation`}
-      fallbackRatio={4/5}
-      className="rounded-2xl absolute inset-0 z-10 opacity-0 md:group-hover:opacity-100 transition-opacity pointer-events-none"
-      sizes="(min-width:1024px) 50vw, 100vw"
-    />
-  </div>
-</div>
+        <AdaptiveFrame
+          className="group relative rounded-2xl border bg-neutral-50 overflow-hidden"
+          src={mockupSrc}
+          alt={`${artwork.title} — mise en situation`}
+          sizes="(min-width:1024px) 50vw, 100vw"
+          imgClassName="object-contain transition-opacity duration-300 group-hover:opacity-0"
+        >
+          <Image
+            src={originalSrc}
+            alt={artwork.title}
+            fill
+            sizes="(min-width:1024px) 50vw, 100vw"
+            className="absolute inset-0 z-10 object-contain opacity-0 group-hover:opacity-100 transition-opacity duration-300 will-change-[opacity] pointer-events-none"
+            priority
+            aria-hidden="true"
+          />
+        </AdaptiveFrame>
 
         <div className="md:pl-6">
           <Link
