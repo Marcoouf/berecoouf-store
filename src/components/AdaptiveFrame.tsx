@@ -63,20 +63,38 @@ export default function AdaptiveFrame({
         />
       )}
       {src && (
-        <Image
-          src={src}
-          alt={alt ?? ''}
-          fill
-          sizes={sizes}
-          className={['object-contain', imgClassName].filter(Boolean).join(' ')}
-          priority={priority}
-          onLoadingComplete={(img) => {
-            const w = img.naturalWidth || 0
-            const h = img.naturalHeight || 0
-            if (w > 0 && h > 0) setRatio(w / h)
-            setReady(true)
-          }}
-        />
+        <>
+          <Image
+            src={src}
+            alt={alt ?? ''}
+            fill
+            sizes={sizes}
+            className={['object-contain', imgClassName].filter(Boolean).join(' ')}
+            priority={priority}
+            onLoadingComplete={(img) => {
+              const w = img.naturalWidth || 0
+              const h = img.naturalHeight || 0
+              if (w > 0 && h > 0) setRatio(w / h)
+              setReady(true)
+            }}
+            draggable={false}
+            onContextMenu={(e) => e.preventDefault()}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 10,
+              backgroundColor: 'transparent',
+              userSelect: 'none',
+            }}
+            onContextMenu={(e) => e.preventDefault()}
+            onDragStart={(e) => e.preventDefault()}
+          />
+        </>
       )}
       {children && (
         <div

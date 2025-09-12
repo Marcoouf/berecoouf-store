@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
+import SmartImage from '@/components/SmartImage'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Breadcrumb from '@/components/Breadcrumb'
 import { artworks as staticArtworks, artists as staticArtists } from '@/lib/data'
@@ -189,13 +189,17 @@ function ArtworksPageInner() {
           return (
             <Link key={w.id} href={`/artworks/${w.slug}`} scroll className="group block">
               <div className="aspect-[4/5] relative overflow-hidden rounded-lg border">
-                <Image
+                <SmartImage
                   src={w.image}
                   alt={w.title}
                   fill
                   className="object-cover transition-transform duration-500 group-hover:scale-105"
                   sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw"
+                  draggable={false}
+                  onContextMenu={(e: React.MouseEvent) => e.preventDefault()}
+                  data-anti-theft="true"
                 />
+                <span className="pointer-events-none absolute inset-0 select-none" aria-hidden />
               </div>
               <div className="mt-2 flex items-start justify-between gap-3">
                 <div className="min-w-0">

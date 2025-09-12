@@ -61,19 +61,24 @@ export default function RelatedCarousel({ items }: { items: Item[] }) {
           <div key={w.id} className="snap-start shrink-0 w-[80%] sm:w-[45%] md:w-[30%]">
             <div className="group hover:shadow-lg hover:scale-[1.03] transition-transform duration-300">
               <div className="relative overflow-hidden rounded-xl border aspect-[4/5]">
-                <Link href={`/artworks/${w.slug}`} className="absolute inset-0" aria-label={`Voir ${w.title}`}>
+                <Link href={`/artworks/${w.slug}`} scroll className="absolute inset-0" aria-label={`Voir ${w.title}`}>
                   <Image
                     src={w.image}
                     alt={w.title}
                     fill
-                    className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                    sizes="(min-width:1024px) 30vw, (min-width:640px) 45vw, 80vw"
+                    className="object-cover transition-transform duration-500 group-hover:scale-[1.02] pointer-events-none select-none"
+                    draggable={false}
+                    data-protect="1"
+                    onContextMenu={(e) => e.preventDefault()}
+                    loading="lazy"
                   />
                 </Link>
               </div>
               <div className="mt-3 flex items-start justify-between gap-4">
                 <div>
                   <div className="text-sm font-medium">
-                    <Link href={`/artworks/${w.slug}`} className="hover:underline">
+                    <Link href={`/artworks/${w.slug}`} scroll className="hover:underline">
                       {w.title}
                     </Link>
                   </div>

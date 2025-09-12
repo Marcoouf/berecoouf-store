@@ -39,10 +39,29 @@ export default async function ArtistPage({ params }: Props) {
 
       <section className="py-6 sm:py-8 md:py-10">
         <div className="relative overflow-hidden rounded-2xl border aspect-[4/2] min-h-[180px] sm:min-h-[240px] md:min-h-[280px] bg-neutral-50">
-          <Image src={artist.cover} alt={artist.name} fill sizes="100vw" className="object-cover" />
+          <Image
+            src={artist.cover}
+            alt={artist.name}
+            fill
+            sizes="100vw"
+            className="object-cover pointer-events-none select-none"
+            data-protect="1"
+            draggable={false}
+            onContextMenu={(e) => e.preventDefault()}
+            priority
+          />
         </div>
         <div className="mt-6 flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
-          <Image src={artist.avatar} alt="" width={56} height={56} sizes="56px" className="rounded-full object-cover" />
+          <Image
+            src={artist.avatar}
+            alt=""
+            width={56}
+            height={56}
+            sizes="56px"
+            className="rounded-full object-cover pointer-events-none select-none"
+            draggable={false}
+            onContextMenu={(e) => e.preventDefault()}
+          />
           <div>
             <h1 className="text-2xl sm:text-3xl font-medium tracking-tight">{artist.name}</h1>
             <div className="text-sm text-neutral-500">{artist.handle}</div>
@@ -58,7 +77,16 @@ export default async function ArtistPage({ params }: Props) {
             <div key={w.id} className="group">
               <div className="aspect-[4/5] relative overflow-hidden rounded-xl border">
                 <Link href={`/artworks/${w.slug}`} scroll className="absolute inset-0">
-                  <Image src={w.image} alt={w.title} fill sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw" className="object-cover transition-transform duration-500 group-hover:scale-[1.02]" />
+                  <Image
+                    src={w.image}
+                    alt={w.title}
+                    fill
+                    sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw"
+                    className="object-cover transition-transform duration-500 group-hover:scale-[1.02] pointer-events-none select-none"
+                    data-protect="1"
+                    draggable={false}
+                    onContextMenu={(e) => e.preventDefault()}
+                  />
                 </Link>
               </div>
               <div className="mt-3 flex items-start justify-between gap-4">

@@ -28,6 +28,9 @@ export default async function ArtistsPage() {
                 sizes="(min-width:1024px) 30vw, (min-width:640px) 45vw, 100vw"
                 className="object-cover transition-transform duration-500 group-hover:scale-[1.05]"
                 priority={false}
+                onContextMenu={e => e.preventDefault()}
+                onDragStart={e => e.preventDefault()}
+                data-protect="1"
               />
             </div>
             <div className="mt-2 text-sm sm:text-base font-medium group-hover:text-accent transition-colors">
