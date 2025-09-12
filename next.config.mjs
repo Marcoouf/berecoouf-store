@@ -1,11 +1,15 @@
+// next.config.mjs
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
     remotePatterns: [
-      { protocol: 'https', hostname: 'public.blob.vercel-storage.com' },
-      { protocol: 'https', hostname: '*.public.blob.vercel-storage.com' },
+      // Autorise toutes tes images hébergées sur Vercel Blob
+      {
+        protocol: 'https',
+        hostname: '*.public.blob.vercel-storage.com',
+      },
     ],
   },
-}
+};
 
-export default nextConfig
+export default nextConfig;
