@@ -21,7 +21,6 @@ type Props = {
   /** Marge intérieure appliquée au calque enfants (ex: "6%", "12px" ou 12). Permet d'aligner l'illustration à l'intérieur de la "fenêtre" du mockup. */
   contentInset?: number | string
   children?: React.ReactNode
-  protect?: boolean
 }
 
 export default function AdaptiveFrame({
@@ -35,7 +34,6 @@ export default function AdaptiveFrame({
   probeSrc,
   contentInset,
   children,
-  protect,
 }: Props) {
   const [ratio, setRatio] = useState<number | null>(null)
   const [ready, setReady] = useState(false)
@@ -82,22 +80,20 @@ export default function AdaptiveFrame({
             draggable={false}
             onContextMenu={(e) => e.preventDefault()}
           />
-          {protect && (
-            <div
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                zIndex: 10,
-                backgroundColor: 'transparent',
-                userSelect: 'none',
-              }}
-              onContextMenu={(e) => e.preventDefault()}
-              onDragStart={(e) => e.preventDefault()}
-            />
-          )}
+          <div
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 10,
+              backgroundColor: 'transparent',
+              userSelect: 'none',
+            }}
+            onContextMenu={(e) => e.preventDefault()}
+            onDragStart={(e) => e.preventDefault()}
+          />
         </>
       )}
       {children && (

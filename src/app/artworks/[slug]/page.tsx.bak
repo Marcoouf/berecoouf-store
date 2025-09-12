@@ -94,7 +94,9 @@ export default async function Page({ params }: { params: { slug: string } }) {
             fill
             sizes="(min-width:1024px) 50vw, 100vw"
             className="absolute inset-0 z-10 object-contain opacity-0 group-hover:opacity-100 transition-opacity duration-300 will-change-[opacity] pointer-events-none"
-            protect
+            draggable={false}
+
+            data-protect="1"
             priority
             aria-hidden="true"
           />
@@ -186,7 +188,9 @@ export default async function Page({ params }: { params: { slug: string } }) {
                       alt={w.title}
                       fill
                       sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw"
-                      protect
+                      draggable={false}
+
+                      data-protect="1"
                       className="object-cover motion-safe:transition-transform motion-safe:duration-500 group-hover:scale-[1.02]"
                     />
                   </Link>
