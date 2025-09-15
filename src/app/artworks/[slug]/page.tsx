@@ -7,13 +7,12 @@ import Breadcrumb from '@/components/Breadcrumb'
 import ArtworkPurchase from '@/components/ArtworkPurchase'
 import { euro } from '@/lib/format'
 import { getCatalog } from '@/lib/getCatalog'
-import type { Catalog } from '@/lib/getCatalog'
-
+import type { Artwork, Artist } from '@/lib/types'
 // important : ne pas figer au build
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-function displayPriceFor(w: Catalog['artworks'][number]) {
+function displayPriceFor(w: Artwork) {
   const formats = Array.isArray(w.formats) ? w.formats : []
   const formatPrices = formats.map((f: { price: any }) => Number(f.price)).filter((n: unknown) => Number.isFinite(n))
   const base = formatPrices.length > 0
@@ -94,7 +93,6 @@ export default async function Page({ params }: { params: { slug: string } }) {
             fill
             sizes="(min-width:1024px) 50vw, 100vw"
             className="absolute inset-0 z-10 object-contain opacity-0 group-hover:opacity-100 transition-opacity duration-300 will-change-[opacity] pointer-events-none"
-            protect
             priority
             aria-hidden="true"
           />
@@ -186,7 +184,6 @@ export default async function Page({ params }: { params: { slug: string } }) {
                       alt={w.title}
                       fill
                       sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw"
-                      protect
                       className="object-cover motion-safe:transition-transform motion-safe:duration-500 group-hover:scale-[1.02]"
                     />
                   </Link>

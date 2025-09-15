@@ -193,10 +193,11 @@ function ArtworksPageInner() {
                   src={w.image}
                   alt={w.title}
                   fill
+                  wrapperClass="absolute inset-0"
                   className="object-cover transition-transform duration-500 group-hover:scale-105"
                   sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw"
                   draggable={false}
-                  protect
+                  
                 />
                 <span className="pointer-events-none absolute inset-0 select-none" aria-hidden />
               </div>

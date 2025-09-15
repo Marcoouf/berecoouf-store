@@ -2,9 +2,9 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Image from '@/components/SmartImage'
+import NextImage from 'next/image'
 import Link from 'next/link'
 import type { Artwork, Artist } from '@/lib/types'
-import type { Catalog } from '@/lib/getCatalog'
 import { useCart } from '@/components/CartContext'
 import { FadeIn, Stagger } from '@/components/Motion'
 import { motion, useScroll, useSpring } from 'framer-motion'
@@ -67,26 +67,33 @@ function Header({ onOpenCart }: { onOpenCart: () => void }) {
   )
 }
 
-function Hero() {
+function Hero({ candidates = [] as string[] }: { candidates?: string[] }) {
   const [src, setSrc] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
     let active = true
-
-    // Récupère la liste des images héro et en choisit une au hasard
-    fetch('/api/hero-images')
-      .then(r => r.json())
-      .then(({ files }) => {
-        if (!active || !Array.isArray(files) || files.length === 0) return
-        const i = Math.floor(Math.random() * files.length)
-        setReady(false) // reset du loader quand on change d'image
-        setSrc(files[i] as string)
-      })
-      .catch(() => {})
-
+    async function pick() {
+      try {
+        const r = await fetch('/api/hero-images')
+        const json = await r.json()
+        const arr = Array.isArray(json?.files) ? json.files.filter(Boolean) : []
+        const pool = arr.length ? arr : candidates
+        if (!active || pool.length === 0) return
+        const i = Math.floor(Math.random() * pool.length)
+        setReady(false)
+        setSrc(String(pool[i]))
+      } catch {
+        const pool = candidates
+        if (!active || pool.length === 0) return
+        const i = Math.floor(Math.random() * pool.length)
+        setReady(false)
+        setSrc(String(pool[i]))
+      }
+    }
+    pick()
     return () => { active = false }
-  }, [])
+  }, [candidates])
 
   return (
     <section className="border-b border-neutral-200/60">
@@ -128,16 +135,23 @@ function Hero() {
             >
               {/* Image : fade-in une fois chargée */}
               {src && (
-                <Image
+                <NextImage
                   src={src}
                   alt="Hero artwork"
                   fill
-                  className={`object-contain transition-opacity duration-500 ${ready ? 'opacity-100' : 'opacity-0'}`}
-                  sizes="(min-width: 1024px) 40vw, (min-width: 768px) 50vw, 100vw"
+                  unoptimized
                   priority
-                  onLoadingComplete={() => {
-                    // Laisse un petit délai pour voir le skeleton même si l'image est en cache
-                    setTimeout(() => setReady(true), 150)
+                  sizes="(min-width: 1024px) 40vw, (min-width: 768px) 50vw, 100vw"
+                  className={`object-contain transition-opacity duration-500 ${ready ? 'opacity-100' : 'opacity-0'}`}
+                  onLoad={() => setTimeout(() => setReady(true), 150)}
+                  onError={() => {
+                    // tente une autre image candidate si possible
+                    const pool = candidates || []
+                    if (pool.length > 0) {
+                      const alt = pool.find(u => u !== src)
+                      if (alt) { setSrc(alt); return }
+                    }
+                    setReady(true)
                   }}
                 />
               )}
@@ -411,7 +425,7 @@ function Footer() {
 
 
 
-export default function Site({ openCartOnLoad = false, catalog }: { openCartOnLoad?: boolean; catalog?: Catalog }) {
+export default function Site({ openCartOnLoad = false, catalog }: { openCartOnLoad?: boolean; catalog?: { artists: Artist[]; artworks: Artwork[] } }) {
   const { openCart } = useCart()
   const [artistsState, setArtistsState] = React.useState<Artist[]>(catalog?.artists ?? [])
   const [artworksState, setArtworksState] = React.useState<Artwork[]>(catalog?.artworks ?? [])
@@ -436,9 +450,13 @@ export default function Site({ openCartOnLoad = false, catalog }: { openCartOnLo
 
   const artistsById = React.useMemo(() => Object.fromEntries(artistsState.map(a => [a.id, a.name])), [artistsState])
 
+  const heroCandidates = React.useMemo(() => {
+    return (artworksState || []).map(a => (a.mockup || a.image)).filter(Boolean) as string[]
+  }, [artworksState])
+
   return (
     <div className="min-h-screen bg-white text-neutral-900 antialiased pb-12 sm:pb-0">
-      <Hero />
+      <Hero candidates={heroCandidates} />
       <Artists artists={artistsState} />
       <Gallery artworks={artworksState} artistsById={artistsById} />
       <Footer />

@@ -69,7 +69,6 @@ export default function RelatedCarousel({ items }: { items: Item[] }) {
                     sizes="(min-width:1024px) 30vw, (min-width:640px) 45vw, 80vw"
                     className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
                     loading="lazy"
-                    protect={true}
                   />
                 </Link>
               </div>
