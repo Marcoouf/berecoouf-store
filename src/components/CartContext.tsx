@@ -3,6 +3,26 @@
 import React, { createContext, useContext, useMemo, useState } from 'react'
 import type { Artwork, Format } from '@/lib/types'
 
+const STORAGE_KEY = 'cart-v1';
+
+function safeLoad<T>(key: string): T | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
+function safeSave<T>(key: string, value: T) {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {}
+}
+
 type CartItem = {
   key: string
   artwork: Artwork
@@ -38,6 +58,17 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([])
   const [lastAdded, setLastAdded] = useState<number>(0)
   const [open, setOpen] = useState(false)
+
+  React.useEffect(() => {
+    const data = safeLoad<{ items: CartItem[] }>(STORAGE_KEY);
+    if (data && Array.isArray(data.items)) {
+      setItems(data.items);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    safeSave(STORAGE_KEY, { items });
+  }, [items]);
 
   const add: CartCtx['add'] = (artwork, format) => {
     setItems(prev => {
