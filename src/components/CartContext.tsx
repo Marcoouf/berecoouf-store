@@ -44,6 +44,9 @@ type CartCtx = {
   openCart: () => void
   closeCart: () => void
   toggleCart: () => void
+  overlayClick: (e: React.MouseEvent<HTMLDivElement>) => void
+  checkingOut: boolean
+  checkout: (options?: { email?: string }) => Promise<void>
 }
 
 const CartContext = createContext<CartCtx | null>(null)
@@ -58,6 +61,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([])
   const [lastAdded, setLastAdded] = useState<number>(0)
   const [open, setOpen] = useState(false)
+  const [checkingOut, setCheckingOut] = useState(false)
 
   React.useEffect(() => {
     const data = safeLoad<{ items: CartItem[] }>(STORAGE_KEY);
@@ -112,6 +116,50 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const closeCart = () => setOpen(false)
   const toggleCart = () => setOpen(o => !o)
 
+  const overlayClick: CartCtx['overlayClick'] = (e) => {
+    // Ferme uniquement si on clique en dehors du panneau (id="cart-drawer").
+    const panel = typeof document !== 'undefined' ? document.getElementById('cart-drawer') : null;
+    const target = e.target as Node | null;
+    if (panel && target && panel.contains(target)) {
+      return; // clic à l'intérieur du panier -> ne rien faire
+    }
+    setOpen(false); // clic sur l'overlay -> fermer
+  };
+
+  async function goToCheckout(payload: any) {
+    const res = await fetch('/api/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) throw new Error('checkout-failed')
+    const data = await res.json()
+    if (!data?.url) throw new Error('missing-url')
+    window.location.href = data.url as string
+  }
+
+  const checkout: CartCtx['checkout'] = async (options) => {
+    if (items.length === 0 || checkingOut) return
+    setCheckingOut(true)
+    try {
+      const mapped = items.map(i => ({
+        workId: i.artwork.id,
+        variantId: i.format?.id ?? `${i.artwork.id}-default`,
+        title: i.artwork.title,
+        artistName: (i.artwork as any).artist?.name ?? (i.artwork as any).artistName,
+        image: (i.artwork as any).image ?? (Array.isArray((i.artwork as any).images) ? (i as any).artwork.images?.[0] : undefined),
+        price: Number(i.format?.price ?? i.artwork.price ?? 0),
+        qty: Number(i.qty ?? 1),
+      }))
+      await goToCheckout({ items: mapped, email: options?.email })
+    } catch (e) {
+      console.error(e)
+      alert('Une erreur est survenue lors de la création du paiement. Réessayez.')
+    } finally {
+      setCheckingOut(false)
+    }
+  }
+
   const value: CartCtx = {
     items,
     add,
@@ -125,6 +173,9 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     openCart,
     closeCart,
     toggleCart,
+    overlayClick,
+    checkingOut,
+    checkout,
   }
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>
