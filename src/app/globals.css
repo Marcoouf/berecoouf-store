@@ -17,21 +17,20 @@ body::before {
   background-size: 200px 200px;
 }
 /* Cacher le curseur partout sauf sur la page admin */
-body:not(.admin-page) html,
-body:not(.admin-page) body {
+body:not(.admin-page) {
   cursor: none !important;
 }
 
 /* Forcer la disparition aussi sur les éléments cliquables, sauf sur la page admin */
 body:not(.admin-page) a,
-body:not(.admin-page) button,
-body:not(.admin-page) [role="button"],
-body:not(.admin-page) label,
-body:not(.admin-page) input,
-body:not(.admin-page) select,
-body:not(.admin-page) textarea,
-body:not(.admin-page) summary,
-body:not(.admin-page) [tabindex]:not([tabindex="-1"]) {
+button,
+[role="button"],
+label,
+input,
+select,
+textarea,
+summary,
+[tabindex]:not([tabindex="-1"]) {
   cursor: none !important;
 }
 
@@ -131,4 +130,48 @@ body.admin-page .brand-dot,
 body.admin-page .site-brand::before {
   display: none !important;
   content: none !important;
+}
+/* === Custom cursor — styles === */
+/* Visible partout sauf admin (déjà masqué via .admin-page ci-dessus) */
+.custom-cursor {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
+  pointer-events: none; /* ne bloque jamais les clics */
+  transform: translate(-50%, -50%);
+  will-change: transform, opacity;
+  transition: opacity .2s ease;
+}
+
+/* Dot (centre) */
+.custom-cursor__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: rgb(16 24 40); /* ink */
+  opacity: .9;
+}
+
+/* Ring (contour) */
+.custom-cursor__ring {
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  border: 1.5px solid rgb(99 102 241 / 0.85); /* proche accent */
+  box-shadow: 0 0 0 2px rgb(99 102 241 / 0.08);
+  transform: translate(-10px, -10px);
+  backdrop-filter: blur(2px);
+}
+
+/* États utilitaires que ton composant peut ajouter */
+.custom-cursor.is-hidden { opacity: 0; }
+.custom-cursor.is-clicking .custom-cursor__ring { transform: translate(-12px, -12px) scale(0.9); }
+.custom-cursor.is-link .custom-cursor__ring { border-color: rgb(16 185 129 / 0.95); box-shadow: 0 0 0 3px rgb(16 185 129 / 0.10); }
+.custom-cursor.is-busy .custom-cursor__dot { opacity: 0.4; }
+
+/* Accessibilité : réduire les animations si "prefers-reduced-motion" */
+@media (prefers-reduced-motion: reduce) {
+  .custom-cursor { transition: none; }
+  .custom-cursor__ring { transition: none; }
 }

@@ -1,50 +1,67 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { usePathname } from "next/navigation"
+
+const INTERACTIVE_SEL =
+  "a, button, [role='button'], label, input, select, textarea, summary, [tabindex]:not([tabindex='-1'])"
 
 export default function CustomCursor() {
-  const [position, setPosition] = useState({ x: 0, y: 0 })
-  const [hovering, setHovering] = useState(false)
+  const pathname = usePathname()
+  const isAdmin = pathname?.startsWith("/admin")
+
+  const [pos, setPos] = useState({ x: 0, y: 0 })
+  const [isLink, setIsLink] = useState(false)
+  const [hidden, setHidden] = useState(false)
+
+  // Gérer la classe body.admin-page
+  useEffect(() => {
+    const body = document.body
+    if (!body) return
+    if (isAdmin) {
+      body.classList.add("admin-page")
+    } else {
+      body.classList.remove("admin-page")
+    }
+    return () => {
+      body.classList.remove("admin-page")
+    }
+  }, [isAdmin])
+
+  if (isAdmin) return null
 
   useEffect(() => {
-    const move = (e: MouseEvent) => {
-      setPosition({ x: e.clientX, y: e.clientY })
+    const onMove = (e: MouseEvent) => {
+      setPos({ x: e.clientX, y: e.clientY })
+      setHidden(false)
     }
-    window.addEventListener("mousemove", move)
-
-    const handleMouseOver = (e: MouseEvent) => {
-      const target = e.target as HTMLElement
-      if (
-        target.closest(
-          "a, button, [role='button'], label, input, select, textarea, summary, [tabindex]:not([tabindex='-1'])"
-        )
-      ) {
-        setHovering(true)
-      } else {
-        setHovering(false)
-      }
+    const onLeave = () => setHidden(true)
+    const onOver = (e: MouseEvent) => {
+      const t = e.target as HTMLElement | null
+      if (!t) return
+      setIsLink(!!t.closest(INTERACTIVE_SEL))
     }
 
-    window.addEventListener("mouseover", handleMouseOver)
+    window.addEventListener("mousemove", onMove)
+    window.addEventListener("mouseleave", onLeave)
+    window.addEventListener("mouseover", onOver)
 
     return () => {
-      window.removeEventListener("mousemove", move)
-      window.removeEventListener("mouseover", handleMouseOver)
+      window.removeEventListener("mousemove", onMove)
+      window.removeEventListener("mouseleave", onLeave)
+      window.removeEventListener("mouseover", onOver)
     }
   }, [])
 
   return (
     <div
-      className={`pointer-events-none fixed top-0 left-0 z-[9999] rounded-full -translate-x-1/2 -translate-y-1/2 transition-all duration-200 ease-out backdrop-blur-sm ${
-        hovering
-          ? "bg-blue-500/80 scale-150"
-          : "bg-[#a3d9ff]/70 scale-100"
-      }`}
+      className={`fixed top-0 left-0 z-[9999] pointer-events-none -translate-x-1/2 -translate-y-1/2 rounded-full transition-colors duration-150 ease-out w-2.5 h-2.5 ${
+        hidden ? 'opacity-0' : 'opacity-100'
+      } ${isLink ? 'bg-accent-600' : 'bg-accent'}`}
       style={{
-        width: "16px",
-        height: "16px",
-        transform: `translate(${position.x}px, ${position.y}px)`,
+        transform: `translate(${pos.x}px, ${pos.y}px)`,
       }}
+      aria-hidden
     />
   )
 }

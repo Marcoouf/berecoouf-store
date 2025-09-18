@@ -16,26 +16,26 @@ export const metadata: Metadata = {
   title: 'Point Bleu — Éditions d’art',
   description: 'Galerie en ligne d’illustrations contemporaines en séries limitées.',
   icons: {
-    icon: "/favicon.png",
+    icon: '/favicon.png',
+  },
 }
-  }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fr">
-<body className={`${inter.variable} ${garamond.variable} font-sans bg-white text-neutral-900 antialiased`}>
-  <Providers>
-    {/* Frontière Suspense globale pour tous les composants client qui utilisent
-       useSearchParams / usePathname (ScrollManager, ClientLayout, GlobalCartDrawer, etc.) */}
-    <Suspense fallback={<div className="sr-only" aria-hidden="true">Chargement…</div>}>
-      <ScrollManager />
-      <HeaderGlobal />
-      <CustomCursor />
-      <ClientLayout>{children}</ClientLayout>
-      <GlobalCartDrawer />
-    </Suspense>
-  </Providers>
-    </body>
+      <body className={`${inter.variable} ${garamond.variable} font-sans bg-white text-neutral-900 antialiased`}>
+        <Providers>
+          {/* Frontière Suspense globale pour tous les composants client qui utilisent
+             useSearchParams / usePathname (ScrollManager, ClientLayout, GlobalCartDrawer, etc.) */}
+          <Suspense fallback={<div className="sr-only" aria-hidden="true">Chargement…</div>}>
+            <ScrollManager />
+            <HeaderGlobal />
+            <CustomCursor />
+            <ClientLayout>{children}</ClientLayout>
+            <GlobalCartDrawer />
+          </Suspense>
+        </Providers>
+      </body>
     </html>
   )
 }

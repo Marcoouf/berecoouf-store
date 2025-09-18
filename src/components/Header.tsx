@@ -38,7 +38,7 @@ export default function HeaderGlobal() {
           <motion.span
             aria-hidden
             className="brand-dot h-2.5 w-2.5 rounded-full bg-accent group-hover:bg-accent-dark"
-            animate={prefersReduced ? { scale: 1 } : { scale: [1, 1.15, 1] }}
+            animate={prefersReduced ? { scale: 1 } : { scale: [1, 1.25, 1] }}
             transition={
               prefersReduced ? undefined : { duration: 2, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' }
             }
