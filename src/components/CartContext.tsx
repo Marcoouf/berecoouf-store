@@ -1,26 +1,30 @@
 'use client'
 
-import React, { createContext, useContext, useMemo, useState } from 'react'
+import React, { createContext, useContext, useMemo, useState, useEffect } from 'react'
 import type { Artwork, Format } from '@/lib/types'
 
-const STORAGE_KEY = 'cart-v1';
-
-function safeLoad<T>(key: string): T | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    return JSON.parse(raw) as T;
-  } catch {
-    return null;
-  }
-}
+const STORAGE_KEY = 'cart-v1'
 
 function safeSave<T>(key: string, value: T) {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined') return
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    localStorage.setItem(key, JSON.stringify(value))
   } catch {}
+}
+
+// Lecture synchrone au premier render côté client pour éviter le flash à vide
+function initialItems(): CartItem[] {
+  if (typeof window === 'undefined') return []
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (Array.isArray(parsed?.items)) return parsed.items as CartItem[]
+    if (Array.isArray(parsed)) return parsed as CartItem[]
+    return []
+  } catch {
+    return []
+  }
 }
 
 type CartItem = {
@@ -47,32 +51,36 @@ type CartCtx = {
   overlayClick: (e: React.MouseEvent<HTMLDivElement>) => void
   checkingOut: boolean
   checkout: (options?: { email?: string }) => Promise<void>
+  /** Vrai quand le contexte est hydraté côté client (évite l'état vide transitoire) */
+  hydrated: boolean
 }
 
 const CartContext = createContext<CartCtx | null>(null)
 
-export const useCart = () => {
+export const useCartCtx = () => {
   const ctx = useContext(CartContext)
-  if (!ctx) throw new Error('useCart must be used within CartProvider')
+  if (!ctx) throw new Error('useCartCtx must be used within CartProvider')
   return ctx
 }
 
-export function CartProvider({ children }: { children: React.ReactNode }) {
-  const [items, setItems] = useState<CartItem[]>([])
+export default function CartProvider({ children }: { children: React.ReactNode }) {
+  // Initialise immédiatement depuis localStorage (si présent)
+  const [items, setItems] = useState<CartItem[]>(initialItems)
   const [lastAdded, setLastAdded] = useState<number>(0)
   const [open, setOpen] = useState(false)
   const [checkingOut, setCheckingOut] = useState(false)
+  const [hydrated, setHydrated] = useState(false)
 
-  React.useEffect(() => {
-    const data = safeLoad<{ items: CartItem[] }>(STORAGE_KEY);
-    if (data && Array.isArray(data.items)) {
-      setItems(data.items);
-    }
-  }, []);
+  // Marque le contexte comme hydraté côté client
+  useEffect(() => {
+    setHydrated(true)
+  }, [])
 
-  React.useEffect(() => {
-    safeSave(STORAGE_KEY, { items });
-  }, [items]);
+  // Persistance après hydratation
+  useEffect(() => {
+    if (!hydrated) return
+    safeSave(STORAGE_KEY, { items })
+  }, [items, hydrated])
 
   const add: CartCtx['add'] = (artwork, format) => {
     setItems(prev => {
@@ -117,14 +125,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const toggleCart = () => setOpen(o => !o)
 
   const overlayClick: CartCtx['overlayClick'] = (e) => {
-    // Ferme uniquement si on clique en dehors du panneau (id="cart-drawer").
-    const panel = typeof document !== 'undefined' ? document.getElementById('cart-drawer') : null;
-    const target = e.target as Node | null;
-    if (panel && target && panel.contains(target)) {
-      return; // clic à l'intérieur du panier -> ne rien faire
+    // ferme uniquement si on clique directement sur l’overlay
+    if (e.currentTarget === e.target) {
+      setOpen(false)
     }
-    setOpen(false); // clic sur l'overlay -> fermer
-  };
+  }
 
   async function goToCheckout(payload: any) {
     const res = await fetch('/api/checkout', {
@@ -176,7 +181,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     overlayClick,
     checkingOut,
     checkout,
+    hydrated,
   }
 
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>
 }
+
+// Back-compat: certains composants importent encore { useCart } depuis ce module
+export { useCartCtx as useCart };

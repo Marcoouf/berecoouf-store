@@ -1,151 +1,181 @@
 'use client'
 
+import { useMemo } from 'react'
 import Link from 'next/link'
 import Image from '@/components/SmartImage'
-import { useCart } from '@/components/CartContext'
 import { euro } from '@/lib/format'
-import { useState } from 'react'
-
-async function goToCheckout(payload: any) {
-  const res = await fetch('/api/checkout', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  if (!res.ok) throw new Error('checkout-failed');
-  const data = await res.json();
-  if (!data?.url) throw new Error('missing-url');
-  window.location.href = data.url as string;
-}
+import { useCartCtx } from '@/components/CartContext'
 
 export default function GlobalCartDrawer() {
-  const { items, total, updateQty, remove, clear, open, closeCart } = useCart()
-  const [loading, setLoading] = useState(false)
+  const {
+    items,
+    remove,
+    updateQty,
+    clear,
+    open,
+    closeCart,
+    overlayClick,
+    checkout,
+    checkingOut,
+  } = useCartCtx()
+
+  const subtotal = useMemo(
+    () => items.reduce((sum: number, i: any) => sum + (i?.format?.price ?? i?.artwork?.price ?? 0) * (i?.qty ?? 1), 0),
+    [items]
+  )
 
   if (!open) return null
 
-  const handlePay = async () => {
-    if (items.length === 0 || loading) return;
-    setLoading(true);
-    try {
-      const mapped = items.map(i => ({
-        workId: (i as any).artwork?.id ?? (i as any).workId ?? String(i.key),
-        variantId: (i as any).format?.id ?? (i as any).variantId ?? `${(i as any).artwork?.id ?? i.key}-default`,
-        title: (i as any).artwork?.title ?? (i as any).title ?? 'Œuvre',
-        artistName: (i as any).artwork?.artist?.name ?? (i as any).artistName,
-        image: (i as any).artwork?.image ?? (i as any).image,
-        price: Number((i as any).format?.price ?? (i as any).artwork?.price ?? (i as any).price ?? 0),
-        qty: Number(i.qty ?? 1),
-      }));
-      await goToCheckout({ items: mapped });
-    } catch (e) {
-      console.error(e);
-      alert('Une erreur est survenue lors de la création du paiement. Réessayez.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Empêche la propagation des clics à l'intérieur du panneau
-  const stop = (e: React.MouseEvent) => e.stopPropagation()
-
   return (
     <div
-      className="fixed inset-0 z-50 flex md:justify-end bg-black/20 backdrop-blur-sm"
-      // Ne ferme que si on clique directement sur l'overlay (pas sur les enfants)
-      onClick={(e) => {
-        if (e.target !== e.currentTarget) return
-        closeCart()
-      }}
-      onMouseDown={(e) => {
-        if (e.target !== e.currentTarget) return
-      }}
+      id="cart-drawer"
+      aria-modal="true"
+      role="dialog"
+      className="fixed inset-0 z-[79] flex"
     >
+      {/* Overlay */}
+      <div
+        className="fixed inset-0 z-[80] bg-neutral-900/40 pointer-events-auto"
+        aria-hidden="true"
+        onMouseDown={overlayClick}
+      />
+
+      {/* Panel */}
       <aside
-        id="cart-drawer"
-        role="dialog"
-        aria-modal="true"
-        onClick={stop}
-        onMouseDown={stop}
-        className="h-full w-full md:max-w-md md:border-l bg-white px-4 sm:px-6 py-5 flex flex-col"
+        className="relative ml-auto h-full w-full max-w-md bg-white shadow-xl border-l border-line/60 flex flex-col z-[81] pointer-events-auto"
+        onMouseDownCapture={(e) => e.stopPropagation()}
+        onPointerDownCapture={(e) => e.stopPropagation()}
+        onTouchStartCapture={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
-        <div className="mb-6 flex items-center justify-between">
-          <h3 className="text-lg font-medium">Panier</h3>
+        {/* Header */}
+        <div className="flex items-center justify-between px-4 py-3 border-b border-line/60">
+          <h2 className="text-sm font-medium">Votre panier</h2>
           <button
             type="button"
-            onClick={closeCart}
-            className="rounded-full border border-accent px-3 py-1 text-sm text-accent hover:bg-accent-light transition"
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              closeCart()
+            }}
+            className="text-xs text-neutral-600 hover:text-neutral-900"
           >
             Fermer
           </button>
         </div>
 
-        {items.length === 0 ? (
-          <p className="text-sm text-neutral-600">Votre panier est vide.</p>
-        ) : (
-          <div className="flex h-full flex-col">
-            <ul className="flex-1 space-y-4 overflow-auto pr-2">
-              {items.map(i => (
-                <li key={i.key} className="flex gap-3">
-                  <div className="h-16 w-16 rounded border overflow-hidden relative">
-                    <Image src={i.artwork.image} alt="" fill className="object-cover" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between">
-                      <div className="truncate text-sm font-medium">{i.artwork.title}</div>
-                      <button type="button" onClick={() => remove(i.key)} className="text-xs text-neutral-500 hover:text-accent">Retirer</button>
-                    </div>
-                    <div className="mt-0.5 text-xs text-neutral-500">
-                      {i.format ? `Format — ${i.format.label}` : 'Format standard'}
-                    </div>
-                    <div className="mt-2 flex items-center gap-2">
-                      <input
-                        type="number"
-                        min={1}
-                        value={i.qty}
-                        onChange={(e) => updateQty(i.key, Math.max(1, Number(e.target.value)))}
-                        className="w-16 rounded border px-2 py-1 text-sm"
-                      />
-                      <div className="ml-auto text-sm tabular-nums">{euro((i.format?.price ?? i.artwork.price) * i.qty)}</div>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-
-            <div className="sticky bottom-0 -mx-4 sm:-mx-6 bg-white/90 supports-[backdrop-filter]:bg-white/60 backdrop-blur border-t px-4 sm:px-6 pt-4 pb-4 space-y-3">
-              <div className="flex justify-between text-sm">
-                <span>Total</span>
-                <span className="tabular-nums">{euro(total)}</span>
-              </div>
-
-              <Link
-                href="/cart"
-                onClick={() => closeCart()}
-                className="w-full inline-flex items-center justify-center rounded-lg border px-3 py-2 text-sm hover:bg-neutral-50"
-              >
-                Voir le panier complet
+        {/* Items */}
+        <div className="flex-1 overflow-auto p-4 space-y-3">
+          {items.length === 0 ? (
+            <div className="rounded-lg border p-6 text-center text-sm text-neutral-600">
+              Votre panier est vide.<br />
+              <Link href="/artworks" className="mt-2 inline-block underline">
+                Découvrir les œuvres
               </Link>
-
-              <button
-                type="button"
-                onClick={handlePay}
-                disabled={items.length === 0 || loading}
-                aria-busy={loading}
-                className="w-full rounded-lg bg-accent hover:bg-accent-dark disabled:opacity-60 disabled:cursor-not-allowed text-ink font-medium px-3 py-2 text-sm transition"
-              >
-                {loading ? 'Redirection en cours…' : 'Procéder au paiement'}
-              </button>
-              <button
-                type="button"
-                onClick={clear}
-                className="w-full rounded-lg border border-accent px-3 py-2 text-xs text-accent hover:bg-accent-light transition"
-              >
-                Vider le panier
-              </button>
             </div>
+          ) : (
+            items.map((i: any) => (
+              <div key={i?.key} className="flex gap-3 border rounded-lg p-3">
+                <div className="relative h-16 w-16 overflow-hidden rounded border">
+                  <Image
+                    src={i?.artwork?.image}
+                    alt={i?.artwork?.title ?? 'Œuvre'}
+                    fill
+                    className="object-cover"
+                  />
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="font-medium truncate text-sm">{i?.artwork?.title ?? 'Œuvre'}</div>
+                      <div className="text-xs text-neutral-500">
+                        {i?.format ? `Format — ${i?.format?.label}` : 'Format standard'}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        remove(i?.key)
+                      }}
+                      className="text-xs text-neutral-500 hover:text-accent"
+                    >
+                      Retirer
+                    </button>
+                  </div>
+
+                  <div className="mt-2 flex items-center gap-2">
+                    <label htmlFor={`qty-${i?.key}`} className="text-xs text-neutral-500">
+                      Qté
+                    </label>
+                    <input
+                      id={`qty-${i?.key}`}
+                      type="number"
+                      min={1}
+                      value={i?.qty ?? 1}
+                      onChange={(e) => updateQty(i?.key, Math.max(1, Number(e.target.value)))}
+                      className="w-16 rounded border px-2 py-1 text-sm"
+                    />
+                    <div className="ml-auto text-sm tabular-nums">
+                      {euro(((i?.format?.price ?? i?.artwork?.price ?? 0) * (i?.qty ?? 1)) as number)}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="border-t border-line/60 p-4 space-y-3">
+          <div className="flex justify-between text-sm">
+            <span>Sous-total</span>
+            <span className="tabular-nums">{euro(subtotal)}</span>
           </div>
-        )}
+          <p className="text-xs text-neutral-500">Taxes et frais d’expédition calculés au paiement.</p>
+
+          <Link
+            href="/cart"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              // we do not close the cart to allow user to return easily
+              window.location.href = '/cart'
+            }}
+            className="w-full block rounded-lg border border-line px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-50 text-center"
+          >
+            Voir le panier complet
+          </Link>
+
+          <button
+            type="button"
+            onClick={async (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (checkingOut) return;
+              await checkout();
+            }}
+            disabled={items.length === 0 || checkingOut}
+            aria-busy={checkingOut}
+            className="w-full rounded-lg bg-accent text-ink px-4 py-2 text-sm font-medium hover:bg-accent-dark disabled:opacity-60 disabled:cursor-not-allowed transition"
+          >
+            {checkingOut ? 'Redirection…' : 'Procéder au paiement'}
+          </button>
+
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              clear()
+            }}
+            className="w-full rounded-lg border border-accent px-4 py-2 text-xs text-accent hover:bg-accent-light transition"
+          >
+            Vider le panier
+          </button>
+        </div>
       </aside>
     </div>
   )
