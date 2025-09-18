@@ -10,6 +10,7 @@ import { FadeIn, Stagger } from '@/components/Motion'
 import { motion, useScroll, useSpring } from 'framer-motion'
 import { euro } from '@/lib/format';
 
+
 // === Container local (on NE l'importe PAS) ===
 function Container({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return <div className={`mx-auto w-full max-w-6xl px-4 sm:px-6 ${className}`}>{children}</div>
@@ -390,41 +391,6 @@ function CartDrawer({ artistsById }: { artistsById: Record<string, string> }) {
   )
 }
 
-function Footer() {
-  return (
-    <footer id="about" className="bg-neutral-50/60">
-      <Container className="py-8 sm:py-10 md:py-16 text-sm text-neutral-600">
-        <div className="grid gap-6 sm:gap-8 md:grid-cols-4">
-          <div className="md:col-span-2">
-            <div className="text-sm tracking-widest uppercase text-neutral-800">Point Bleu</div>
-            <p className="mt-3 max-w-sm">Éditions d&apos;art et galerie en ligne. Tirages numérotés, impression fine art.</p>
-          </div>
-          <div>
-            <div className="font-medium text-neutral-800">Aide</div>
-            <ul className="mt-3 space-y-2">
-              <li><a href="#" className="hover:text-accent">FAQ</a></li>
-              <li><a href="#" className="hover:text-accent">Livraison & retours</a></li>
-              <li><a href="#" className="hover:text-accent">Contact</a></li>
-            </ul>
-          </div>
-          <div>
-            <div className="font-medium text-neutral-800">Légal</div>
-            <ul className="mt-3 space-y-2">
-              <li><a href="#" className="hover:text-accent">Mentions légales</a></li>
-              <li><a href="#" className="hover:text-accent">CGV</a></li>
-              <li><a href="#" className="hover:text-accent">Confidentialité</a></li>
-            </ul>
-          </div>
-        </div>
-        <div className="mt-10 text-xs text-neutral-500">© {new Date().getFullYear()} Point Bleu. Tous droits réservés.</div>
-      </Container>
-    </footer>
-  )
-}
-
-
-
-
 export default function Site({ openCartOnLoad = false, catalog }: { openCartOnLoad?: boolean; catalog?: { artists: Artist[]; artworks: Artwork[] } }) {
   const { openCart } = useCart()
   const [artistsState, setArtistsState] = React.useState<Artist[]>(catalog?.artists ?? [])
@@ -459,7 +425,6 @@ export default function Site({ openCartOnLoad = false, catalog }: { openCartOnLo
       <Hero candidates={heroCandidates} />
       <Artists artists={artistsState} />
       <Gallery artworks={artworksState} artistsById={artistsById} />
-      <Footer />
       <CartDrawer artistsById={artistsById} />
     </div>
   )

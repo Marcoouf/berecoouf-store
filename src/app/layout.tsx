@@ -8,6 +8,7 @@ import GlobalCartDrawer from '@/components/GlobalCartDrawer'
 import ScrollManager from '@/components/ScrollManager'
 import ClientLayout from '@/components/ClientLayout'
 import { Suspense } from 'react'
+import Footer from '@/components/Footer'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
 const garamond = EB_Garamond({ subsets: ['latin'], variable: '--font-serif' })
@@ -35,6 +36,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <GlobalCartDrawer />
           </Suspense>
         </Providers>
+        <Footer />
       </body>
     </html>
   )
