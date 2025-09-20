@@ -1,13 +1,14 @@
 // src/app/artworks/[slug]/page.tsx
 import Link from 'next/link'
 import Image from '@/components/SmartImage'
-import AdaptiveFrame from '@/components/AdaptiveFrame'
 import { notFound } from 'next/navigation'
 import Breadcrumb from '@/components/Breadcrumb'
 import ArtworkPurchase from '@/components/ArtworkPurchase'
 import { euro } from '@/lib/format'
 import { getCatalog } from '@/lib/getCatalog'
 import type { Artwork, Artist } from '@/lib/types'
+import ArtworkImageCarousel from '@/components/ArtworkImageCarousel'
+import RelatedCarousel from '@/components/RelatedCarousel'
 // important : ne pas figer au build
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -59,12 +60,8 @@ export default async function Page({ params }: { params: { slug: string } }) {
   if (!artwork) notFound()
 
   const artist = catalog.artists.find(a => a.id === artwork.artistId) ?? null
-  const related = catalog.artworks
-    .filter(w => w.artistId === artwork.artistId && w.id !== artwork.id)
-    .slice(0, 3)
-
-  const mockupSrc = artwork.mockup ?? artwork.image
-  const originalSrc = artwork.image
+  const related = catalog.artworks.filter(w => w.artistId === artwork.artistId && w.id !== artwork.id)
+  const artistsById = Object.fromEntries(catalog.artists.map(a => [a.id, a.name]))
 
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6">
@@ -80,23 +77,16 @@ export default async function Page({ params }: { params: { slug: string } }) {
       </div>
 
       <div className="grid gap-6 md:gap-8 py-8 sm:py-10 md:py-16 md:grid-cols-2">
-        <AdaptiveFrame
-          className="group relative rounded-2xl border bg-neutral-50 overflow-hidden transition-colors duration-300 hover:border-transparent hover:bg-transparent"
-          src={mockupSrc}
-          alt={`${artwork.title} — mise en situation`}
-          sizes="(min-width:1024px) 50vw, 100vw"
-          imgClassName="object-contain transition-opacity duration-300 will-change-[opacity] group-hover:opacity-0"
-        >
-          <Image
-            src={originalSrc}
-            alt={artwork.title}
-            fill
-            sizes="(min-width:1024px) 50vw, 100vw"
-            className="absolute inset-0 z-10 object-contain opacity-0 group-hover:opacity-100 transition-opacity duration-300 will-change-[opacity] pointer-events-none"
+        {/* Wrapper `.group` pour permettre l'affichage des flèches du carrousel au survol */}
+        <figure className="relative group">
+          <ArtworkImageCarousel
+            title={artwork.title}
+            image={artwork.image}
+            mockup={artwork.mockup ?? null}
             priority
-            aria-hidden="true"
           />
-        </AdaptiveFrame>
+          <figcaption className="sr-only">{artwork.title}</figcaption>
+        </figure>
 
         <div className="md:pl-6">
           <Link
@@ -170,39 +160,11 @@ export default async function Page({ params }: { params: { slug: string } }) {
       </div>
 
       {related.length > 0 && (
-        <section className="border-t border-neutral-200/60 py-10 md:py-16">
-          <h2 className="mb-6 text-xl font-medium tracking-tight">
-            Plus d’œuvres {artist ? `de ${artist.name}` : 'de cet artiste'}
-          </h2>
-          <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
-            {related.map(w => (
-              <div key={w.id} className="group">
-                <div className="relative overflow-hidden rounded-xl border aspect-[4/5]">
-                  <Link href={`/artworks/${w.slug}`} scroll className="absolute inset-0" aria-label={`Voir ${w.title}`}>
-                    <Image
-                      src={w.image}
-                      alt={w.title}
-                      fill
-                      sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw"
-                      className="object-cover motion-safe:transition-transform motion-safe:duration-500 group-hover:scale-[1.02]"
-                    />
-                  </Link>
-                </div>
-                <div className="mt-3 flex items-start justify-between gap-4">
-                  <div>
-                    <div className="text-sm font-medium">
-                      <Link href={`/artworks/${w.slug}`} scroll className="hover:underline">
-                        {w.title}
-                      </Link>
-                    </div>
-                    {artist && <div className="text-xs text-neutral-500">{artist.name}</div>}
-                  </div>
-                  <div className="text-sm tabular-nums">{displayPriceFor(w)}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+        <RelatedCarousel
+          items={related}
+          title={artist ? `Plus d’œuvres de ${artist.name}` : 'Plus d’œuvres'}
+          artistsById={artistsById}
+        />
       )}
 
       {(() => {
