@@ -146,10 +146,10 @@ body.admin-page .site-brand::before {
 
 /* Dot (centre) */
 .custom-cursor__dot {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 9999px;
-  background: rgb(16 24 40); /* ink */
+  background: theme('colors.accent.300'); /* accent logo color */
   opacity: .9;
 }
 
@@ -158,8 +158,8 @@ body.admin-page .site-brand::before {
   width: 28px;
   height: 28px;
   border-radius: 9999px;
-  border: 1.5px solid rgb(99 102 241 / 0.85); /* proche accent */
-  box-shadow: 0 0 0 2px rgb(99 102 241 / 0.08);
+  border: 1.5px solid theme('colors.accent.400'); /* accent ring */
+  box-shadow: 0 0 0 2px theme('colors.accent.200' / 0.08);
   transform: translate(-10px, -10px);
   backdrop-filter: blur(2px);
 }

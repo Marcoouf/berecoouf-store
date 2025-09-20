@@ -9,16 +9,26 @@ const INTERACTIVE_SEL =
 export default function CustomCursor() {
   const pathname = usePathname()
   const isAdmin = pathname?.startsWith("/admin")
+  const [isMobile, setIsMobile] = useState(false)
 
   const [pos, setPos] = useState({ x: 0, y: 0 })
   const [isLink, setIsLink] = useState(false)
   const [hidden, setHidden] = useState(false)
 
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 1024)
+    check()
+    window.addEventListener("resize", check)
+    return () => {
+      window.removeEventListener("resize", check)
+    }
+  }, [])
+
   // Gérer la classe body.admin-page
   useEffect(() => {
     const body = document.body
     if (!body) return
-    if (isAdmin) {
+    if (isAdmin || isMobile) {
       body.classList.add("admin-page")
     } else {
       body.classList.remove("admin-page")
@@ -26,9 +36,9 @@ export default function CustomCursor() {
     return () => {
       body.classList.remove("admin-page")
     }
-  }, [isAdmin])
+  }, [isAdmin, isMobile])
 
-  if (isAdmin) return null
+  if (isAdmin || isMobile) return null
 
   useEffect(() => {
     const onMove = (e: MouseEvent) => {

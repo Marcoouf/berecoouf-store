@@ -17,7 +17,7 @@ export default async function MerciPage({ searchParams }: Props) {
       <main className="relative z-10 mx-auto max-w-3xl p-6">
         <h1 className="text-2xl font-semibold mb-2">Merci pour votre commande</h1>
         <p className="text-neutral-600">Référence de paiement inconnue.</p>
-        <Link href="/galerie" className="mt-6 inline-block underline">Retourner à la galerie</Link>
+        <Link href="/" className="mt-6 inline-block underline">Retourner à la galerie</Link>
       </main>
     )
   }
@@ -77,18 +77,12 @@ export default async function MerciPage({ searchParams }: Props) {
           )}
         </section>
 
-        <div className="mt-6 flex gap-3">
+        <div className="mt-6">
           <Link
-            href="/galerie"
-            className="rounded-lg border px-4 py-2 text-sm hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-accent/40"
+            href="/"
+            className="inline-flex rounded-lg border px-4 py-2 text-sm hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-accent/40"
           >
-            Continuer vos achats
-          </Link>
-          <Link
-            href="/account/orders"
-            className="rounded-lg bg-accent text-ink px-4 py-2 text-sm hover:bg-accent-dark focus:outline-none focus:ring-2 focus:ring-accent/40"
-          >
-            Voir ma commande
+            Retourner à la galerie
           </Link>
         </div>
       </main>
