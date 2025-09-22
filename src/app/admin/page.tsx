@@ -2,7 +2,6 @@
 export const dynamic = 'force-dynamic'
 
 import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
 
 type Toast = { id: string; kind: 'success' | 'error' | 'info'; msg: string }
@@ -129,9 +128,16 @@ function addToast(kind: Toast['kind'], msg: string) {
     const fd = new FormData()
     fd.append('file', file)
     fd.append('kind', kind)
+    fd.append('originalName', file.name || 'image')
 
     const xhr = new XMLHttpRequest()
     xhr.open('POST', '/api/upload', true)
+    // Pass admin auth to the API (header) and mark as XHR
+    const adminKey = process.env.NEXT_PUBLIC_ADMIN_KEY as string | undefined
+    if (adminKey) xhr.setRequestHeader('x-admin-key', adminKey)
+    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest')
+    // Ask XHR to parse JSON for us when supported
+    try { xhr.responseType = 'json' } catch {}
     xhr.withCredentials = true
     xhr.upload.onprogress = (evt) => {
       if (evt.lengthComputable) {
@@ -142,9 +148,14 @@ function addToast(kind: Toast['kind'], msg: string) {
     xhr.onreadystatechange = () => {
       if (xhr.readyState === 4) {
         try {
-          const json = JSON.parse(xhr.responseText || '{}')
-          resolve(json)
-        } catch {
+          const res: any = (xhr.responseType === 'json' ? xhr.response : JSON.parse(xhr.responseText || '{}')) || {}
+          if (xhr.status >= 200 && xhr.status < 300 && (res?.url || res?.path)) {
+            resolve({ ok: true, url: res.url, path: res.path })
+          } else {
+            const msg = res?.error || res?.message || (xhr.status ? `HTTP ${xhr.status}` : 'Réponse invalide')
+            resolve({ ok: false, error: msg })
+          }
+        } catch (e) {
           resolve({ ok: false, error: 'Réponse invalide' })
         }
       }
@@ -245,8 +256,11 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
     }
     if (!canSubmit) return
 
+    const isEditing = !!editingId
+
     const payload: ArtworkDraft = {
       ...value,
+      id: value.id, // s'assurer que l'id courant est bien envoyé
       image: value.image,
       mockup: value.mockup || undefined,
       slug: derivedSlug,
@@ -261,41 +275,52 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
     } as any
 
     try {
-      const res = await fetch('/api/admin/save-artwork', {
-        method: 'POST',
+      const url = new URL('/api/admin/work', window.location.origin)
+      if (isEditing) url.searchParams.set('id', String(value.id))
+
+      const adminKey = process.env.NEXT_PUBLIC_ADMIN_KEY
+      const res = await fetch(url.toString(), {
+        method: isEditing ? 'PUT' : 'POST',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
+          ...(adminKey ? { 'x-admin-key': adminKey } : {}),
         },
         body: JSON.stringify(payload),
       })
       const j = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(j?.error || `HTTP ${res.status}`)
+      if (!res.ok || j?.ok === false) throw new Error(j?.error || `HTTP ${res.status}`)
 
-      addToast('success', 'Œuvre enregistrée ✅')
+      addToast('success', isEditing ? 'Œuvre mise à jour ✅' : 'Œuvre enregistrée ✅')
+
+      // Recharge la liste et garde le contexte
       await refreshExisting()
-
-      // reset
-      set({
-        id: uid(),
-        slug: '',
-        title: '',
-        artistId: artistsForSelect[0].value,
-        image: '',
-        mockup: '',
-        price: 0,
-        description: '',
-        year: undefined,
-        technique: '',
-        paper: '',
-        size: '',
-        edition: '',
-        formats: [
-          { id: uid('f'), label: 'A3 — 297×420mm', price: 120 },
-          { id: uid('f'), label: 'A2 — 420×594mm', price: 180 },
-          { id: uid('f'), label: 'A1 — 594×841mm', price: 220 },
-        ],
-      })
+      if (isEditing) {
+        // rester sur l'œuvre éditée
+        setEditingId(value.id)
+      } else {
+        // reset uniquement en création
+        set({
+          id: uid(),
+          slug: '',
+          title: '',
+          artistId: artistsForSelect[0].value,
+          image: '',
+          mockup: '',
+          price: 0,
+          description: '',
+          year: undefined,
+          technique: '',
+          paper: '',
+          size: '',
+          edition: '',
+          formats: [
+            { id: uid('f'), label: 'A3 — 297×420mm', price: 120 },
+            { id: uid('f'), label: 'A2 — 420×594mm', price: 180 },
+            { id: uid('f'), label: 'A1 — 594×841mm', price: 220 },
+          ],
+        })
+      }
     } catch (err: any) {
       addToast('error', err?.message || 'Échec enregistrement')
     }
@@ -344,15 +369,21 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
                 } else {
                   const found = existing.find(x => x.id === id)
                   if (found) {
-                    set({
-                      ...found,
-                      formats: (found.formats && found.formats.length > 0)
-                        ? found.formats
+                    const formats = (Array.isArray((found as any).formats) && (found as any).formats.length > 0)
+                      ? (found as any).formats
+                      : (Array.isArray((found as any).variants) && (found as any).variants.length > 0)
+                        ? (found as any).variants.map((v: any) => ({ id: v.id || uid('f'), label: v.label, price: Number(v.price) || 0 }))
                         : [
                             { id: uid('f'), label: 'A3 — 297×420mm', price: 120 },
                             { id: uid('f'), label: 'A2 — 420×594mm', price: 180 },
                             { id: uid('f'), label: 'A1 — 594×841mm', price: 220 },
-                          ],
+                          ]
+                    set({
+                      ...found,
+                      id: String(found.id),
+                      formats,
+                      image: String((found as any).image || (found as any).imageUrl || ''),
+                      mockup: (found as any).mockup || (found as any).mockupUrl || '',
                     } as any)
                   }
                 }
@@ -392,10 +423,15 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
                 if (!editingId) return
                 const ok = confirm('Supprimer définitivement cette œuvre ?')
                 if (!ok) return
-                const url = new URL('/api/admin/save-artwork', window.location.origin)
+                const url = new URL('/api/admin/work', window.location.origin)
                 url.searchParams.set('id', editingId)
+                const adminKey = process.env.NEXT_PUBLIC_ADMIN_KEY
                 const res = await fetch(url.toString(), {
                   method: 'DELETE',
+                  credentials: 'include',
+                  headers: {
+                    ...(adminKey ? { 'x-admin-key': adminKey } : {}),
+                  },
                 })
                 const j = await res.json().catch(() => ({}))
                 if (!res.ok || !j?.ok) {
@@ -452,6 +488,46 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
               </button>
               {uploadError && <span className="text-sm text-red-600">{uploadError}</span>}
             </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <input
+                type="url"
+                placeholder="Coller une URL d’image (https://…)"
+                className="w-full max-w-md rounded-md border px-3 py-2 text-sm"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const v = (e.currentTarget as HTMLInputElement).value.trim()
+                    if (v) {
+                      setField('image', v)
+                      addToast('success', 'URL image appliquée ✅')
+                    }
+                  }
+                }}
+              />
+              <button
+                type="button"
+                className="rounded-md border px-3 py-2 text-sm hover:bg-neutral-50"
+                onClick={(e) => {
+                  const input = (e.currentTarget.previousElementSibling as HTMLInputElement)
+                  const v = input?.value?.trim()
+                  if (v) {
+                    setField('image', v)
+                    addToast('success', 'URL image appliquée ✅')
+                  }
+                }}
+              >
+                Utiliser cette URL
+              </button>
+              {value.image && (
+                <button
+                  type="button"
+                  className="rounded-md border px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                  onClick={() => setField('image', '')}
+                  title="Retirer l’image actuelle"
+                >
+                  Retirer l’image
+                </button>
+              )}
+            </div>
             {imgProgress > 0 && (
   <div className="mt-2 h-2 w-full rounded bg-neutral-100">
     <div
@@ -502,6 +578,46 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
                   <span className="text-sm text-red-600">{uploadErrorMockup}</span>
                 )}
               </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <input
+                  type="url"
+                  placeholder="Coller une URL de mockup (https://…)"
+                  className="w-full max-w-md rounded-md border px-3 py-2 text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const v = (e.currentTarget as HTMLInputElement).value.trim()
+                      if (v) {
+                        setField('mockup', v)
+                        addToast('success', 'URL mockup appliquée ✅')
+                      }
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="rounded-md border px-3 py-2 text-sm hover:bg-neutral-50"
+                  onClick={(e) => {
+                    const input = (e.currentTarget.previousElementSibling as HTMLInputElement)
+                    const v = input?.value?.trim()
+                    if (v) {
+                      setField('mockup', v)
+                      addToast('success', 'URL mockup appliquée ✅')
+                    }
+                  }}
+                >
+                  Utiliser cette URL
+                </button>
+                {value.mockup && (
+                  <button
+                    type="button"
+                    className="rounded-md border px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                    onClick={() => setField('mockup', '')}
+                    title="Retirer le mockup actuel"
+                  >
+                    Retirer le mockup
+                  </button>
+                )}
+              </div>
               {mockProgress > 0 && (
   <div className="mt-2 h-2 w-full rounded bg-neutral-100">
     <div
@@ -543,7 +659,24 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
             <div className="rounded-xl border">
               <div className="relative aspect-[4/5] overflow-hidden rounded-xl">
                 {value.image ? (
-                  <img src={value.image} alt="Aperçu image" className="absolute inset-0 h-full w-full object-cover" />
+                  <>
+                    <img src={value.image} alt="Aperçu image" className="absolute inset-0 h-full w-full object-cover" />
+                    <div className="absolute left-1/2 top-1 -translate-x-1/2 rounded-full bg-white/80 px-2 py-0.5 shadow backdrop-blur supports-[backdrop-filter]:bg-white/60">
+                      <button
+                        type="button"
+                        className="text-[11px] underline underline-offset-2"
+                        onClick={() => {
+                          navigator.clipboard?.writeText(value.image).then(() => addToast('info', 'URL copiée'))
+                        }}
+                      >
+                        Copier l’URL
+                      </button>
+                      <span className="mx-1 text-neutral-400">•</span>
+                      <a href={value.image} target="_blank" rel="noreferrer" className="text-[11px] underline underline-offset-2">
+                        Ouvrir
+                      </a>
+                    </div>
+                  </>
                 ) : (
                   <div className="absolute inset-0 grid place-items-center text-xs text-neutral-500">Aucun visuel</div>
                 )}
@@ -552,7 +685,24 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
             <div className="rounded-xl border">
               <div className="relative aspect-[4/5] overflow-hidden rounded-xl">
                 {value.mockup ? (
-                  <img src={value.mockup} alt="Aperçu mockup" className="absolute inset-0 h-full w-full object-cover" />
+                  <>
+                    <img src={value.mockup} alt="Aperçu mockup" className="absolute inset-0 h-full w-full object-cover" />
+                    <div className="absolute left-1/2 top-1 -translate-x-1/2 rounded-full bg-white/80 px-2 py-0.5 shadow backdrop-blur supports-[backdrop-filter]:bg-white/60">
+                      <button
+                        type="button"
+                        className="text-[11px] underline underline-offset-2"
+                        onClick={() => {
+                          navigator.clipboard?.writeText(value.mockup!).then(() => addToast('info', 'URL copiée'))
+                        }}
+                      >
+                        Copier l’URL
+                      </button>
+                      <span className="mx-1 text-neutral-400">•</span>
+                      <a href={value.mockup} target="_blank" rel="noreferrer" className="text-[11px] underline underline-offset-2">
+                        Ouvrir
+                      </a>
+                    </div>
+                  </>
                 ) : (
                   <div className="absolute inset-0 grid place-items-center text-[10px] text-neutral-500">Aucun mockup</div>
                 )}
@@ -687,7 +837,7 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
             title={uploading || uploadingMockup ? 'Veuillez attendre la fin des uploads' : undefined}
             className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-ink hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {uploading || uploadingMockup ? 'Patiente…' : 'Enregistrer l’œuvre'}
+            {uploading || uploadingMockup ? 'Patiente…' : (editingId ? 'Mettre à jour' : 'Enregistrer l’œuvre')}
           </button>
         </div>
       </form>

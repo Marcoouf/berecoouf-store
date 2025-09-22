@@ -2,6 +2,8 @@ import { rateLimit } from "@/lib/rateLimit"
 import { assertAdmin, assertMethod } from "@/lib/adminAuth"
 import { NextResponse } from "next/server"
 import { put } from "@vercel/blob"
+import { writeFile, mkdir } from 'node:fs/promises'
+import path from 'node:path'
 
 export const runtime = "nodejs"
 
@@ -31,20 +33,26 @@ export async function POST(req: Request) {
   if (notAdmin) return notAdmin
 
   if (!rateLimit(req, 10, 60_000)) {
-    return NextResponse.json({ ok: false, error: "rate_limited" }, { status: 429 })
+    return NextResponse.json(
+      { ok: false, error: "rate_limited" },
+      { status: 429, headers: { "Access-Control-Allow-Origin": "*" } }
+    )
   }
 
   try {
     const form = await req.formData()
     const file = form.get("file") as File | null
     if (!file) {
-      return NextResponse.json({ ok: false, error: "file manquant" }, { status: 400 })
+      return NextResponse.json(
+        { ok: false, error: "file_missing" },
+        { status: 400, headers: { "Access-Control-Allow-Origin": "*" } }
+      )
     }
 
     if (!ALLOWED.has(file.type)) {
       return NextResponse.json(
-        { ok: false, error: `type non autorisé: ${file.type}` },
-        { status: 400 },
+        { ok: false, error: "unsupported_type", details: file.type },
+        { status: 400, headers: { "Access-Control-Allow-Origin": "*" } }
       )
     }
 
@@ -52,8 +60,8 @@ export async function POST(req: Request) {
     const MAX = 10 * 1024 * 1024
     if (file.size > MAX) {
       return NextResponse.json(
-        { ok: false, error: "fichier trop volumineux (>10MB)" },
-        { status: 400 },
+        { ok: false, error: "too_large", details: ">10MB" },
+        { status: 400, headers: { "Access-Control-Allow-Origin": "*" } }
       )
     }
 
@@ -64,28 +72,93 @@ export async function POST(req: Request) {
     const folder = rawKind === "mockup" || rawKind === "mockups" ? "mockups" : "artworks"
 
     // Nom de fichier : base nettoyée + timestamp + extension cohérente avec le MIME
-    const original = (file as any).name || "image"
-    const base = safeBase(original.replace(/\.[^.]+$/, "")) || "img"
+    const original = form.get("originalName") || (file as any).name || "image"
+    const base = safeBase(String(original).replace(/\.[^.]+$/, "")) || "img"
     const ext = (file.type.split("/")[1] || "bin").toLowerCase()
     const ts = Date.now()
     const filename = `${folder}/${base}-${ts}.${ext}`
 
-    // Upload vers Vercel Blob (public) avec contentType explicite
-    const blob = await put(filename, file, {
-      access: "public",
-      contentType: file.type,
-      // cacheControl: "public, max-age=31536000, immutable", // optionnel
-    })
+    // Essayez d'abord Vercel Blob si le token d'écriture est présent,
+    // sinon basculez sur un enregistrement local dans /public/uploads.
+    const token = process.env.BLOB_READ_WRITE_TOKEN
 
-    // Retourne l’URL publique et des infos pratiques
-    return NextResponse.json({
-      ok: true,
-      url: blob.url,
-      key: blob.pathname, // ex: "artworks/quiet-grid-1693072138.webp"
-      kind: folder,
-    })
+    // Convert to Buffer once so we can reuse for either target
+    const bytes = Buffer.from(await file.arrayBuffer())
+
+    if (token) {
+      try {
+        const blob = await put(filename, bytes, {
+          access: 'public',
+          contentType: file.type,
+          token, // important en local/dev
+          // cacheControl: 'public, max-age=31536000, immutable',
+        })
+        return NextResponse.json(
+          { url: blob.url },
+          { status: 200, headers: { 'Access-Control-Allow-Origin': '*' } }
+        )
+      } catch (err) {
+        // Log et on tentera le fallback local
+        console.error('Vercel Blob upload failed, falling back to local file', err)
+      }
+    }
+
+    // Fallback local: écrit le fichier sous /public/uploads/<folder>/...
+    const uploadsDir = path.join(process.cwd(), 'public', 'uploads', folder)
+    await mkdir(uploadsDir, { recursive: true })
+    const localPath = path.join(uploadsDir, `${base}-${ts}.${ext}`)
+    await writeFile(localPath, bytes)
+    const publicUrl = `/uploads/${folder}/${path.basename(localPath)}`
+
+    return NextResponse.json(
+      { url: publicUrl },
+      { status: 200, headers: { 'Access-Control-Allow-Origin': '*' } }
+    )
   } catch (e: any) {
-    console.error("UPLOAD ERROR", e)
-    return NextResponse.json({ ok: false, error: "Erreur upload serveur" }, { status: 500 })
+    // Mappage d'erreurs plus clair pour dépistage
+    const message = e?.message || String(e)
+    const status = e?.status || e?.cause?.status
+
+    // Signatures fréquentes côté Vercel Blob
+    const isBlobUnauthorized =
+      status === 401 ||
+      /unauthorized|not\s*authorized|permission/i.test(message) ||
+      (/vercel-blob/i.test(message) && /401|unauthorized/i.test(message))
+
+    const isBlobForbidden = status === 403 || /forbidden|permission/i.test(message)
+
+    const payload = {
+      ok: false as const,
+      error: isBlobUnauthorized
+        ? "blob_unauthorized"
+        : isBlobForbidden
+        ? "blob_forbidden"
+        : "upload_failed",
+      details: message,
+    }
+
+    console.error("UPLOAD ERROR", { status, message, raw: e })
+    return NextResponse.json(payload, {
+      status: Number.isInteger(status)
+        ? status as number
+        : isBlobUnauthorized
+        ? 401
+        : isBlobForbidden
+        ? 403
+        : 500,
+      headers: { "Access-Control-Allow-Origin": "*" },
+    })
   }
+}
+
+// OPTIONS handler for CORS preflight
+export async function OPTIONS(req: Request) {
+  return new NextResponse(null, {
+    status: 204,
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization, x-admin-key",
+    },
+  })
 }

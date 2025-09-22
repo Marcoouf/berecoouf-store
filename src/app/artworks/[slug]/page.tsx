@@ -1,26 +1,14 @@
 // src/app/artworks/[slug]/page.tsx
 import Link from 'next/link'
-import Image from '@/components/SmartImage'
 import { notFound } from 'next/navigation'
 import Breadcrumb from '@/components/Breadcrumb'
 import ArtworkPurchase from '@/components/ArtworkPurchase'
-import { euro } from '@/lib/format'
 import { getCatalog } from '@/lib/getCatalog'
-import type { Artwork, Artist } from '@/lib/types'
 import ArtworkImageCarousel from '@/components/ArtworkImageCarousel'
 import RelatedCarousel from '@/components/RelatedCarousel'
 // important : ne pas figer au build
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
-
-function displayPriceFor(w: Artwork) {
-  const formats = Array.isArray(w.formats) ? w.formats : []
-  const formatPrices = formats.map((f: { price: any }) => Number(f.price)).filter((n: unknown) => Number.isFinite(n))
-  const base = formatPrices.length > 0
-    ? Math.min(...formatPrices)
-    : (Number.isFinite(Number(w.price)) ? Number(w.price) : 0)
-  return euro(base)
-}
 
 export async function generateMetadata({ params }: { params: { slug: string } }) {
   const catalog = await getCatalog()
@@ -31,7 +19,7 @@ export async function generateMetadata({ params }: { params: { slug: string } })
   const title = `${artwork.title}${artist ? ` — ${artist.name}` : ''}`
   const description = artwork.description || 'Œuvre disponible en édition limitée.'
   const site = (process.env.NEXT_PUBLIC_SITE_URL || '').replace(/\/$/, '')
-  const imgPath = artwork.mockup || artwork.image
+  const imgPath = artwork.mockup || artwork.image || ''
   const ogImage = /^https?:\/\//i.test(imgPath) ? imgPath : (site ? `${site}${imgPath}` : imgPath)
 
   return {
@@ -59,9 +47,44 @@ export default async function Page({ params }: { params: { slug: string } }) {
   const artwork = catalog.artworks.find(a => a.slug === slug)
   if (!artwork) notFound()
 
+  // Normalisation: variants & priceMin pour l'UI (types solides)
+  type VariantUI = { id: string; label: string; price: number }
+
+  const variants: VariantUI[] = (Array.isArray((artwork as any).variants)
+    ? (artwork as any).variants
+    : Array.isArray((artwork as any).formats)
+      ? (artwork as any).formats
+      : [])
+    .map((v: any): VariantUI => ({
+      id: String(v?.id ?? ''),
+      label: String(v?.label ?? ''),
+      price: Number(v?.price ?? 0) || 0,
+    }))
+
+  const prices = variants
+    .map((v) => Number(v.price))
+    .filter((n) => Number.isFinite(n) && n >= 0)
+
+  const base = Number((artwork as any)?.basePrice ?? (artwork as any)?.price ?? 0)
+  const priceMin = prices.length > 0
+    ? Math.min(...prices)
+    : (Number.isFinite(base) && base > 0 ? base : 0)
+
   const artist = catalog.artists.find(a => a.id === artwork.artistId) ?? null
-  const related = catalog.artworks.filter(w => w.artistId === artwork.artistId && w.id !== artwork.id)
-  const artistsById = Object.fromEntries(catalog.artists.map(a => [a.id, a.name]))
+
+  // Prépare les items "plus d'oeuvres" au format attendu par RelatedCarousel
+  const relatedRaw = catalog.artworks.filter(w => w.artistId === artwork.artistId && w.id !== artwork.id)
+  const relatedItems = relatedRaw.map(w => ({
+    id: w.id,
+    slug: w.slug,
+    title: w.title,
+    image: String((w as any).image ?? ''),
+    price: Number((w as any).price ?? (w as any).basePrice ?? 0) || 0,
+    artistId: w.artistId,
+  }))
+
+  const artistsById = Object.fromEntries(catalog.artists.map(a => [a.id, a.name as string])) as Record<string, string>
+  const relatedTitle: string = artist ? `Plus d’œuvres de ${artist?.name ?? ''}` : 'Plus d’œuvres'
 
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6">
@@ -77,20 +100,20 @@ export default async function Page({ params }: { params: { slug: string } }) {
       </div>
 
       <div className="grid gap-6 md:gap-8 py-8 sm:py-10 md:py-16 md:grid-cols-2">
-        {/* Wrapper `.group` pour permettre l'affichage des flèches du carrousel au survol */}
-        <figure className="relative group">
+        <figure className="mx-auto w-full max-w-[820px]">
           <ArtworkImageCarousel
-            title={artwork.title}
-            image={artwork.image}
-            mockup={artwork.mockup ?? null}
+            title={String(artwork.title)}
+            image={String((artwork as any).image ?? '')}
+            mockup={(artwork as any).mockup ?? null}
             priority
+            maxSize={720}
           />
           <figcaption className="sr-only">{artwork.title}</figcaption>
         </figure>
 
         <div className="md:pl-6">
           <Link
-            href={artist ? `/artists/${artist.slug}` : '#'}
+            href={artist ? (`/artists/${artist.slug ?? ''}` as const) : '#'}
             className="text-xs uppercase tracking-widest text-neutral-500 hover:underline"
           >
             {artist ? artist.name : 'Artiste'}
@@ -142,12 +165,12 @@ export default async function Page({ params }: { params: { slug: string } }) {
 
           <ArtworkPurchase
             artwork={{
-              id: artwork.id,
-              title: artwork.title,
-              image: artwork.image,
-              price: artwork.price,
-              artistId: artwork.artistId,
-              formats: artwork.formats,
+              id: String(artwork.id),
+              title: String(artwork.title),
+              image: String((artwork as any).image ?? ''),
+              price: Number(priceMin) || 0,
+              artistId: String(artwork.artistId),
+              formats: variants.map((v) => ({ id: v.id, label: v.label, price: v.price })),
             }}
           />
 
@@ -159,18 +182,19 @@ export default async function Page({ params }: { params: { slug: string } }) {
         </div>
       </div>
 
-      {related.length > 0 && (
+      {relatedItems.length > 0 && (
         <RelatedCarousel
-          items={related}
-          title={artist ? `Plus d’œuvres de ${artist.name}` : 'Plus d’œuvres'}
+          items={relatedItems}
+          title={relatedTitle}
           artistsById={artistsById}
         />
       )}
 
       {(() => {
         const site = (process.env.NEXT_PUBLIC_SITE_URL || '').replace(/\/$/, '')
-        const img = artwork.mockup || artwork.image
-        const imageAbs = /^https?:\/\//i.test(img) ? img : (site ? `${site}${img}` : img)
+        const img = artwork.mockup || artwork.image || ''
+        const isAbsolute = /^https?:\/\//i.test(img)
+        const imageAbs = isAbsolute ? img : (site ? `${site}${img}` : img)
         const urlAbs = site ? `${site}/artworks/${artwork.slug}` : `/artworks/${artwork.slug}`
         const jsonLd = {
           '@context': 'https://schema.org',

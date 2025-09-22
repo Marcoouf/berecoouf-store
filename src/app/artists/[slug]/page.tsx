@@ -93,15 +93,19 @@ export default async function ArtistPage({ params }: Props) {
             <div key={w.id} className="group">
               <div className="aspect-[4/5] relative overflow-hidden rounded-xl border">
                 <Link href={`/artworks/${w.slug}`} scroll className="absolute inset-0">
-                  <SmartImage
-                    src={w.image}
-                    alt={w.title}
-                    fill
-                    sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw"
-                    wrapperClass="absolute inset-0"
-                    imgClassName="object-cover transition-transform duration-500 group-hover:scale-[1.02] pointer-events-none select-none"
-                    unoptimized
-                  />
+                  {typeof w.image === 'string' && w.image ? (
+                    <SmartImage
+                      src={w.image as string}
+                      alt={w.title}
+                      fill
+                      sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw"
+                      wrapperClass="absolute inset-0"
+                      imgClassName="object-cover transition-transform duration-500 group-hover:scale-[1.02] pointer-events-none select-none"
+                      unoptimized
+                    />
+                  ) : (
+                    <div className="absolute inset-0 bg-neutral-100" />
+                  )}
                 </Link>
               </div>
               <div className="mt-3 flex items-start justify-between gap-4">
@@ -111,7 +115,7 @@ export default async function ArtistPage({ params }: Props) {
                   </div>
                   <div className="text-xs text-neutral-500">{artist.name}</div>
                 </div>
-                <div className="text-sm tabular-nums">{w.price.toFixed(0)} €</div>
+                <div className="text-sm tabular-nums">{Number(w.price ?? 0).toFixed(0)} €</div>
               </div>
             </div>
           ))}

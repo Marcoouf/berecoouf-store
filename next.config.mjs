@@ -9,6 +9,14 @@ const nextConfig = {
       { source: '/oeuvre/:slug',  destination: '/artworks/:slug', permanent: false },
     ];
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '*.public.blob.vercel-storage.com',
+      },
+    ],
+  },
 };
 
 export default nextConfig;

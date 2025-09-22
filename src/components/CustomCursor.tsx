@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
 
 // Elements that should make the cursor darken on hover
@@ -37,6 +37,21 @@ export default function CustomCursor() {
     else document.body.classList.remove("admin-page")
     return () => document.body.classList.remove("admin-page")
   }, [isAdmin])
+
+  // Toggle base cursor visibility globally via body class
+  useEffect(() => {
+    const body = document?.body
+    if (!body) return
+    if (isAdmin || isMobile) {
+      body.classList.remove('cursor-hidden')
+    } else {
+      body.classList.add('cursor-hidden')
+    }
+    return () => {
+      // on unmount, always ensure native cursor comes back
+      body.classList.remove('cursor-hidden')
+    }
+  }, [isAdmin, isMobile])
 
   // Do not render the custom cursor on admin routes or mobile/tablet
   if (isAdmin || isMobile) return null

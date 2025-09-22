@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+model Artist {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  handle    String?
+  bio       String?
+  avatarUrl String?
+  coverUrl  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  works     Work[]
+}
+
+model Work {
+  id          String    @id @default(cuid())
+  title       String
+  slug        String    @unique
+  description String?
+  year        Int?
+  technique   String?
+  paper       String?
+  dimensions  String?
+  edition     String?
+  imageUrl    String
+  mockupUrl   String?
+  basePrice   Int?
+  published   Boolean   @default(true)
+  artistId    String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  variants    Variant[]
+  artist      Artist    @relation(fields: [artistId], references: [id])
+
+  @@index([artistId])
+}
+
+model Variant {
+  id        String   @id @default(cuid())
+  workId    String
+  label     String
+  price     Int
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  work      Work     @relation(fields: [workId], references: [id], onDelete: Cascade)
+
+  @@index([workId])
+}

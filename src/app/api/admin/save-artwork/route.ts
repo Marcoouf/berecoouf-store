@@ -126,9 +126,99 @@ export async function POST(req: Request) {
     await writeBlobJSON(backupKey, current)
     await writeBlobJSON(key, current)
 
-    return NextResponse.json({ ok: true, artwork, counts: { artworks: current.artworks.length } })
+    return NextResponse.json(
+      { ok: true, artwork, counts: { artworks: current.artworks.length } },
+      { status: 201 }
+    )
   } catch (e) {
     console.error('SAVE_ARTWORK POST ERROR', e)
+    return NextResponse.json({ ok: false, error: 'server_error' }, { status: 500 })
+  }
+}
+
+export async function PUT(req: Request) {
+  // sécurité de base
+  const m = assertMethod(req, ['PUT']); if (m) return m
+  if (!rateLimit(req, 20, 60_000)) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
+  const a = assertAdmin(req); if (a) return a
+
+  try {
+    const url = new URL(req.url)
+    const idFromQuery = url.searchParams.get('id') || ''
+    const BODY = await req.json().catch(() => ({})) as Partial<Artwork>
+    const id = String(BODY.id || idFromQuery || '')
+
+    if (!id) return NextResponse.json({ ok: false, error: 'missing_id' }, { status: 400 })
+
+    const key = (process.env.CATALOG_BLOB_KEY || '').replace(/^\/+/, '')
+    if (!key) return NextResponse.json({ ok: false, error: 'blob_key_missing' }, { status: 500 })
+
+    // 1) lire catalogue courant
+    let current = await readBlobJSON<Catalog>(key)
+    if (!current) current = { artists: [], artworks: [] }
+    current.artworks = Array.isArray(current.artworks) ? current.artworks : []
+
+    // 2) retrouver l'œuvre existante par id (strict)
+    const prevIdx = current.artworks.findIndex(a => a.id === id)
+    if (prevIdx === -1) {
+      return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
+    }
+    const prev = current.artworks[prevIdx]
+
+    // 3) slug demandé & base
+    const requestedSlug = safeSlug(BODY.slug || '')
+    const baseSlug = requestedSlug || safeSlug(prev.slug || BODY.title || BODY.id || id)
+
+    // 4) si aucun changement explicite de slug, conserver celui d'avant
+    let slug = (requestedSlug && requestedSlug !== prev.slug) ? requestedSlug : (prev.slug || baseSlug || `art-${Date.now()}`)
+
+    // 5) unicité du slug (en excluant l'item courant)
+    const taken = new Set(current.artworks.filter(a => a.id !== id).map(a => a.slug))
+    if (taken.has(slug)) {
+      const root = slug
+      let n = 2
+      while (taken.has(`${root}-${n}`)) n++
+      slug = `${root}-${n}`
+    }
+
+    // 6) calcul prix & formats
+    const price = toNum(BODY.price, Array.isArray(BODY.formats) && (BODY.formats as any)[0] ? toNum((BODY.formats as any)[0]?.price, prev.price || 0) : (prev.price || 0))
+
+    const formats: Format[] = Array.isArray(BODY.formats)
+      ? BODY.formats
+          .filter(f => f && typeof f === 'object' && String((f as any).label || '').trim())
+          .map((f, i) => ({ id: String((f as any).id || `f-${i + 1}`), label: String((f as any).label), price: toNum((f as any).price) }))
+      : (prev.formats || [])
+
+    // 7) fusion finale
+    const artwork: Artwork = {
+      id: prev.id,
+      slug,
+      title: String(BODY.title ?? prev.title ?? ''),
+      artistId: String(BODY.artistId ?? prev.artistId ?? ''),
+      image: BODY.image !== undefined ? String(BODY.image) : (prev.image || ''),
+      mockup: BODY.mockup !== undefined ? (BODY.mockup ? String(BODY.mockup) : undefined) : prev.mockup,
+      price,
+      description: BODY.description !== undefined ? (BODY.description as any as string) : prev.description,
+      year: BODY.year !== undefined ? toNum(BODY.year) : prev.year,
+      technique: BODY.technique !== undefined ? (BODY.technique as any as string) : prev.technique,
+      paper: BODY.paper !== undefined ? (BODY.paper as any as string) : prev.paper,
+      size: BODY.size !== undefined ? (BODY.size as any as string) : prev.size,
+      edition: BODY.edition !== undefined ? (BODY.edition as any as string) : prev.edition,
+      formats,
+    }
+
+    // 8) remplacement en place puis écriture
+    current.artworks[prevIdx] = artwork
+
+    const ts = new Date().toISOString().replace(/[:.]/g, '-')
+    const backupKey = `catalog-backups/catalog-${ts}.json`
+    await writeBlobJSON(backupKey, current)
+    await writeBlobJSON(key, current)
+
+    return NextResponse.json({ ok: true, artwork, counts: { artworks: current.artworks.length } }, { status: 200 })
+  } catch (e) {
+    console.error('SAVE_ARTWORK PUT ERROR', e)
     return NextResponse.json({ ok: false, error: 'server_error' }, { status: 500 })
   }
 }
