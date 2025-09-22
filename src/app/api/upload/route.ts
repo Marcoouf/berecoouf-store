@@ -5,6 +5,16 @@ import { put } from "@vercel/blob"
 import { writeFile, mkdir } from 'node:fs/promises'
 import path from 'node:path'
 
+// Helper pour vérifier la clé admin via header ou Authorization
+function adminHeaderOk(req: Request) {
+  const fromHeader = req.headers.get('x-admin-key') || req.headers.get('X-Admin-Key')
+  const fromAuth = req.headers.get('authorization') || req.headers.get('Authorization')
+  const bearer = fromAuth && /^Bearer\s+(.+)$/i.test(fromAuth) ? (fromAuth.match(/^Bearer\s+(.+)$/i) as RegExpMatchArray)[1] : null
+  const candidate = (fromHeader || bearer || '').trim()
+  const valid = process.env.ADMIN_KEY || process.env.NEXT_PUBLIC_ADMIN_KEY
+  return !!candidate && !!valid && candidate === valid
+}
+
 export const runtime = "nodejs"
 
 const ALLOWED = new Set([
@@ -29,8 +39,11 @@ export async function POST(req: Request) {
   const badMethod = assertMethod(req, ["POST"])
   if (badMethod) return badMethod
 
-  const notAdmin = assertAdmin(req)
-  if (notAdmin) return notAdmin
+  // Autoriser aussi le header "x-admin-key" (ou Authorization: Bearer ...)
+  if (!adminHeaderOk(req)) {
+    const notAdmin = assertAdmin(req) // fallback à ta logique existante (cookie/session, etc.)
+    if (notAdmin) return notAdmin
+  }
 
   if (!rateLimit(req, 10, 60_000)) {
     return NextResponse.json(
@@ -151,7 +164,7 @@ export async function POST(req: Request) {
   }
 }
 
-// OPTIONS handler for CORS preflight
+// OPTIONS handler for CORS preflight (inclut x-admin-key)
 export async function OPTIONS(req: Request) {
   return new NextResponse(null, {
     status: 204,

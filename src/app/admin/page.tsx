@@ -85,6 +85,19 @@ function addToast(kind: Toast['kind'], msg: string) {
   }, 4000)
 }
 
+  // Admin key helpers (client)
+  function getAdminKey() {
+    const k = process.env.NEXT_PUBLIC_ADMIN_KEY as string | undefined
+    return (k && k.trim().length > 0) ? k : undefined
+  }
+  function adminHeaders(extra: Record<string, string> = {}) {
+    const k = getAdminKey()
+    return {
+      ...extra,
+      ...(k ? { 'x-admin-key': k } : {}),
+    }
+  }
+
   useEffect(() => {
     let active = true
     fetch('/api/catalog')
@@ -133,8 +146,12 @@ function addToast(kind: Toast['kind'], msg: string) {
     const xhr = new XMLHttpRequest()
     xhr.open('POST', '/api/upload', true)
     // Pass admin auth to the API (header) and mark as XHR
-    const adminKey = process.env.NEXT_PUBLIC_ADMIN_KEY as string | undefined
-    if (adminKey) xhr.setRequestHeader('x-admin-key', adminKey)
+    const adminKey = getAdminKey()
+    if (!adminKey) {
+      addToast('error', 'Clé admin manquante côté client (NEXT_PUBLIC_ADMIN_KEY)')
+    } else {
+      xhr.setRequestHeader('x-admin-key', adminKey)
+    }
     xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest')
     // Ask XHR to parse JSON for us when supported
     try { xhr.responseType = 'json' } catch {}
@@ -278,14 +295,10 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
       const url = new URL('/api/admin/work', window.location.origin)
       if (isEditing) url.searchParams.set('id', String(value.id))
 
-      const adminKey = process.env.NEXT_PUBLIC_ADMIN_KEY
       const res = await fetch(url.toString(), {
         method: isEditing ? 'PUT' : 'POST',
         credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(adminKey ? { 'x-admin-key': adminKey } : {}),
-        },
+        headers: adminHeaders({ 'Content-Type': 'application/json' }),
         body: JSON.stringify(payload),
       })
       const j = await res.json().catch(() => ({}))
@@ -332,6 +345,12 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
         <h1 className="text-2xl font-medium tracking-tight">Admin — Nouvelle œuvre</h1>
         <Link href="/" className="text-sm underline underline-offset-4">← Retour au site</Link>
       </div>
+
+      {!getAdminKey() && (
+        <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Attention : <code>NEXT_PUBLIC_ADMIN_KEY</code> n&apos;est pas défini côté client. Les appels d&apos;API d&apos;admin risquent d&apos;échouer (401).
+        </div>
+      )}
 
       <div className="mb-6 rounded-xl border p-4">
         <div className="text-sm font-medium mb-2">Mode</div>
@@ -425,13 +444,10 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
                 if (!ok) return
                 const url = new URL('/api/admin/work', window.location.origin)
                 url.searchParams.set('id', editingId)
-                const adminKey = process.env.NEXT_PUBLIC_ADMIN_KEY
                 const res = await fetch(url.toString(), {
                   method: 'DELETE',
                   credentials: 'include',
-                  headers: {
-                    ...(adminKey ? { 'x-admin-key': adminKey } : {}),
-                  },
+                  headers: adminHeaders(),
                 })
                 const j = await res.json().catch(() => ({}))
                 if (!res.ok || !j?.ok) {
