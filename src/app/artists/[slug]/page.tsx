@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { getCatalog } from '@/lib/getCatalog'
 import type { Metadata } from 'next'
 import Breadcrumb from '@/components/Breadcrumb'
+import { euro } from '@/lib/format'
 
 export const dynamic = 'force-dynamic'
 
@@ -115,7 +116,9 @@ export default async function ArtistPage({ params }: Props) {
                   </div>
                   <div className="text-xs text-neutral-500">{artist.name}</div>
                 </div>
-                <div className="text-sm tabular-nums">{Number(w.price ?? 0).toFixed(0)} €</div>
+                <div className="ml-auto text-sm tabular-nums">
+                  {(w as any).priceMinFormatted ?? euro((w as any).priceMin ?? 0)}
+                </div>
               </div>
             </div>
           ))}

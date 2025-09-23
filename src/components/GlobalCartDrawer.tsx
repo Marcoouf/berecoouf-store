@@ -20,7 +20,12 @@ export default function GlobalCartDrawer() {
   } = useCartCtx()
 
   const subtotal = useMemo(
-    () => items.reduce((sum: number, i: any) => sum + (i?.format?.price ?? i?.artwork?.price ?? 0) * (i?.qty ?? 1), 0),
+    () =>
+      items.reduce((sum: number, i: any) => {
+        const unit = Number(i?.unitPriceCents ?? 0)
+        const qty = Number(i?.qty ?? 1)
+        return sum + unit * qty
+      }, 0),
     [items]
   )
 
@@ -78,7 +83,7 @@ export default function GlobalCartDrawer() {
               <div key={i?.key} className="flex gap-3 border rounded-lg p-3">
                 <div className="relative h-16 w-16 overflow-hidden rounded border">
                   <Image
-                    src={i?.artwork?.image}
+                    src={i?.artwork?.image ?? ''}
                     alt={i?.artwork?.title ?? 'Œuvre'}
                     fill
                     className="object-cover"
@@ -118,8 +123,8 @@ export default function GlobalCartDrawer() {
                       onChange={(e) => updateQty(i?.key, Math.max(1, Number(e.target.value)))}
                       className="w-16 rounded border px-2 py-1 text-sm"
                     />
-                    <div className="ml-auto text-sm tabular-nums">
-                      {euro(((i?.format?.price ?? i?.artwork?.price ?? 0) * (i?.qty ?? 1)) as number)}
+                    <div className="ml-auto tabular-nums">
+                      {euro(Number(i?.unitPriceCents ?? 0))}
                     </div>
                   </div>
                 </div>

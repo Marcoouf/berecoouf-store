@@ -1,7 +1,7 @@
 'use client'
 
 import React, { createContext, useContext, useMemo, useState, useEffect } from 'react'
-import type { Artwork, Format } from '@/lib/types'
+import type { CartItem } from '@/lib/types'
 
 const STORAGE_KEY = 'cart-v1'
 
@@ -27,16 +27,10 @@ function initialItems(): CartItem[] {
   }
 }
 
-type CartItem = {
-  key: string
-  artwork: Artwork
-  format: Format | null
-  qty: number
-}
 
 type CartCtx = {
   items: CartItem[]
-  add: (artwork: Artwork, format: Format | null) => void
+  add: (item: CartItem) => void
   remove: (key: string) => void
   updateQty: (key: string, qty: number) => void
   clear: () => void
@@ -82,16 +76,18 @@ export default function CartProvider({ children }: { children: React.ReactNode }
     safeSave(STORAGE_KEY, { items })
   }, [items, hydrated])
 
-  const add: CartCtx['add'] = (artwork, format) => {
+  const add: CartCtx['add'] = (item) => {
     setItems(prev => {
-      const key = `${artwork.id}-${format?.id ?? 'std'}`
+      const key = item.key
       const found = prev.find(i => i.key === key)
       if (found) {
         // Incrémente la quantité si déjà présent
-        return prev.map(i => (i.key === key ? { ...i, qty: i.qty + 1 } : i))
+        const inc = Math.max(1, Number(item.qty ?? 1))
+        return prev.map(i => (i.key === key ? { ...i, qty: i.qty + inc } : i))
       }
-      // Ajoute une nouvelle ligne
-      return [...prev, { key, artwork, format, qty: 1 }]
+      // Ajoute une nouvelle ligne (avec garde sur le prix unitaire)
+      const unit = Number.isFinite(item.unitPriceCents) ? Number(item.unitPriceCents) : 0
+      return [...prev, { ...item, unitPriceCents: unit, qty: Math.max(1, Number(item.qty ?? 1)) }]
     })
     // Déclenche le signal d’anim (timestamp unique)
     setLastAdded(Date.now())
@@ -111,7 +107,7 @@ export default function CartProvider({ children }: { children: React.ReactNode }
   const clear = () => setItems([])
 
   const total = useMemo(
-    () => items.reduce((acc, i) => acc + (i.format?.price ?? i.artwork.price) * i.qty, 0),
+    () => items.reduce((acc, i) => acc + i.unitPriceCents * i.qty, 0),
     [items]
   )
 
@@ -153,7 +149,7 @@ export default function CartProvider({ children }: { children: React.ReactNode }
         title: i.artwork.title,
         artistName: (i.artwork as any).artist?.name ?? (i.artwork as any).artistName,
         image: (i.artwork as any).image ?? (Array.isArray((i.artwork as any).images) ? (i as any).artwork.images?.[0] : undefined),
-        price: Number(i.format?.price ?? i.artwork.price ?? 0),
+        price: Number(i.unitPriceCents ?? 0),
         qty: Number(i.qty ?? 1),
       }))
       await goToCheckout({ items: mapped, email: options?.email })

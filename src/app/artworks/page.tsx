@@ -6,19 +6,21 @@ import SmartImage from '@/components/SmartImage'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Breadcrumb from '@/components/Breadcrumb'
 import { artworks as staticArtworks, artists as staticArtists } from '@/lib/data'
+import { euro } from '@/lib/format'
 
-// petit util pour obtenir un prix "défaut" (si formats présents on prend le moins cher)
-function basePrice(w: any): number {
+// --- Prix utilitaires (en CENTIMES) ---
+function unitPriceCents(w: any): number {
+  // Priorité à priceMin (fourni par l'API / Prisma), sinon min des formats, sinon fallback `price`.
+  const fromPriceMin = Number(w?.priceMin)
+  if (Number.isFinite(fromPriceMin) && fromPriceMin > 0) return fromPriceMin
+
   if (Array.isArray(w?.formats) && w.formats.length > 0) {
-    return w.formats.reduce((m: number, f: any) => Math.min(m, Number(f.price || 0)), Infinity)
+    const min = w.formats.reduce((m: number, f: any) => Math.min(m, Number(f.price || 0)), Infinity)
+    if (Number.isFinite(min) && min !== Infinity) return min
   }
-  return Number(w?.price || 0)
-}
 
-// simple format monétaire suffixé d'un €
-function euro(n: number) {
-  if (!Number.isFinite(n)) return '—'
-  return `${Math.round(n)}\u00A0€`
+  const fromPrice = Number(w?.price)
+  return Number.isFinite(fromPrice) ? fromPrice : 0
 }
 
 function ArtworksPageInner() {
@@ -49,7 +51,7 @@ function ArtworksPageInner() {
 
   const [artistId, setArtistId] = useState<string>(search.get('artist') || 'all')
   const [q, setQ] = useState<string>(search.get('q') || '')
-  const [max, setMax] = useState<string>(search.get('max') || '') // saisi utilisateur; on convertit plus bas
+  const [max, setMax] = useState<string>(search.get('max') || '') // saisi utilisateur en EUROS ; converti en cents plus bas
   const [sort, setSort] = useState<'titleAsc' | 'titleDesc' | 'priceAsc' | 'priceDesc'>(
     (search.get('sort') as any) || 'titleAsc'
   )
@@ -65,9 +67,10 @@ function ArtworksPageInner() {
     router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
   }, [artistId, q, max, sort, router, pathname])
 
-  const maxAvailable = useMemo(() => {
-    const prices = artworks.map(basePrice).filter(n => Number.isFinite(n))
-    return prices.length ? Math.max(...prices) : 0
+  const maxAvailableEuros = useMemo(() => {
+    const prices = artworks.map(unitPriceCents).filter(n => Number.isFinite(n))
+    const maxCents = prices.length ? Math.max(...prices) : 0
+    return Math.round(maxCents / 100)
   }, [artworks])
 
   const filtered = useMemo(() => {
@@ -76,17 +79,22 @@ function ArtworksPageInner() {
     if (artistId !== 'all') list = list.filter(w => w.artistId === artistId)
     if (q.trim()) {
       const needle = q.trim().toLowerCase()
-      list = list.filter(w => w.title?.toLowerCase().includes(needle))
+      list = list.filter(w => (w.title || '').toLowerCase().includes(needle))
     }
-    const maxNum = Number(max)
-    if (!Number.isNaN(maxNum) && max !== '') list = list.filter(w => basePrice(w) <= maxNum)
+
+    // Filtre prix max en EUROS → on convertit en CENTS pour comparer
+    const maxNumEuros = Number(max)
+    if (!Number.isNaN(maxNumEuros) && max !== '') {
+      const cap = Math.round(maxNumEuros * 100)
+      list = list.filter(w => unitPriceCents(w) <= cap)
+    }
 
     switch (sort) {
       case 'priceAsc':
-        list.sort((a, b) => basePrice(a) - basePrice(b))
+        list.sort((a, b) => unitPriceCents(a) - unitPriceCents(b))
         break
       case 'priceDesc':
-        list.sort((a, b) => basePrice(b) - basePrice(a))
+        list.sort((a, b) => unitPriceCents(b) - unitPriceCents(a))
         break
       case 'titleDesc':
         list.sort((a, b) => (a.title || '').localeCompare(b.title || '') * -1)
@@ -143,10 +151,10 @@ function ArtworksPageInner() {
             type="number"
             inputMode="numeric"
             min={0}
-            max={maxAvailable || undefined}
+            max={maxAvailableEuros || undefined}
             value={max}
             onChange={e => setMax(e.target.value)}
-            placeholder={maxAvailable ? `jusqu’à ${maxAvailable}` : '—'}
+            placeholder={maxAvailableEuros ? `jusqu’à ${maxAvailableEuros}` : '—'}
             className="w-full rounded-lg border px-3 py-2 text-sm"
           />
         </div>
@@ -186,18 +194,18 @@ function ArtworksPageInner() {
       <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
         {filtered.map(w => {
           const artist = artists.find((a: any) => a.id === w.artistId)
+          const priceCents = unitPriceCents(w)
           return (
             <Link key={w.id} href={`/artworks/${w.slug}`} scroll className="group block">
-              <div className="aspect-[4/5] relative overflow-hidden rounded-lg border">
+              <div className="aspect-square relative overflow-hidden rounded-lg border bg-white">
                 <SmartImage
                   src={w.image}
                   alt={w.title}
                   fill
                   wrapperClass="absolute inset-0"
-                  className="object-cover transition-transform duration-500 group-hover:scale-105"
+                  className="object-contain transition-transform duration-500 group-hover:scale-[1.01]"
                   sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw"
                   draggable={false}
-                  
                 />
                 <span className="pointer-events-none absolute inset-0 select-none" aria-hidden />
               </div>
@@ -206,7 +214,7 @@ function ArtworksPageInner() {
                   <div className="truncate text-sm font-medium">{w.title}</div>
                   <div className="text-xs text-neutral-500">{artist?.name}</div>
                 </div>
-                <div className="shrink-0 text-sm tabular-nums">{euro(basePrice(w))}</div>
+                <div className="shrink-0 text-sm tabular-nums">{euro(priceCents)}</div>
               </div>
             </Link>
           )

@@ -55,8 +55,8 @@ export default function SmartImage(props: SmartImageProps) {
   const imgClasses = clsx(
     // assure une boîte visible
     'block',
-    // pour les cas fill on privilégie object-cover qui matche la plupart des grids
-    fill ? 'object-cover' : undefined,
+    // pour les cas fill on privilégie object-contain qui matche la plupart des grids
+    fill ? 'object-contain' : undefined,
     rawImgClasses,
     // si aucune opacité fournie, on force visible par défaut
     !hasExplicitOpacity(rawImgClasses) && 'opacity-100'
@@ -96,6 +96,8 @@ export default function SmartImage(props: SmartImageProps) {
     <NextImage
       src={src}
       alt={alt}
+      width={1080}
+      height={1080}
       sizes={resolvedSizes}
       className={imgClasses}
       {...rest}

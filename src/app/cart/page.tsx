@@ -28,7 +28,7 @@ export default function CartPage() {
   }, [open, closeCart])
 
   const subtotal = useMemo(
-    () => items.reduce((sum: number, i: any) => sum + (i?.format?.price ?? i?.artwork?.price ?? 0) * (i?.qty ?? 1), 0),
+    () => items.reduce((sum: number, i: any) => sum + Number(i?.unitPriceCents ?? 0) * Number(i?.qty ?? 1), 0),
     [items]
   )
 
@@ -43,7 +43,7 @@ export default function CartPage() {
           title: i?.artwork?.title ?? i?.title ?? 'Œuvre',
           artistName: i?.artwork?.artist?.name ?? i?.artistName ?? '',
           image: i?.artwork?.image ?? i?.image ?? '',
-          price: Number(i?.format?.price ?? i?.artwork?.price ?? i?.price ?? 0),
+          price: Number(i?.unitPriceCents ?? 0),
           qty: Number(i?.qty ?? 1),
         })),
       }
@@ -119,7 +119,7 @@ export default function CartPage() {
                       className="w-20 rounded border px-2 py-1 text-sm"
                     />
                     <div className="ml-auto text-sm tabular-nums">
-                      {euro(((i?.format?.price ?? i?.artwork?.price ?? 0) * (i?.qty ?? 1)) as number)}
+                      {euro(Number(i?.unitPriceCents ?? 0) * Number(i?.qty ?? 1))}
                     </div>
                   </div>
                 </div>

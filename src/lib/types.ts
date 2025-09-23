@@ -1,4 +1,8 @@
-export type Format = { id: string; label: string; price: number }
+export type Format = {
+  id: string
+  label: string
+  price: number // en centimes
+}
 
 export type Artwork = {
   id: string
@@ -7,25 +11,49 @@ export type Artwork = {
   image: string
   mockup?: string
   artistId: string
-  price: number
   description?: string
   formats?: Format[]
 
-  // --- Nouveaux champs optionnels pour la fiche œuvre ---
+  // Fallback si pas de formats (prix de base)
+  price?: number // en centimes
+
+  priceMin: number // en centimes
+  priceMinFormatted: string // formaté en €
+
+  // --- Champs optionnels pour la fiche œuvre ---
   year?: number | string
   technique?: string
   paper?: string
   size?: string
   edition?: string
-
 }
 
 export type Artist = {
   id: string
   slug: string
   name: string
-  handle: string
-  bio: string
-  avatar: string
-  cover: string
+  handle?: string
+  bio?: string
+  avatar?: string
+  cover?: string
 }
+
+export type CartItem = {
+  key: string;            // id unique de ligne
+  qty: number;
+
+  // données visuelles
+  artwork: {
+    id: string;
+    title: string;
+    image?: string | null;
+  };
+  format?: {
+    id?: string;
+    label?: string | null;
+    price?: number | null; // centimes (optionnel, pour info)
+  };
+
+  // 👉 source de vérité pour les calculs/affichages
+  unitPriceCents: number;  // toujours en centimes
+};

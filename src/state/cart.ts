@@ -95,3 +95,7 @@ export const useCartCount = () =>
 
 export const useCartSubtotal = () =>
   useCart((s) => s.items.reduce((sum, i) => sum + i.price * i.qty, 0));
+
+// Expose raw items & a boolean helper
+export const useCartItems = () => useCart((s) => s.items)
+export const useCartHasItems = () => useCart((s) => s.items.length > 0)

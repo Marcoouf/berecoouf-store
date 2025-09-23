@@ -3,14 +3,20 @@
 import { useEffect, useMemo, useState } from 'react'
 import { euro } from '@/lib/format'
 import { useCart } from '@/components/CartContext'
+import type { CartItem } from '@/lib/types'
 
-type Format = { id: string; label: string; price: number }
-type ArtworkLite = {
+// Types de props (light)
+export type Format = { id: string; label: string; price: number }
+export type ArtworkLite = {
   id: string
   title: string
-  image: string
-  artistId: string
-  price: number
+  image?: string | null
+  mockup?: string | null
+  artistId?: string
+  // les prix sont TOUJOURS en centimes
+  price?: number | null
+  basePrice?: number | null
+  priceMin?: number | null
   formats?: Format[]
 }
 
@@ -34,20 +40,36 @@ export default function ArtworkPurchase({ artwork }: { artwork: ArtworkLite }) {
     [formatId, formats]
   )
 
-  // Prix affiché : prix du format sélectionné OU prix de base de l’œuvre
-  const unitPrice = Number.isFinite(Number(selected?.price))
-    ? Number(selected!.price)
-    : Number(artwork.price) || 0
+  // Prix en CENTIMES: priorise le format sélectionné, sinon fallback de l'œuvre
+  const unitPriceCents: number =
+    (selected?.price as number | undefined) ??
+    (artwork.price as number | undefined) ??
+    (artwork.basePrice as number | undefined) ??
+    (artwork.priceMin as number | undefined) ??
+    0
 
-  // Affichage formaté (place correctement le symbole selon ta fonction euro())
-  const displayPrice = euro(unitPrice)
+  // Affichage formaté (la fonction `euro` attend des centimes)
+  const displayPrice = euro(unitPriceCents)
 
   // Feedback visuel sur le bouton « Ajouter au panier »
   const [bump, setBump] = useState(false)
   function handleAdd() {
-    add(artwork as any, selected || null)
+    const item: CartItem = {
+      key: `${artwork.id}-${selected?.id ?? 'default'}`,
+      qty: 1,
+      artwork: {
+        id: artwork.id,
+        title: artwork.title,
+        image: (artwork.image ?? artwork.mockup ?? null) as string | null,
+      },
+      format: selected
+        ? { id: selected.id, label: (selected as any).label, price: selected.price }
+        : undefined,
+      unitPriceCents,
+    }
+    // Ajoute l'item normalisé au panier
+    add(item)
     setBump(true)
-    // petit bump rapide
     setTimeout(() => setBump(false), 180)
   }
 

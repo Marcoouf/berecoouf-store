@@ -1,3 +1,4 @@
+import { euro } from '@/lib/format'
 import type { Artist, Artwork } from './types'
 
 export const artists: Artist[] = [
@@ -30,7 +31,9 @@ export const artists: Artist[] = [
   },
 ]
 
-export const artworks: Artwork[] = [
+type BaseArtwork = Omit<Artwork, 'priceMin' | 'priceMinFormatted'>
+
+const baseArtworks: BaseArtwork[] = [
   {
     id: 'w-01',
     slug: 'quiet-grid',
@@ -164,6 +167,20 @@ export const artworks: Artwork[] = [
     edition: 'Édition limitée à 18 exemplaires',
   },
 ]
+
+export const artworks: Artwork[] = baseArtworks.map((a) => {
+  const prices = Array.isArray(a.formats)
+    ? a.formats.map((f) => Number(f.price)).filter((v) => Number.isFinite(v))
+    : []
+  // Les prix dans ce fichier sont en euros → convertir en centimes
+  const minRaw = prices.length ? Math.min(...prices) : Number(a.price) || 0
+  const priceMin = Math.round(minRaw * 100)
+  return {
+    ...a,
+    priceMin,
+    priceMinFormatted: euro(priceMin),
+  }
+})
 
 // Helpers typés
 export function findArtistBySlug(slug: string) {
