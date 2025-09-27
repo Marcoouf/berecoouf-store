@@ -2,22 +2,28 @@
 // Lecture du catalogue depuis Prisma (DB) et normalisation pour l'UI
 
 import { prisma } from '@/lib/prisma'
+import { euro } from '@/lib/format'
+import { unstable_noStore as noStore } from 'next/cache'
 
-// DB shapes used locally — avoids coupling to generated Prisma types
+// === Shapes minimalistes (décorrélées des types Prisma générés) ===
 type DbArtist = {
   id: string
   slug: string
   name: string
-  handle: string | null
   bio: string | null
-  avatarUrl: string | null
-  coverUrl: string | null
+  image: string | null        // cover/hero
+  portrait: string | null     // avatar rond
+  socials?: string[] | null
+  handle?: string | null
+  isArchived?: boolean
 }
+
 type DbVariant = {
   id: string
   label: string
-  price: number // stored in cents in DB
+  price: number // centimes
 }
+
 type DbWork = {
   id: string
   slug: string
@@ -25,7 +31,7 @@ type DbWork = {
   imageUrl: string | null
   mockupUrl: string | null
   artistId: string
-  basePrice: number | null
+  basePrice: number | null    // centimes
   description: string | null
   year: number | null
   technique: string | null
@@ -35,7 +41,6 @@ type DbWork = {
   variants: DbVariant[]
 }
 
-// --- Types minimaux consommés par l'UI ---
 export type Artist = {
   id: string
   slug: string
@@ -49,7 +54,7 @@ export type Artist = {
 export type Variant = {
   id: string
   label: string
-  price: number // en euros pour l'UI
+  price: number // centimes
   type?: 'digital' | 'print'
   sku?: string
   stock?: number | null
@@ -59,14 +64,13 @@ export type Artwork = {
   id: string
   slug: string
   title: string
-  // source hétérogène : on accepte image / images / mockup
   image?: string
   images?: Array<string | { url: string }>
   mockup?: string
   cover?: string | { url: string }
   artistId: string
   artist?: Pick<Artist, 'id' | 'slug' | 'name'>
-  price?: number // prix par défaut si pas de variants (euros)
+  price?: number // centimes
   description?: string
   year?: number
   technique?: string
@@ -76,28 +80,12 @@ export type Artwork = {
   formats?: Array<{ id: string; label: string; price: number }>
   variants?: Variant[]
   priceMin?: number
+  priceMinFormatted?: string
 }
 
 // --- Helpers ---
-function isArtist(x: any): x is Artist {
-  return !!x && typeof x === 'object' && typeof x.id === 'string' && typeof x.slug === 'string' && typeof x.name === 'string'
-}
-
 function isArtwork(x: any): x is Artwork {
   return !!x && typeof x === 'object' && typeof x.id === 'string' && typeof x.slug === 'string' && typeof x.title === 'string' && typeof x.artistId === 'string'
-}
-
-function uniqBy<T>(arr: T[], key: (t: T) => string) {
-  const seen = new Set<string>()
-  const out: T[] = []
-  for (const it of arr) {
-    const k = key(it)
-    if (!seen.has(k)) {
-      seen.add(k)
-      out.push(it)
-    }
-  }
-  return out
 }
 
 function toUrlString(x: unknown): string | null {
@@ -112,9 +100,10 @@ function asArray<T>(x: T | T[] | null | undefined): T[] {
   return x ? [x] : []
 }
 
-const fromCents = (n: number | null | undefined) => (typeof n === 'number' ? Math.round(n) / 100 : undefined)
+// DB stocke en centimes → on renvoie des centimes (identité)
+const fromCents = (n: number | null | undefined) => (typeof n === 'number' ? Math.round(n) : undefined)
 
-// --- Normalisation d'une oeuvre ---
+// --- Normalisation d'une œuvre ---
 function normalizeArtwork(raw: Artwork, artistIndex: Map<string, Artist>): Artwork {
   const imagesCandidates: Array<string | { url: string }> = [
     ...(Array.isArray(raw.images) ? raw.images : []),
@@ -128,17 +117,15 @@ function normalizeArtwork(raw: Artwork, artistIndex: Map<string, Artist>): Artwo
 
   const coverUrl = toUrlString(raw.cover) || normalizedImages[0] || null
 
-  // Variants : on rétro-compatibilise `formats` → `variants`.
-  let variants: Variant[] | undefined = undefined
-  if (Array.isArray(raw.variants) && raw.variants.length > 0) {
-    variants = raw.variants
-  } else if (Array.isArray(raw.formats) && raw.formats.length > 0) {
-    variants = raw.formats.map((f) => ({ id: f.id, label: f.label, price: f.price, type: 'print' as const }))
-  } else if (typeof raw.price === 'number') {
-    variants = [{ id: `${raw.id}-digital`, label: 'Numérique', price: raw.price, type: 'digital' }]
-  }
+  // Variants : on prend uniquement celles issues de la DB
+  const variants: Variant[] = Array.isArray(raw.variants) ? raw.variants : []
 
-  const priceMin = Array.isArray(variants) && variants.length > 0 ? Math.min(...variants.map((v) => v.price)) : raw.price ?? undefined
+  // Prix minimal en centimes (base + variants), en ignorant 0
+  const pool: number[] = []
+  if (typeof raw.price === 'number' && raw.price > 0) pool.push(raw.price)
+  for (const v of variants) if (typeof v.price === 'number' && v.price > 0) pool.push(v.price)
+  const priceMin = pool.length ? Math.min(...pool) : undefined
+  const priceMinFormatted = typeof priceMin === 'number' ? euro(priceMin) : undefined
 
   const artist = artistIndex.get(raw.artistId)
 
@@ -149,36 +136,83 @@ function normalizeArtwork(raw: Artwork, artistIndex: Map<string, Artist>): Artwo
     artist: artist ? { id: artist.id, slug: artist.slug, name: artist.name } : raw.artist,
     variants,
     priceMin,
+    priceMinFormatted,
   }
+}
+
+function isRemoteUrl(u: string): boolean {
+  return /^(https?:)?\/\//.test(u)
+}
+
+function primaryImageUrl(a: Artwork): string | null {
+  const candidates: Array<string | null> = [
+    toUrlString(a.cover as any),
+    typeof a.image === 'string' ? a.image : null,
+    typeof a.mockup === 'string' ? a.mockup : null,
+    ...(Array.isArray(a.images) ? a.images.map((it: any) => toUrlString(it)) : []),
+  ]
+  return candidates.find((u) => !!u) || null
 }
 
 /**
  * getCatalog (DB → UI)
- * - lit artistes & œuvres via Prisma
- * - mappe les champs DB → UI
- * - normalise les œuvres (images[], cover{url}, artist embarqué, variants, priceMin)
  */
 export async function getCatalog(): Promise<{ artists: Artist[]; artworks: Artwork[] }> {
+  noStore()
   try {
-    const [dbArtists, dbWorks] = (await Promise.all([
-      prisma.artist.findMany({ orderBy: { name: 'asc' } }),
-      prisma.work.findMany({
-        include: { variants: true },
-        orderBy: [{ year: 'desc' }, { title: 'asc' }],
-      }),
-    ])) as [DbArtist[], DbWork[]]
+    // On tape explicitement les `select` pour obtenir exactement les shapes souhaités (et éviter les cast hasardeux).
+    const [dbArtists, dbWorks] = await Promise.all([
+  prisma.artist.findMany({
+    orderBy: { name: 'asc' },
+    select: {
+      id: true,
+      slug: true,
+      name: true,
+      bio: true,
+      image: true,      // cover/hero
+      portrait: true,   // avatar
+      socials: true,
+      handle: true,
+      isArchived: true,
+    },
+  }),
+  prisma.work.findMany({
+    orderBy: [{ year: 'desc' }, { title: 'asc' }],
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      imageUrl: true,
+      mockupUrl: true,
+      artistId: true,
+      basePrice: true,
+      description: true,
+      year: true,
+      technique: true,
+      paper: true,
+      dimensions: true,
+      edition: true,
+      variants: {
+        select: { id: true, label: true, price: true }, // <= nested select
+      },
+    },
+  }),
+] as const)
 
-    const artists: Artist[] = dbArtists.map((a: DbArtist) => ({
-      id: a.id,
-      slug: a.slug,
-      name: a.name,
-      handle: a.handle ?? undefined,
-      bio: a.bio ?? undefined,
-      avatar: a.avatarUrl ?? undefined,
-      cover: a.coverUrl ?? undefined,
-    }))
+    // Artistes actifs uniquement
+    const artists: Artist[] = (dbArtists as unknown as DbArtist[])
+      .filter((a) => !a.isArchived)
+      .map((a) => ({
+        id: a.id,
+        slug: a.slug,
+        name: a.name,
+        handle: a.handle ?? undefined,
+        bio: a.bio ?? undefined,
+        avatar: a.portrait ?? undefined,
+        cover: a.image ?? undefined,
+      }))
 
-    const artworksRaw: Artwork[] = dbWorks.map((w) => ({
+    const artworksRaw: Artwork[] = (dbWorks as unknown as DbWork[]).map((w) => ({
       id: w.id,
       slug: w.slug,
       title: w.title,
@@ -193,22 +227,26 @@ export async function getCatalog(): Promise<{ artists: Artist[]; artworks: Artwo
       paper: w.paper ?? undefined,
       size: w.dimensions ?? undefined,
       edition: w.edition ?? undefined,
-      variants: (Array.isArray((w as any).variants) ? (w as any).variants : []).map((v: DbVariant) => ({ id: v.id, label: v.label, price: fromCents(v.price) ?? 0 })),
+      variants: (Array.isArray(w.variants) ? w.variants : []).map((v) => ({
+        id: v.id,
+        label: v.label,
+        price: fromCents(v.price) ?? 0,
+      })),
     }))
 
-    // Fusion/dé-doublonnage (inutile ici, mais on garde la même sortie et normalisation)
     const artistIndex = new Map<string, Artist>(artists.map((a) => [a.id, a]))
     const artworksNormalized = artworksRaw.map((w) => normalizeArtwork(w, artistIndex)).filter(isArtwork)
 
-    // Tri léger : par année décroissante puis titre (déjà ordonné en DB, ici on garantit)
-    artworksNormalized.sort((a, b) => {
-      const ya = typeof a.year === 'number' ? a.year : -Infinity
-      const yb = typeof b.year === 'number' ? b.year : -Infinity
-      if (yb !== ya) return yb - ya
-      return (a.title || '').localeCompare(b.title || '')
+    const artworksFiltered = artworksNormalized.filter((a) => {
+      const url = primaryImageUrl(a)
+      if (!url) return false
+      if (url === 'about:blank') return false
+      return isRemoteUrl(url)
     })
 
-    return { artists, artworks: artworksNormalized }
+    artworksFiltered.sort((a, b) => (a.title || '').localeCompare(b.title || ''))
+
+    return { artists, artworks: artworksFiltered }
   } catch (e) {
     console.error('getCatalog: prisma error', e)
     return { artists: [], artworks: [] }

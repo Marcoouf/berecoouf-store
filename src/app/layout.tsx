@@ -14,8 +14,8 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
 const garamond = EB_Garamond({ subsets: ['latin'], variable: '--font-serif' })
 
 export const metadata: Metadata = {
-  title: 'Point Bleu — Éditions d’art',
-  description: 'Galerie en ligne d’illustrations contemporaines en séries limitées.',
+  title: 'Vague — Éditions d’art',
+  description: 'Vague est une galerie d’art en ligne : illustrations contemporaines, éditions limitées et fichiers numériques, avec variantes (taille, finition, cadre) et paiement sécurisé.',
   icons: {
     icon: '/favicon.png',
   },

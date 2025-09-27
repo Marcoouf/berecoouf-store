@@ -87,15 +87,15 @@ async function main() {
         name: a.name,
         handle: a.handle ?? null,
         bio: a.bio ?? null,
-        avatarUrl: a.avatar ?? null,
-        coverUrl: a.cover ?? null,
+        portrait: a.avatar ?? null, // ancien avatarUrl -> portrait
+        image: a.cover ?? null,     // ancien coverUrl  -> image
       },
       update: {
         name: a.name,
         handle: a.handle ?? null,
         bio: a.bio ?? null,
-        avatarUrl: a.avatar ?? null,
-        coverUrl: a.cover ?? null,
+        portrait: a.avatar ?? null, // ancien avatarUrl -> portrait
+        image: a.cover ?? null,     // ancien coverUrl  -> image
       },
     })
   }
@@ -134,40 +134,40 @@ async function main() {
     const basePrice = eurosToCents(w.basePrice ?? (w as any).price ?? (w.formats?.[0]?.price ?? null)) ?? undefined
 
     // Upsert de l’œuvre
-    const work = await prisma.work.upsert({
-      where: { slug },
-      create: {
-        id: w.id ?? undefined,
-        slug,
-        title: w.title,
-        description: w.description ?? null,
-        year: w.year ?? null,
-        technique: w.technique ?? null,
-        paper: w.paper ?? null,
-        dimensions: w.dimensions ?? null,
-        edition: w.edition ?? null,
-        imageUrl: w.image ?? 'about:blank',
-        mockupUrl: w.mockup ?? null,
-        basePrice,
-        published: w.published ?? true,
-        artistId,
-      },
-      update: {
-        title: w.title,
-        description: w.description ?? null,
-        year: w.year ?? null,
-        technique: w.technique ?? null,
-        paper: w.paper ?? null,
-        dimensions: w.dimensions ?? null,
-        edition: w.edition ?? null,
-        imageUrl: w.image ?? 'about:blank',
-        mockupUrl: w.mockup ?? null,
-        basePrice,
-        published: w.published ?? true,
-        artistId,
-      },
-    })
-
+// Upsert de l’œuvre
+const work = await prisma.work.upsert({
+  where: { slug },
+  create: {
+    // id: w.id ?? undefined,   // <-- SUPPRIMER CETTE LIGNE
+    slug,
+    title: w.title,
+    description: w.description ?? null,
+    year: w.year ?? null,
+    technique: w.technique ?? null,
+    paper: w.paper ?? null,
+    dimensions: w.dimensions ?? null,
+    edition: w.edition ?? null,
+    imageUrl: w.image ?? 'about:blank',
+    mockupUrl: w.mockup ?? null,
+    basePrice,
+    published: w.published ?? true,
+    artistId,
+  },
+  update: {
+    title: w.title,
+    description: w.description ?? null,
+    year: w.year ?? null,
+    technique: w.technique ?? null,
+    paper: w.paper ?? null,
+    dimensions: w.dimensions ?? null,
+    edition: w.edition ?? null,
+    imageUrl: w.image ?? 'about:blank',
+    mockupUrl: w.mockup ?? null,
+    basePrice,
+    published: w.published ?? true,
+    artistId,
+  },
+})
     // Sync variants — stratégie simple : on remplace tout
     const incoming = (w.formats ?? []).map((f, idx) => ({
       // ne PAS inclure d'id : on laisse Prisma générer

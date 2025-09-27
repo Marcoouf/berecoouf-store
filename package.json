@@ -1,6 +1,7 @@
 {
-  "name": "berecoouf-store",
+  "name": "vague",
   "version": "0.1.0",
+  "description": "Vague — galerie d’art en ligne : illustrations, tirages d’art, éditions limitées et fichiers numériques.",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -9,11 +10,8 @@
     "lint": "next lint",
     "seed": "prisma db seed"
   },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
-  },
   "dependencies": {
-    "@prisma/client": "^6.16.2",
+    "@prisma/client": "6.16.2",
     "@vercel/blob": "^1.1.1",
     "@vercel/speed-insights": "^1.2.0",
     "clsx": "^2.1.1",
@@ -23,6 +21,7 @@
     "react-dom": "18.2.0",
     "resend": "^6.1.0",
     "stripe": "^18.5.0",
+    "zod": "^4.1.11",
     "zustand": "^5.0.8"
   },
   "devDependencies": {

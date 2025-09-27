@@ -1,11 +1,13 @@
 // src/app/artworks/[slug]/page.tsx
 import Link from 'next/link'
+import Image from 'next/image'
+import SmartImage from '@/components/SmartImage'
+import { euro } from '@/lib/format'
 import { notFound } from 'next/navigation'
 import Breadcrumb from '@/components/Breadcrumb'
 import ArtworkPurchase from '@/components/ArtworkPurchase'
 import { getCatalog } from '@/lib/getCatalog'
 import ArtworkImageCarousel from '@/components/ArtworkImageCarousel'
-import RelatedCarousel from '@/components/RelatedCarousel'
 // important : ne pas figer au build
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -72,19 +74,18 @@ export default async function Page({ params }: { params: { slug: string } }) {
 
   const artist = catalog.artists.find(a => a.id === artwork.artistId) ?? null
 
-  // Prépare les items "plus d'oeuvres" au format attendu par RelatedCarousel
-  const relatedRaw = catalog.artworks.filter(w => w.artistId === artwork.artistId && w.id !== artwork.id)
-  const relatedItems = relatedRaw.map(w => ({
-    id: w.id,
-    slug: w.slug,
-    title: w.title,
-    image: String((w as any).image ?? ''),
-    price: Number((w as any).price ?? (w as any).basePrice ?? 0) || 0,
-    artistId: w.artistId,
-  }))
+  // Prépare les items "plus d'œuvres" directement depuis le catalogue
+  const related = catalog.artworks.filter(
+    (w) => w.artistId === artwork.artistId && w.id !== artwork.id
+  )
 
-  const artistsById = Object.fromEntries(catalog.artists.map(a => [a.id, a.name as string])) as Record<string, string>
-  const relatedTitle: string = artist ? `Plus d’œuvres de ${artist?.name ?? ''}` : 'Plus d’œuvres'
+  const artistsById = Object.fromEntries(
+    catalog.artists.map((a) => [a.id, a.name as string])
+  ) as Record<string, string>
+
+  const relatedTitle: string = artist
+    ? `Plus d’œuvres de ${artist?.name ?? ''}`
+    : 'Plus d’œuvres'
 
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6">
@@ -182,12 +183,40 @@ export default async function Page({ params }: { params: { slug: string } }) {
         </div>
       </div>
 
-      {relatedItems.length > 0 && (
-        <RelatedCarousel
-          items={relatedItems}
-          title={relatedTitle}
-          artistsById={artistsById}
-        />
+      {related.length > 0 && (
+        <section className="mt-12">
+          <h2 className="mb-4 text-lg font-medium">{relatedTitle}</h2>
+          <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
+            {related.map((art) => (
+              <Link
+                key={art.id}
+                href={`/artworks/${art.slug}`}
+                className="group block"
+              >
+                <div className="aspect-square w-full overflow-hidden rounded-2xl border bg-white relative">
+                  <SmartImage
+                    src={String((art as any).image ?? '')}
+                    alt={String(art.title)}
+                    // carré comme sur la home
+                    fill
+                    className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+                    sizes="(min-width: 1024px) 320px, (min-width: 640px) 33vw, 100vw"
+                  />
+                </div>
+
+                <div className="mt-2 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-medium">{art.title}</div>
+                    <div className="text-xs text-neutral-500">{artistsById[art.artistId]}</div>
+                  </div>
+                  <div className="ml-auto text-sm tabular-nums">
+                    {(art as any).priceMinFormatted ?? euro((art as any).priceMin ?? (art as any).price ?? 0)}
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
       )}
 
       {(() => {

@@ -7,5 +7,5 @@ export function euro(v: number | null | undefined) {
     currency: 'EUR',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(n)
+  }).format(n/100)
 }

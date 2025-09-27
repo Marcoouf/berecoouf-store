@@ -5,10 +5,10 @@ export default function Footer() {
         <div className="grid gap-6 sm:gap-8 md:grid-cols-4">
           <div className="md:col-span-2">
             <div className="text-sm tracking-widest uppercase text-neutral-800">
-              Point Bleu
+              Vague
             </div>
             <p className="mt-3 max-w-sm">
-              Éditions d&apos;art et galerie en ligne. Tirages numérotés, impression fine art.
+              Galerie d’art en ligne — illustrations, tirages, éditions limitées & fichiers numériques.
             </p>
           </div>
           <div>
@@ -29,7 +29,7 @@ export default function Footer() {
           </div>
         </div>
         <div className="mt-10 text-xs text-neutral-500">
-          © {new Date().getFullYear()} Point Bleu. Tous droits réservés.
+          © {new Date().getFullYear()} Vague. Tous droits réservés.
         </div>
       </div>
     </footer>

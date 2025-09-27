@@ -9,16 +9,21 @@ datasource db {
 }
 
 model Artist {
-  id        String   @id @default(cuid())
-  name      String
-  slug      String   @unique
-  handle    String?
-  bio       String?
-  avatarUrl String?
-  coverUrl  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  works     Work[]
+  id         String   @id @default(cuid())
+  slug       String   @unique
+  name       String
+  bio        String?
+  socials    String[] @default([])      // <-- manquante en DB
+  image      String?  @map("coverUrl")  // mapping sur ta colonne existante
+  portrait   String?  @map("avatarUrl")
+  handle     String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  isArchived Boolean   @default(false)
+  deletedAt  DateTime?
+  works      Work[]
+
+  @@index([isArchived, deletedAt])
 }
 
 model Work {

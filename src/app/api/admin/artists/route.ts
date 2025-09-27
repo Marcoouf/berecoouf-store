@@ -1,0 +1,59 @@
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { artistCreateSchema } from "@/lib/validators/artist";
+import { revalidateArtistPaths } from "@/lib/revalidate";
+
+// TODO: remplace par ta vraie auth admin
+function assertAdmin() {
+  // if (!isAdmin) throw new Error("Unauthorized");
+}
+
+export async function GET() {
+  const artists = await prisma.artist.findMany({
+    where: { deletedAt: null },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true, slug: true, isArchived: true },
+  });
+  return NextResponse.json(artists);
+}
+
+export async function POST(req: Request) {
+  try {
+    assertAdmin();
+    const payload = await req.json();
+    const input = artistCreateSchema.parse(payload);
+
+    // Empêche doublon slug si non supprimé
+    const exists = await prisma.artist.findUnique({ where: { slug: input.slug } });
+    if (exists && !exists.deletedAt) {
+      return NextResponse.json({ error: "Slug déjà utilisé" }, { status: 409 });
+    }
+
+    const created = await prisma.artist.upsert({
+      where: { slug: input.slug },
+      create: {
+        name: input.name,
+        slug: input.slug,
+        bio: input.bio ?? null,
+        socials: input.socials ?? [],
+        image: input.image ?? null,
+        portrait: input.portrait ?? null,
+      },
+      update: {
+        name: input.name,
+        bio: input.bio ?? null,
+        socials: input.socials ?? [],
+        image: input.image ?? null,
+        portrait: input.portrait ?? null,
+        deletedAt: null,
+        isArchived: false,
+      },
+      select: { id: true, slug: true, name: true },
+    });
+
+    await revalidateArtistPaths(created.slug);
+    return NextResponse.json(created, { status: 201 });
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message ?? "Erreur" }, { status: 400 });
+  }
+}

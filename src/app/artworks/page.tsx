@@ -5,7 +5,6 @@ import Link from 'next/link'
 import SmartImage from '@/components/SmartImage'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import Breadcrumb from '@/components/Breadcrumb'
-import { artworks as staticArtworks, artists as staticArtists } from '@/lib/data'
 import { euro } from '@/lib/format'
 
 // --- Prix utilitaires (en CENTIMES) ---
@@ -23,21 +22,63 @@ function unitPriceCents(w: any): number {
   return Number.isFinite(fromPrice) ? fromPrice : 0
 }
 
+function ArtworkCard({
+  artwork,
+  artist,
+}: {
+  artwork: any
+  artist: any
+}) {
+  // Affichage prix : priorité à priceMinFormatted ; sinon, on formate directement des CENTIMES
+  const priceLabel: string =
+    (artwork as any).priceMinFormatted ??
+    (typeof (artwork as any).priceMin === 'number'
+      ? euro((artwork as any).priceMin) // priceMin est en centimes
+      : euro(unitPriceCents(artwork))); // unitPriceCents renvoie des centimes
+
+  return (
+    <div className="flex flex-col">
+      <Link href={`/artworks/${artwork.slug}`} scroll className="group block">
+        <div className="aspect-square relative overflow-hidden rounded-lg border bg-white">
+          <SmartImage
+            src={artwork.image}
+            alt={artwork.title}
+            fill
+            wrapperClass="absolute inset-0 flex items-center justify-center p-4"
+            className="!object-contain mx-auto"
+            sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw"
+            draggable={false}
+          />
+          <span className="pointer-events-none absolute inset-0 select-none" aria-hidden />
+        </div>
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <div className="truncate text-sm font-medium">{artwork.title}</div>
+          <div className="ml-auto text-sm tabular-nums">{priceLabel}</div>
+        </div>
+        <div className="text-xs text-neutral-500">{artist?.name}</div>
+      </Link>
+    </div>
+  )
+}
+
 function ArtworksPageInner() {
-  // → on précharge avec les données statiques, puis on remplace par /api/catalog (permet de voir aussi les oeuvres créées depuis l'admin)
-  const [artworks, setArtworks] = useState<any[]>(staticArtworks)
-  const [artists, setArtists] = useState<any[]>(staticArtists)
-  const [loading, setLoading] = useState(false)
+  // → on lit toujours le catalogue depuis /api/catalog (DB), sans données locales
+  const [artworks, setArtworks] = useState<any[]>([])
+  const [artists, setArtists] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let active = true
-    setLoading(true)
-    fetch('/api/catalog')
+    fetch('/api/catalog', { cache: 'no-store' })
       .then(r => r.json())
       .then((data) => {
         if (!active) return
-        if (Array.isArray(data.artworks)) setArtworks(data.artworks)
-        if (Array.isArray(data.artists)) setArtists(data.artists)
+        if (Array.isArray(data.artworks)) {
+          setArtworks(data.artworks)
+        }
+        if (Array.isArray(data.artists)) {
+          setArtists(data.artists)
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false))
@@ -191,32 +232,11 @@ function ArtworksPageInner() {
       )}
 
       {/* Grille */}
-      <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
+      <div className="grid items-stretch gap-5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
         {filtered.map(w => {
           const artist = artists.find((a: any) => a.id === w.artistId)
-          const priceCents = unitPriceCents(w)
           return (
-            <Link key={w.id} href={`/artworks/${w.slug}`} scroll className="group block">
-              <div className="aspect-square relative overflow-hidden rounded-lg border bg-white">
-                <SmartImage
-                  src={w.image}
-                  alt={w.title}
-                  fill
-                  wrapperClass="absolute inset-0"
-                  className="object-contain transition-transform duration-500 group-hover:scale-[1.01]"
-                  sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw"
-                  draggable={false}
-                />
-                <span className="pointer-events-none absolute inset-0 select-none" aria-hidden />
-              </div>
-              <div className="mt-2 flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-medium">{w.title}</div>
-                  <div className="text-xs text-neutral-500">{artist?.name}</div>
-                </div>
-                <div className="shrink-0 text-sm tabular-nums">{euro(priceCents)}</div>
-              </div>
-            </Link>
+            <ArtworkCard key={w.id} artwork={w} artist={artist} />
           )
         })}
         {filtered.length === 0 && (

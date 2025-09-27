@@ -2,17 +2,34 @@
 import Link from 'next/link'
 import SmartImage from '@/components/SmartImage'
 import Breadcrumb from '@/components/Breadcrumb'
-import { getCatalog } from '@/lib/getCatalog'
-import type { Artist } from '@/lib/types'
+import { prisma } from '@/lib/db'
+
+const PLACEHOLDER_DATA_URL =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="810">
+       <rect width="100%" height="100%" fill="#f3f4f6"/>
+       <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
+             font-family="system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial"
+             font-size="32" fill="#9ca3af">Aperçu indisponible</text>
+     </svg>`
+  );
 
 export const dynamic = 'force-dynamic'
 
 export default async function ArtistsPage() {
-  // Récupère le catalogue (serveur)
-  const data = await getCatalog()
-  const artists: Artist[] = Array.isArray((data as any)?.artists)
-    ? ((data as any).artists as Artist[])
-    : []
+  // Récupère les artistes directement via Prisma
+  const artists = await prisma.artist.findMany({
+    where: { deletedAt: null, isArchived: false },
+    orderBy: { name: 'asc' },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      image: true,
+      portrait: true,
+    },
+  });
 
   // Filtre les entrées incomplètes pour éviter un rendu cassé
   const safe = artists.filter(a => a && a.slug && a.name)
@@ -44,7 +61,7 @@ export default async function ArtistsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
           {safe.map((a, idx) => {
             // Fallback image léger pour éviter un rendu vide si cover manquant
-            const cover = a.cover || '/images/placeholder.webp'
+            const cover = a.image || a.portrait || PLACEHOLDER_DATA_URL
             return (
               <Link
                 key={a.id}

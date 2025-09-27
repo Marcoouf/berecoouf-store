@@ -273,43 +273,56 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
     }
     if (!canSubmit) return
 
-    const isEditing = !!editingId
-
-    const payload: ArtworkDraft = {
-      ...value,
-      id: value.id, // s'assurer que l'id courant est bien envoyé
-      image: value.image,
-      mockup: value.mockup || undefined,
+    // ---- Route unique admin /api/admin/work ----
+    // L'API accepte image/mockup/price (euros) et formats[]
+    const payloadForApi = {
+      id: editingId ? String(value.id) : undefined,
+      title: value.title,
       slug: derivedSlug,
-      price:
-        value.price && value.price > 0
-          ? value.price
-          : (value.formats?.[0]?.price ?? 0),
-      formats:
-        (value.formats ?? [])
-          .filter(f => f.label.trim())
-          .map(f => ({ ...f, price: Number(f.price || 0) })) || undefined,
-    } as any
+      artistId: value.artistId,
+      image: value.image || '',
+      mockup: value.mockup || null,
+      // prix de base en euros si aucun format, sinon on le laisse vide (le serveur prendra min(formats))
+      price: (value.price && value.price > 0 ? Number(value.price) : undefined),
+      description: value.description || null,
+      year: value.year ?? null,
+      technique: value.technique || null,
+      paper: value.paper || null,
+      size: value.size || null,
+      edition: value.edition || null,
+      published: true,
+      formats: (value.formats ?? [])
+        .filter(f => f.label.trim())
+        .map(f => ({
+          id: String(f.id || '').startsWith('f-') ? undefined : f.id,
+          label: f.label,
+          price: Number(f.price || 0),
+        })),
+    }
+
+    const endpoint = editingId
+      ? `/api/admin/work?id=${encodeURIComponent(String(value.id))}`
+      : '/api/admin/work'
+    const method = editingId ? 'PUT' : 'POST'
 
     try {
-      const url = new URL('/api/admin/work', window.location.origin)
-      if (isEditing) url.searchParams.set('id', String(value.id))
-
-      const res = await fetch(url.toString(), {
-        method: isEditing ? 'PUT' : 'POST',
+      const res = await fetch(endpoint, {
+        method,
         credentials: 'include',
         headers: adminHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify(payload),
+        body: JSON.stringify(payloadForApi),
       })
       const j = await res.json().catch(() => ({}))
-      if (!res.ok || j?.ok === false) throw new Error(j?.error || `HTTP ${res.status}`)
+      if (!res.ok || j?.ok === false) {
+        throw new Error(j?.error || `HTTP ${res.status}`)
+      }
 
-      addToast('success', isEditing ? 'Œuvre mise à jour ✅' : 'Œuvre enregistrée ✅')
+      addToast('success', editingId ? 'Œuvre mise à jour ✅' : 'Œuvre enregistrée ✅')
 
       // Recharge la liste et garde le contexte
       await refreshExisting()
-      if (isEditing) {
-        // rester sur l'œuvre éditée
+      if (editingId) {
+        // on reste sur l'œuvre éditée
         setEditingId(value.id)
       } else {
         // reset uniquement en création
@@ -440,11 +453,17 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
               type="button"
               onClick={async () => {
                 if (!editingId) return
-                const ok = confirm('Supprimer définitivement cette œuvre ?')
+                const found = existing.find(x => x.id === editingId)
+                const title = found?.title || '(sans titre)'
+                const slug = (found as any)?.slug || ''
+                const ok = confirm(
+                  `Supprimer définitivement cette œuvre ?\n\n` +
+                  `Titre : ${title}\n` +
+                  `Slug : ${slug}\n\n` +
+                  `Cette action est irréversible.`
+                )
                 if (!ok) return
-                const url = new URL('/api/admin/work', window.location.origin)
-                url.searchParams.set('id', editingId)
-                const res = await fetch(url.toString(), {
+                const res = await fetch(`/api/admin/work?id=${encodeURIComponent(editingId)}`, {
                   method: 'DELETE',
                   credentials: 'include',
                   headers: adminHeaders(),

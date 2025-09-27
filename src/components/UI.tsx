@@ -56,7 +56,7 @@ function Header({ onOpenCart }: { onOpenCart: () => void }) {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-line/70 bg-white/70 backdrop-blur">
       <Container className="py-3 flex items-center justify-between">
-        <Link href="/" className="text-sm tracking-widest uppercase">Point Bleu</Link>
+        <Link href="/" className="text-sm tracking-widest uppercase">Vague</Link>
         <nav className="hidden gap-6 md:flex text-sm text-neutral-600">
           <Link href="/artists" className="hover:underline underline-offset-4">Artistes</Link>
           <Link href="/artworks" className="hover:underline underline-offset-4">Œuvres</Link>

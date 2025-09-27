@@ -1,4 +1,5 @@
 import { NextResponse, NextRequest } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
 
@@ -6,66 +7,99 @@ import type { Prisma } from '@prisma/client'
 function withAdmin<T extends (req: NextRequest, ...rest: any[]) => Promise<Response>>(handler: T) {
   return async (req: NextRequest, ...rest: any[]) => {
     // Accept both server and public env keys (public used by admin client fetch)
-    const expectedKeys = [
-      process.env.ADMIN_KEY,
-      process.env.NEXT_PUBLIC_ADMIN_KEY,
-    ]
+    const expectedKeys = [process.env.ADMIN_KEY, process.env.NEXT_PUBLIC_ADMIN_KEY]
       .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
-      .map((v) => v.trim());
+      .map((v) => v.trim())
 
     if (expectedKeys.length === 0) {
-      return NextResponse.json({ ok: false, error: 'Server misconfigured: no ADMIN_KEY set' }, { status: 500 });
+      return NextResponse.json({ ok: false, error: 'Server misconfigured: no ADMIN_KEY set' }, { status: 500 })
     }
 
     // Extract provided key from multiple places
-    const url = new URL(req.url);
-    const fromHeader = (req.headers.get('x-admin-key') || '').trim();
-    const fromAuth = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim();
-    const fromCookie = (req.cookies?.get?.('admin_key')?.value || '').trim();
-    const fromQuery = (url.searchParams.get('admin_key') || '').trim();
+    const url = new URL(req.url)
+    const fromHeader = (req.headers.get('x-admin-key') || '').trim()
+    const fromAuth = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim()
+    const fromCookie = (req.cookies?.get?.('admin_key')?.value || '').trim()
+    const fromQuery = (url.searchParams.get('admin_key') || '').trim()
 
-    const provided = fromHeader || fromAuth || fromCookie || fromQuery;
+    const provided = fromHeader || fromAuth || fromCookie || fromQuery
+    const ok = provided && expectedKeys.some((k) => k === provided)
+    if (!ok) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
 
-    const ok = provided && expectedKeys.some((k) => k === provided);
-    if (!ok) {
-      return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 });
-    }
-
-    return handler(req, ...rest);
-  };
+    return handler(req, ...rest)
+  }
 }
 
-type VariantIn = { id?: string; label: string; price: number; sku?: string | null; stock?: number | null }
-type WorkIn = {
+// ----------------- Types d'entrée normalisés -----------------
+export type VariantIn = { id?: string; label: string; price: number; sku?: string | null; stock?: number | null }
+export type WorkIn = {
   id?: string
   slug: string
   title: string
-  artistId: string
+  artistId: string // id OU slug
   description?: string | null
   technique?: string | null
   year?: number | null
   paper?: string | null
   dimensions?: string | null
-  image: string
+  image: string // URL publique requise
   mockup?: string | null
-  basePrice: number
+  basePrice: number // CENTIMES
   published?: boolean
-  variants?: VariantIn[]
+  variants?: VariantIn[] // PRIX EN CENTIMES
+}
+
+// ----------------- Helpers -----------------
+const pickNumber = (v: any): number | null => {
+  if (v === undefined || v === null || v === '') return null
+  const n = Number(String(v).replace(',', '.'))
+  return Number.isFinite(n) ? n : null
+}
+
+const toCents = (raw: number | null): number => {
+  if (!raw) return 0
+  // Si ça ressemble à des euros (< 10000), convertir, sinon on considère que c'est déjà des centimes
+  return raw > 0 && raw < 10000 ? Math.round(raw * 100) : Math.round(raw)
 }
 
 async function resolveArtistId(key: string) {
-  const k = String(key || '').trim();
-  if (!k) return null;
-  const a = await prisma.artist.findFirst({ where: { OR: [{ id: k }, { slug: k }] }, select: { id: true } });
-  return a?.id ?? null;
+  const k = String(key || '').trim()
+  if (!k) return null
+  const a = await prisma.artist.findFirst({ where: { OR: [{ id: k }, { slug: k }] }, select: { id: true } })
+  return a?.id ?? null
 }
 
 function normalize(body: any): WorkIn {
-  const rawBase = Number(body?.basePrice ?? 0)
-  // Convert to cents if it looks like a euro amount (e.g. 160 -> 16000, 160.5 -> 16050)
-  const basePriceCents = rawBase > 0 && rawBase < 10000 ? Math.round(rawBase * 100) : Math.round(rawBase)
+  // Accepte `variants` (nouveau) OU `formats` (héritage admin)
+  const rawVariants: any[] = Array.isArray(body?.variants)
+    ? body.variants
+    : Array.isArray(body?.formats)
+    ? body.formats
+    : []
 
-  const vsIn = Array.isArray(body?.variants) ? (body.variants as VariantIn[]) : []
+  const variants: VariantIn[] = rawVariants.map((v) => {
+    const raw = pickNumber(v?.price) ?? 0
+    const priceCents = toCents(raw)
+    return {
+      id: v?.id || undefined,
+      label: String(v?.label ?? '').trim(),
+      price: priceCents,
+      sku: v?.sku ?? null,
+      stock: v?.stock ?? null,
+    }
+  })
+
+  // base price: accepte `basePrice` (euros/centimes) OU `price` (euros), sinon min(variants)
+  const rawBase = pickNumber(body?.basePrice)
+  const rawPriceEuros = rawBase ?? pickNumber(body?.price)
+  let basePrice = toCents(rawPriceEuros ?? 0)
+  if (!basePrice && variants.length) {
+    basePrice = variants.reduce((min, v) => (v.price > 0 && v.price < min ? v.price : min), Infinity)
+    if (!Number.isFinite(basePrice)) basePrice = 0
+  }
+
+  const image = String(body?.image || body?.imageUrl || '').trim()
+  const mockup = body?.mockup ? String(body.mockup).trim() : body?.mockupUrl ? String(body.mockupUrl).trim() : null
 
   return {
     id: body?.id ? String(body.id).trim() : undefined,
@@ -76,76 +110,70 @@ function normalize(body: any): WorkIn {
     technique: body?.technique ?? null,
     year: body?.year ? Number(body.year) : null,
     paper: body?.paper ?? null,
-    dimensions: body?.dimensions ?? null,
-    image: String(body?.image || '').trim(),
-    mockup: body?.mockup ? String(body.mockup).trim() : null,
-    basePrice: basePriceCents,
+    dimensions: body?.dimensions ?? body?.size ?? null,
+    image,
+    mockup,
+    basePrice,
     published: body?.published ?? true,
-    variants: vsIn.map((v) => {
-      const raw = Number(v.price ?? 0)
-      const priceCents = raw > 0 && raw < 10000 ? Math.round(raw * 100) : Math.round(raw)
-      return {
-        id: v.id,
-        label: String(v.label ?? '').trim(),
-        price: priceCents,
-        sku: v.sku ?? null,
-        stock: v.stock ?? null,
-      }
-    }),
+    variants,
   }
 }
 
+// ----------------- Handlers -----------------
 export const POST = withAdmin(async (req: NextRequest) => {
   const data = normalize(await req.json())
-  const artistResolvedId = await resolveArtistId(data.artistId);
-  if (!artistResolvedId) {
-    return NextResponse.json({ ok: false, error: 'Artist inconnu (id ou slug)' }, { status: 400 });
-  }
-  // slug unique : message clair si conflit
-  const created = await prisma.work.create({
-    data: {
-      slug: data.slug,
-      title: data.title,
-      description: data.description,
-      technique: data.technique,
-      year: data.year,
-      paper: data.paper,
-      dimensions: data.dimensions,
-      imageUrl: data.image,
-      mockupUrl: data.mockup,
-      basePrice: data.basePrice,
-      published: data.published ?? true,
-      artist: { connect: { id: artistResolvedId } },
-      variants: {
-        create: (data.variants ?? []).map((v, i) => ({
-          label: v.label,
-          price: v.price,
-          // order: i, // uncomment if you want to persist display order
-        })),
-      },
-    },
-    include: { variants: true, artist: true },
-  }).catch((e: any) => {
-    if (e?.code === 'P2002') return null
-    throw e
-  })
 
-  if (!created) return NextResponse.json({ ok: false, error: 'Slug déjà utilisé' }, { status: 409 })
+  if (!data.image) return NextResponse.json({ ok: false, error: 'image_required' }, { status: 400 })
+
+  const artistResolvedId = await resolveArtistId(data.artistId)
+  if (!artistResolvedId) return NextResponse.json({ ok: false, error: 'unknown_artist' }, { status: 400 })
+
+  const created = await prisma.work
+    .create({
+      data: {
+        slug: data.slug,
+        title: data.title,
+        description: data.description,
+        technique: data.technique,
+        year: data.year,
+        paper: data.paper,
+        dimensions: data.dimensions,
+        imageUrl: data.image,
+        mockupUrl: data.mockup,
+        basePrice: data.basePrice, // **CENTIMES**
+        published: data.published ?? true,
+        artist: { connect: { id: artistResolvedId } },
+        ...(data.variants && data.variants.length
+          ? { variants: { create: data.variants.map((v) => ({ label: v.label, price: v.price })) } }
+          : {}),
+      },
+      include: { variants: true, artist: true },
+    })
+    .catch((e: any) => (e?.code === 'P2002' ? null : Promise.reject(e)))
+
+  if (!created) return NextResponse.json({ ok: false, error: 'slug_conflict' }, { status: 409 })
+
+  // Revalidate public pages
+  revalidatePath('/artworks')
+  revalidatePath(`/artworks/${created.slug}`)
+
   return NextResponse.json({ ok: true, artwork: created }, { status: 201 })
 })
 
 export const PUT = withAdmin(async (req: NextRequest) => {
+  // On ne lit le body qu'une seule fois
   const url = new URL(req.url)
-  const id = url.searchParams.get('id') || (await req.clone().json()).id
-  if (!id) return NextResponse.json({ ok: false, error: 'Missing work id' }, { status: 400 })
-  const data = normalize(await req.json())
-  const artistResolvedId = await resolveArtistId(data.artistId);
-  if (!artistResolvedId) {
-    return NextResponse.json({ ok: false, error: 'Artist inconnu (id ou slug)' }, { status: 400 });
-  }
+  const body = await req.json().catch(() => ({} as any))
+  const id = url.searchParams.get('id') || body.id
+  if (!id) return NextResponse.json({ ok: false, error: 'missing_id' }, { status: 400 })
+
+  const data = normalize(body)
+  if (!data.image) return NextResponse.json({ ok: false, error: 'image_required' }, { status: 400 })
+
+  const artistResolvedId = await resolveArtistId(data.artistId)
+  if (!artistResolvedId) return NextResponse.json({ ok: false, error: 'unknown_artist' }, { status: 400 })
 
   const work = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-    // update champs principaux
     await tx.work.update({
       where: { id },
       data: {
@@ -158,50 +186,55 @@ export const PUT = withAdmin(async (req: NextRequest) => {
         dimensions: data.dimensions,
         imageUrl: data.image,
         mockupUrl: data.mockup,
-        basePrice: data.basePrice,
+        basePrice: data.basePrice, // **CENTIMES**
         published: data.published ?? true,
         artist: { connect: { id: artistResolvedId } },
       },
     })
 
-    // diff variants
+    // Sync variants
     const incoming = data.variants ?? []
-    const keepIds = incoming.filter(v => v.id).map(v => v.id!) // à garder/maj
+    const keepIds = incoming
+      .filter((v) => typeof v.id === 'string' && v.id.trim().length > 0)
+      .map((v) => v.id as string)
 
-    // delete celles retirées du form
-    await tx.variant.deleteMany({
-      where: { workId: id, NOT: { id: { in: keepIds.length ? keepIds : ['__none__'] } } },
-    })
+    // Supprimer celles retirées dans l'admin
+    await tx.variant.deleteMany({ where: { workId: id, NOT: { id: { in: keepIds.length ? keepIds : ['__none__'] } } } })
 
-    // upsert / create
+    // Mettre à jour / Créer
     for (const v of incoming) {
-      if (v.id) {
-        await tx.variant.update({
-          where: { id: v.id },
-          data: {
-            label: v.label,
-            price: v.price,
-            // order: 0, // optionally set or compute an order index
-          },
-        })
+      if (v.id && v.id.trim()) {
+        await tx.variant.update({ where: { id: v.id }, data: { label: v.label, price: v.price } })
       } else {
-        await tx.variant.create({
-          data: {
-            workId: id,
-            label: v.label,
-            price: v.price,
-            // order: 0,
-          },
-        })
+        await tx.variant.create({ data: { workId: id, label: v.label, price: v.price } })
       }
     }
 
     return tx.work.findUnique({ where: { id }, include: { variants: true, artist: true } })
   })
 
-  if (!work) {
-    return NextResponse.json({ ok: false, error: 'Work not found' }, { status: 404 })
-  }
+  if (!work) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
+
+  // Revalidate public pages
+  revalidatePath('/artworks')
+  revalidatePath(`/artworks/${work.slug}`)
 
   return NextResponse.json({ ok: true, artwork: work }, { status: 200 })
+})
+
+export const DELETE = withAdmin(async (req: NextRequest) => {
+  const url = new URL(req.url)
+  const id = url.searchParams.get('id') || ''
+  if (!id) return NextResponse.json({ ok: false, error: 'missing_id' }, { status: 400 })
+
+  const deleted = await prisma.$transaction(async (tx) => {
+    await tx.variant.deleteMany({ where: { workId: id } })
+    return tx.work.delete({ where: { id }, select: { slug: true } })
+  })
+
+  // Revalidate public pages
+  revalidatePath('/artworks')
+  revalidatePath(`/artworks/${deleted.slug}`)
+
+  return NextResponse.json({ ok: true })
 })

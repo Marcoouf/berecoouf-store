@@ -33,18 +33,25 @@ export default function HeaderGlobal() {
         <Link
           href="/"
           className="group site-brand flex items-center gap-2 text-sm tracking-widest uppercase"
-          data-brand-dot
+          data-brand-wave
         >
-          <motion.span
+          <motion.svg
             aria-hidden
-            className="brand-dot h-2.5 w-2.5 rounded-full bg-accent group-hover:bg-accent-dark"
-            animate={prefersReduced ? { scale: 1 } : { scale: [1, 1.25, 1] }}
-            transition={
-              prefersReduced ? undefined : { duration: 2, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' }
-            }
+            viewBox="0 0 24 12"
+            className="brand-wave h-3 w-5 text-accent group-hover:text-accent-dark"
+            animate={prefersReduced ? { y: 0 } : { y: [0, -1, 0] }}
+            transition={prefersReduced ? undefined : { duration: 2, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' }}
             style={{ willChange: 'transform' }}
-          />
-          <span>Point Bleu</span>
+          >
+            <path
+              d="M1 6c2.5 0 2.5-4 5-4s2.5 4 5 4 2.5-4 5-4 2.5 4 5 4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </motion.svg>
+          <span>Vague</span>
         </Link>
 
         {/* Burger (mobile) */}
