@@ -1,7 +1,6 @@
 import { NextResponse, NextRequest } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
-import type { Prisma } from '@prisma/client'
 
 // --- Simple admin guard based on ADMIN_KEY (no shared import needed)
 function withAdmin<T extends (req: NextRequest, ...rest: any[]) => Promise<Response>>(handler: T) {
@@ -173,7 +172,7 @@ export const PUT = withAdmin(async (req: NextRequest) => {
   const artistResolvedId = await resolveArtistId(data.artistId)
   if (!artistResolvedId) return NextResponse.json({ ok: false, error: 'unknown_artist' }, { status: 400 })
 
-  const work = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
+  const work = await prisma.$transaction(async (tx) => {
     await tx.work.update({
       where: { id },
       data: {
