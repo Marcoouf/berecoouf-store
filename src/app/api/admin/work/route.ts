@@ -172,8 +172,7 @@ export const PUT = withAdmin(async (req: NextRequest) => {
   const artistResolvedId = await resolveArtistId(data.artistId)
   if (!artistResolvedId) return NextResponse.json({ ok: false, error: 'unknown_artist' }, { status: 400 })
 
-  const work = await prisma.$transaction(async (tx) => {
-    await tx.work.update({
+const work = await prisma.$transaction(async (tx: any) => {    await tx.work.update({
       where: { id },
       data: {
         slug: data.slug,
@@ -226,7 +225,7 @@ export const DELETE = withAdmin(async (req: NextRequest) => {
   const id = url.searchParams.get('id') || ''
   if (!id) return NextResponse.json({ ok: false, error: 'missing_id' }, { status: 400 })
 
-  const deleted = await prisma.$transaction(async (tx) => {
+  const deleted = await prisma.$transaction(async (tx: any) => {
     await tx.variant.deleteMany({ where: { workId: id } })
     return tx.work.delete({ where: { id }, select: { slug: true } })
   })

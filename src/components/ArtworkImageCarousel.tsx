@@ -73,7 +73,7 @@ export default function ArtworkImageCarousel({
     <div ref={rootRef} tabIndex={0} aria-roledescription="carousel" aria-label={`Images pour « ${title} »`}>
       {/* Wrapper responsive centré : largeur limitée, carré garanti */}
       <div
-        className="group relative mx-auto w-full max-w-[min(92vw,theme(spacing.[max]))] aspect-square"
+        className="group relative mx-auto w-full max-w-[min(92vw,theme(maxWidth.7xl))] aspect-square"
         style={{
           // max-w dynamique basé sur la prop (ex: 720) — on passe en CSS var pour conserver Tailwind
           // @ts-ignore
