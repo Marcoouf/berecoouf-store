@@ -52,16 +52,25 @@ export default async function Page({ params }: { params: { slug: string } }) {
   // Normalisation: variants & priceMin pour l'UI (types solides)
   type VariantUI = { id: string; label: string; price: number }
 
-  const variants: VariantUI[] = (Array.isArray((artwork as any).variants)
+  const rawVariants = Array.isArray((artwork as any).variants)
     ? (artwork as any).variants
     : Array.isArray((artwork as any).formats)
       ? (artwork as any).formats
-      : [])
+      : []
+
+  // Print-only: on exclut toute variante numérique si un champ "type" est présent
+  const variants: VariantUI[] = (rawVariants as any[])
+    .filter((v: any) => {
+      const t = String(v?.type ?? '').toLowerCase()
+      return !t || t === 'print'
+    })
     .map((v: any): VariantUI => ({
       id: String(v?.id ?? ''),
       label: String(v?.label ?? ''),
       price: Number(v?.price ?? 0) || 0,
     }))
+    // On ne garde que les formats valides (prix > 0 et label non vide)
+    .filter((v) => Number.isFinite(v.price) && v.price > 0 && v.label.trim().length > 0)
 
   const prices = variants
     .map((v) => Number(v.price))

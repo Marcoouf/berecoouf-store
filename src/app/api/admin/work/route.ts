@@ -93,7 +93,7 @@ function normalize(body: any): WorkIn {
   const rawPriceEuros = rawBase ?? pickNumber(body?.price)
   let basePrice = toCents(rawPriceEuros ?? 0)
   if (!basePrice && variants.length) {
-    basePrice = variants.reduce((min, v) => (v.price > 0 && v.price < min ? v.price : min), Infinity)
+    basePrice = variants.reduce((min, v) => (v.price > 0 && v.price < min ? v.price : min), Infinity as any)
     if (!Number.isFinite(basePrice)) basePrice = 0
   }
 
@@ -118,11 +118,64 @@ function normalize(body: any): WorkIn {
   }
 }
 
+// ----------------- Validation stricte (print only) -----------------
+function ensureOnlyPrint(data: WorkIn, raw: any) {
+  const errs: string[] = []
+
+  if (!data.slug) errs.push('slug_required')
+  if (!data.title) errs.push('title_required')
+  if (!data.artistId) errs.push('artist_required')
+  if (!data.image) errs.push('image_required')
+  if (data.image.startsWith('/images/')) errs.push('image_must_be_remote')
+
+  // variants
+  if (!Array.isArray(data.variants) || data.variants.length === 0) errs.push('variants_required')
+
+  // Si l'UI envoie un champ type, il doit être 'print'
+  const list = Array.isArray(raw?.variants) ? raw.variants : Array.isArray(raw?.formats) ? raw.formats : []
+  const invalidType = list.some((v: any) => {
+    if (v == null || typeof v !== 'object') return false
+    if (v.type == null) return false
+    const t = String(v.type).toLowerCase().trim()
+    return t !== 'print'
+  })
+  if (invalidType) errs.push('invalid_variant_type')
+
+  for (const v of data.variants ?? []) {
+    if (!v.label?.trim()) errs.push('variant_label_required')
+    if (!Number.isFinite(v.price) || v.price <= 0) errs.push(`variant_price_invalid:${v.label || ''}`)
+    if (v.stock != null && (!Number.isInteger(v.stock) || v.stock < 0)) errs.push(`variant_stock_invalid:${v.label || ''}`)
+  }
+
+  // basePrice: doit être > 0 ; sinon on le remplace par le min variant si possible
+  if (!Number.isFinite(data.basePrice) || data.basePrice <= 0) {
+    const min = (data.variants ?? []).reduce((acc, v) => (v.price > 0 && v.price < acc ? v.price : acc), Infinity)
+    if (Number.isFinite(min)) {
+      ;(data as any).basePrice = min
+    } else {
+      errs.push('base_price_invalid')
+    }
+  }
+
+  if (errs.length) {
+    const detail = Array.from(new Set(errs))
+    const e: any = new Error('validation_failed')
+    e.code = 'validation_failed'
+    e.detail = detail
+    throw e
+  }
+}
+
 // ----------------- Handlers -----------------
 export const POST = withAdmin(async (req: NextRequest) => {
-  const data = normalize(await req.json())
+  const raw = await req.json().catch(() => ({} as any))
+  const data = normalize(raw)
 
-  if (!data.image) return NextResponse.json({ ok: false, error: 'image_required' }, { status: 400 })
+  try {
+    ensureOnlyPrint(data, raw)
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e?.code || 'validation_failed', detail: e?.detail || [e?.message] }, { status: 400 })
+  }
 
   const artistResolvedId = await resolveArtistId(data.artistId)
   if (!artistResolvedId) return NextResponse.json({ ok: false, error: 'unknown_artist' }, { status: 400 })
@@ -143,7 +196,11 @@ export const POST = withAdmin(async (req: NextRequest) => {
         published: data.published ?? true,
         artist: { connect: { id: artistResolvedId } },
         ...(data.variants && data.variants.length
-          ? { variants: { create: data.variants.map((v) => ({ label: v.label, price: v.price })) } }
+          ? {
+              variants: {
+                create: data.variants.map((v) => ({ label: v.label, price: v.price })),
+              },
+            }
           : {}),
       },
       include: { variants: true, artist: true },
@@ -167,12 +224,18 @@ export const PUT = withAdmin(async (req: NextRequest) => {
   if (!id) return NextResponse.json({ ok: false, error: 'missing_id' }, { status: 400 })
 
   const data = normalize(body)
-  if (!data.image) return NextResponse.json({ ok: false, error: 'image_required' }, { status: 400 })
+
+  try {
+    ensureOnlyPrint(data, body)
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e?.code || 'validation_failed', detail: e?.detail || [e?.message] }, { status: 400 })
+  }
 
   const artistResolvedId = await resolveArtistId(data.artistId)
   if (!artistResolvedId) return NextResponse.json({ ok: false, error: 'unknown_artist' }, { status: 400 })
 
-const work = await prisma.$transaction(async (tx: any) => {    await tx.work.update({
+  const work = await prisma.$transaction(async (tx: any) => {
+    await tx.work.update({
       where: { id },
       data: {
         slug: data.slug,

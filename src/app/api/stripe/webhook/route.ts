@@ -1,152 +1,151 @@
 // src/app/api/stripe/webhook/route.ts
-import { NextResponse } from "next/server";
-import { stripe } from "@/lib/stripe";
-import { getCatalog } from "@/lib/getCatalog";
-import type Stripe from "stripe";
+import { NextResponse } from 'next/server'
+import { stripe } from '@/lib/stripe'
+import { prisma } from '@/lib/prisma'
+import type Stripe from 'stripe'
 
-// --- Resend (optionnel) ---
-let resend: any = null;
+// Resend (optionnel)
+let resend: any = null
 try {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { Resend } = require("resend");
-  const key = process.env.RESEND_API_KEY;
-  if (key) resend = new Resend(key);
+  const { Resend } = require('resend')
+  const key = process.env.RESEND_API_KEY
+  if (key) resend = new Resend(key)
 } catch {
-  // paquet non installé → on continuera sans email
+  // paquet non installé → on continue sans email
 }
 
-export const runtime = "nodejs";
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
+function ok(body: any = { received: true }, init: number | ResponseInit = 200) {
+  return NextResponse.json(body, typeof init === 'number' ? { status: init } : init)
+}
+function bad(msg = 'bad_request', code = 400) {
+  return new NextResponse(msg, { status: code })
+}
 
 export async function POST(req: Request) {
-  const sig = req.headers.get("stripe-signature");
-  const whSecret = process.env.STRIPE_WEBHOOK_SECRET;
+  const sig = req.headers.get('stripe-signature')
+  const whSecret = process.env.STRIPE_WEBHOOK_SECRET
   if (!sig || !whSecret) {
-    // En dev, ne rien casser si non configuré
-    return NextResponse.json({ ok: true });
+    // En dev sans secret, ne casse pas (noop)
+    return ok({ skipped: 'missing_signature_or_secret' })
   }
 
-  const rawBody = await req.text();
-  let event: any;
+  const rawBody = await req.text()
+  let event: Stripe.Event
   try {
-    event = stripe.webhooks.constructEvent(rawBody, sig, whSecret);
+    event = stripe.webhooks.constructEvent(rawBody, sig, whSecret)
   } catch (err: any) {
-    console.error("Webhook signature failed:", err?.message);
-    // On répond 400 pour signaler la mauvaise signature
-    return new NextResponse("Bad signature", { status: 400 });
+    console.error('Webhook signature failed:', err?.message)
+    return bad('invalid_signature', 400)
   }
 
-  if (event.type === "checkout.session.completed") {
-    const sessionObj = event.data.object as { id: string };
+  if (event.type !== 'checkout.session.completed') {
+    return ok({ ignored: event.type })
+  }
 
-    // 1) Récupère la session SANS expand shipping_details (interdit sur ta version)
-    const full = (await stripe.checkout.sessions.retrieve(sessionObj.id)) as unknown as Stripe.Checkout.Session;
+  const sessObj = event.data.object as { id: string }
 
-    // 2) Récupère les lignes avec le product expandé (méthode sûre)
-    const lineItems = await stripe.checkout.sessions.listLineItems(sessionObj.id, {
-      expand: ["data.price.product"],
-      limit: 100,
-    });
+  // 1) Récupération session sans expand exotique (shipping_details est directement présent)
+  const session = (await stripe.checkout.sessions.retrieve(sessObj.id)) as unknown as Stripe.Checkout.Session
 
-    const shipping: any = (full as any).shipping_details; // peut être undefined
-    const customerEmail = full.customer_details?.email ?? full.customer_email ?? "";
-    const currency = (full.currency ?? "eur").toUpperCase();
-    const amountTotal = (full.amount_total ?? 0) / 100;
+  // 2) Lignes de commande avec product expandé pour lire metadata (workId/variantId)
+  const lines = await stripe.checkout.sessions.listLineItems(sessObj.id, {
+    expand: ['data.price.product'],
+    limit: 100,
+  })
 
-    const items = (lineItems.data ?? []).map((li: any) => {
-      const qty = li.quantity ?? 1;
-      const unit = (li.price?.unit_amount ?? 0) / 100;
-      const name =
-        li.description ||
-        (typeof li.price?.product !== "string" ? li.price?.product?.name : "Œuvre");
-      const meta =
-        typeof li.price?.product !== "string" ? li.price?.product?.metadata ?? {} : {};
-      return { name, qty, unit, total: unit * qty, metadata: meta };
-    });
+  const email = session.customer_details?.email || session.customer_email || ''
+  const totalCents = session.amount_total ?? 0
+  const currency = (session.currency || 'eur').toUpperCase()
 
-    // Cherche emails artistes depuis le catalogue (par workId)
-    let recipients: string[] = [];
-    try {
-      const catalog = await getCatalog();
-      const artistEmails = new Set<string>();
-      for (const it of items) {
-        const workId = (it.metadata?.workId as string) || "";
-        const work = catalog.artworks?.find((w: any) => w.id === workId);
-        const artist = work && catalog.artists?.find((a: any) => a.id === work.artistId);
-        const email: string | undefined =
-          (artist as any)?.email || (artist as any)?.contact?.email;
-        if (email) artistEmails.add(email);
+  type Item = { workId: string; variantId: string | null; qty: number; unitPrice: number }
+  const items: Item[] = []
+
+  for (const li of lines.data ?? []) {
+    const qty = li.quantity ?? 1
+    const unit = li.price?.unit_amount ?? 0 // CENTIMES
+    const product = (li.price?.product as Stripe.Product) || null
+    const workId = (product?.metadata?.workId || '').toString()
+    const variantIdRaw = (product?.metadata?.variantId || '').toString()
+    const variantId = variantIdRaw.length ? variantIdRaw : null
+
+    if (!workId || !unit || qty <= 0) continue
+    items.push({ workId, variantId, qty, unitPrice: unit })
+  }
+
+  if (items.length === 0) {
+    console.warn('webhook: no items from line_items', sessObj.id)
+    return ok()
+  }
+
+  // 3) Transaction DB: créer Order + OrderItems (print uniquement)
+  try {
+    await prisma.$transaction(async (tx: any) => {
+      // Certains schémas locaux n'ont pas encore Order/OrderItem → on vérifie dynamiquement
+      const hasOrder = tx && typeof tx === 'object' && tx.order && typeof tx.order.create === 'function'
+      const hasOrderItem = tx && typeof tx === 'object' && tx.orderItem && typeof tx.orderItem.create === 'function'
+      if (!hasOrder || !hasOrderItem) {
+        console.warn('webhook: Order/OrderItem models not available in Prisma client → skipping persistence')
+        return
       }
-      recipients = Array.from(artistEmails);
-    } catch (e) {
-      console.warn("getCatalog() failed for webhook artist lookup:", e);
-    }
 
-    // Override (toujours appliqué en dernier)
-    const override = process.env.SALES_NOTIF_OVERRIDE;
-    if (override) recipients = [override];
+      const order = await tx.order.create({
+        data: {
+          email: email || null,
+          total: totalCents,
+          status: 'paid',
+          stripeSessionId: session.id,
+        },
+      })
 
-    // Adresse lisible (si renseignée)
-    const addr = shipping?.address as any;
-    const name = shipping?.name ?? addr?.name ?? "";
-    const phone = shipping?.phone ?? "";
-    const addressText = addr
-      ? [name, addr.line1, addr.line2, `${addr.postal_code ?? ""} ${addr.city ?? ""}`.trim(), addr.country, phone]
-          .filter(Boolean)
-          .join("\n")
-      : "(adresse non fournie)";
+      for (const it of items) {
+        await tx.orderItem.create({
+          data: {
+            orderId: order.id,
+            workId: it.workId,
+            variantId: it.variantId || undefined,
+            qty: it.qty,
+            unitPrice: it.unitPrice, // CENTIMES
+          },
+        })
+      }
+    })
+  } catch (e) {
+    console.error('webhook db error', e)
+    // On renvoie 200 pour éviter les retries agressifs pendant le dev,
+    // mais logge bien pour rattraper l’état si besoin.
+    return ok({ db: 'error' })
+  }
 
-    // Rendu des articles pour l’email
-    const lines = items
-      .map((it) => `• ${it.name} × ${it.qty} — ${it.total.toFixed(2)} ${currency}`)
-      .join("\n");
-
-    // Envoi email via Resend si configuré
-    const from = process.env.RESEND_FROM || "Acme <onboarding@resend.dev>";
-
-    if (!resend) {
-      console.log("Webhook OK, email NON envoyé (Resend désactivé)", {
-        reason: !process.env.RESEND_API_KEY ? "RESEND_API_KEY missing" : "package not installed",
-        recipients,
-        from,
-        customerEmail,
-        amountTotal,
-        currency,
-        addressText,
-        items,
-      });
-      return NextResponse.json({ received: true });
-    }
-
-    if (recipients.length === 0) {
-      console.log("Webhook OK, email NON envoyé (aucun destinataire)", {
-        recipients,
-        hint: "Définir SALES_NOTIF_OVERRIDE=ton@email.com pour tester",
-      });
-      return NextResponse.json({ received: true });
-    }
-
-    try {
+  // 4) Notification email (optionnelle, pas bloquante)
+  try {
+    const to = (process.env.SALES_NOTIF_OVERRIDE || '').trim()
+    if (resend && to) {
+      const linesTxt = items
+        .map((i) => `• ${i.qty} × ${i.workId}${i.variantId ? ` (${i.variantId})` : ''} — ${(i.unitPrice / 100).toFixed(2)} €`)
+        .join('\n')
       const html = `
         <h2>Nouvelle commande confirmée</h2>
-        <p><strong>Session Stripe :</strong> ${full.id}</p>
-        <p><strong>Email client :</strong> ${customerEmail}</p>
+        <p><strong>Session:</strong> ${session.id}</p>
+        <p><strong>Client:</strong> ${email || '(inconnu)'}</p>
+        <p><strong>Total:</strong> ${(totalCents / 100).toFixed(2)} ${currency}</p>
         <h3>Articles</h3>
-        <pre>${lines}</pre>
-        <h3>Adresse de livraison</h3>
-        <pre>${addressText}</pre>
-      `;
+        <pre>${linesTxt}</pre>
+      `
       await resend.emails.send({
-        from,
-        to: recipients,
-        subject: "Nouvelle commande – œuvre physique",
+        from: process.env.RESEND_FROM || 'Vague <noreply@vague.art>',
+        to,
+        subject: 'Nouvelle commande — Vague',
         html,
-      });
-      console.log("Email envoyé via Resend →", { to: recipients, from });
-    } catch (e) {
-      console.error("Resend send failed:", e);
+      })
+    } else {
+      console.log('Webhook OK, notification non envoyée (Resend ou SALES_NOTIF_OVERRIDE manquant).')
     }
+  } catch (e) {
+    console.error('webhook email error', e)
   }
 
-  // Toujours répondre 200 pour éviter les retries agressifs du CLI en dev
-  return NextResponse.json({ received: true });
+  return ok()
 }

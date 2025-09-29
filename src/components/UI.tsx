@@ -92,7 +92,9 @@ function Hero({ candidates = [] as string[] }: { candidates?: string[] }) {
         const r = await fetch('/api/hero-images')
         const json = await r.json()
         const arr = Array.isArray(json?.files) ? json.files.filter(Boolean) : []
-        const pool = arr.length ? arr : candidates
+        // Filtre les mockups renvoyés par l'API (exclut chemins contenant "mockup")
+        const noMockups = arr.filter((s: string) => typeof s === 'string' && !/mockup/i.test(s))
+        const pool = noMockups.length ? noMockups : candidates
         if (!active || pool.length === 0) return
         const i = Math.floor(Math.random() * pool.length)
         setReady(false)
@@ -491,7 +493,10 @@ export default function Site({ openCartOnLoad = false, catalog }: { openCartOnLo
   const artistsById = React.useMemo(() => Object.fromEntries(artistsState.map(a => [a.id, a.name])), [artistsState])
 
   const heroCandidates = React.useMemo(() => {
-    return (artworksState || []).map(a => (a.mockup || a.image)).filter(Boolean) as string[]
+    // N'utiliser que l'image d'œuvre (pas les mockups)
+    return (artworksState || [])
+      .map(a => (a as any).image)
+      .filter((u): u is string => typeof u === 'string' && u.length > 0)
   }, [artworksState])
 
   return (
