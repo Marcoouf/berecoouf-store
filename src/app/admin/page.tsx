@@ -695,6 +695,7 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
               <div className="relative aspect-[4/5] overflow-hidden rounded-xl">
                 {value.image ? (
                   <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={value.image} alt="Aperçu image" className="absolute inset-0 h-full w-full object-cover" />
                     <div className="absolute left-1/2 top-1 -translate-x-1/2 rounded-full bg-white/80 px-2 py-0.5 shadow backdrop-blur supports-[backdrop-filter]:bg-white/60">
                       <button
@@ -721,6 +722,7 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
               <div className="relative aspect-[4/5] overflow-hidden rounded-xl">
                 {value.mockup ? (
                   <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={value.mockup} alt="Aperçu mockup" className="absolute inset-0 h-full w-full object-cover" />
                     <div className="absolute left-1/2 top-1 -translate-x-1/2 rounded-full bg-white/80 px-2 py-0.5 shadow backdrop-blur supports-[backdrop-filter]:bg-white/60">
                       <button

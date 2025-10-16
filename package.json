@@ -8,6 +8,7 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
+    "check:artists": "tsx scripts/check-artists-contact-email.ts",
     "seed": "prisma db seed",
     "postinstall": "prisma generate"
   },

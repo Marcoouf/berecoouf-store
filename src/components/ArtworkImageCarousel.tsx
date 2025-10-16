@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState, useEffect } from 'react'
+import { useMemo, useRef, useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
 
 type Props = {
@@ -42,7 +42,7 @@ export default function ArtworkImageCarousel({
     return [mockup, image].filter(Boolean) as string[];
   }, [images, mockup, image])
   const [idx, setIdx] = useState(0)
-  const wrap = (n: number) => (n + slides.length) % slides.length
+  const wrap = useCallback((n: number) => (n + slides.length) % slides.length, [slides.length])
 
   // Nav clavier
   const rootRef = useRef<HTMLDivElement>(null)
@@ -54,7 +54,7 @@ export default function ArtworkImageCarousel({
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [wrap])
 
   // Swipe simple
   const startX = useRef<number | null>(null)

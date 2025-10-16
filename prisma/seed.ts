@@ -22,6 +22,8 @@ type JsonArtist = {
   bio?: string
   avatar?: string
   cover?: string
+  contactEmail?: string
+  email?: string
 }
 
 type JsonFormat = {
@@ -79,6 +81,8 @@ async function main() {
     const id = a.id ?? undefined
     const slug = (a.slug || toSlug(a.name)).trim()
 
+    const contactEmail = (a.contactEmail ?? a.email ?? '').trim() || null
+
     await prisma.artist.upsert({
       where: { slug },
       create: {
@@ -89,6 +93,7 @@ async function main() {
         bio: a.bio ?? null,
         portrait: a.avatar ?? null, // ancien avatarUrl -> portrait
         image: a.cover ?? null,     // ancien coverUrl  -> image
+        contactEmail,
       },
       update: {
         name: a.name,
@@ -96,6 +101,7 @@ async function main() {
         bio: a.bio ?? null,
         portrait: a.avatar ?? null, // ancien avatarUrl -> portrait
         image: a.cover ?? null,     // ancien coverUrl  -> image
+        contactEmail,
       },
     })
   }

@@ -44,6 +44,7 @@ export type Artist = {
   // Images normalisées depuis l’admin
   portrait?: string | null // avatar
   image?: string | null    // cover
+  contactEmail?: string | null
 
   socials?: string[]
   isArchived?: boolean

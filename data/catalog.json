@@ -7,7 +7,8 @@
       "handle": "@Marcouf",
       "bio": "Textures brutes, encres profondes, géométries silencieuses.",
       "avatar": "/images/artists/marcouf-lebar.webp",
-      "cover": "/images/artworks/art5.webp"
+      "cover": "/images/artworks/art5.webp",
+      "contactEmail": "marcouf@example.com"
     },
     {
       "id": "b-Béré",
@@ -16,7 +17,8 @@
       "handle": "@Béré",
       "bio": "Textures brutes, encres profondes, géométries silencieuses.",
       "avatar": "/images/artists/bere.webp",
-      "cover": "/images/artworks/art4.webp"
+      "cover": "/images/artworks/art4.webp",
+      "contactEmail": "berenice@example.com"
     },
     {
       "id": "c-Cam",
@@ -25,7 +27,8 @@
       "handle": "@Camille",
       "bio": "Textures brutes, encres profondes, géométries silencieuses.",
       "avatar": "/images/artists/cam.webp",
-      "cover": "/images/artworks/art9.webp"
+      "cover": "/images/artworks/art9.webp",
+      "contactEmail": "camille@example.com"
     }
   ],
   "artworks": [

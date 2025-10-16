@@ -13,6 +13,7 @@ type DbArtist = {
   bio: string | null
   image: string | null        // cover/hero
   portrait: string | null     // avatar rond
+  contactEmail: string | null
   socials?: string[] | null
   handle?: string | null
   isArchived?: boolean
@@ -47,8 +48,9 @@ export type Artist = {
   name: string
   handle?: string
   bio?: string
-  avatar?: string
-  cover?: string | { url: string }
+  portrait?: string
+  image?: string
+  contactEmail?: string
 }
 
 export type Variant = {
@@ -175,6 +177,7 @@ export async function getCatalog(): Promise<{ artists: Artist[]; artworks: Artwo
       bio: true,
       image: true,      // cover/hero
       portrait: true,   // avatar
+      contactEmail: true,
       socials: true,
       handle: true,
       isArchived: true,
@@ -206,15 +209,21 @@ export async function getCatalog(): Promise<{ artists: Artist[]; artworks: Artwo
     // Artistes actifs uniquement
     const artists: Artist[] = (dbArtists as unknown as DbArtist[])
       .filter((a) => !a.isArchived)
-      .map((a) => ({
-        id: a.id,
-        slug: normalizeSlug(a.slug),
-        name: a.name,
-        handle: a.handle ?? undefined,
-        bio: a.bio ?? undefined,
-        avatar: a.portrait ?? undefined,
-        cover: a.image ?? undefined,
-      }))
+      .map((a) => {
+        const portrait = toUrlString(a.portrait) ?? toUrlString(a.image) ?? undefined
+        const cover = toUrlString(a.image) ?? toUrlString(a.portrait) ?? undefined
+        const email = typeof a.contactEmail === 'string' ? a.contactEmail.trim() : ''
+        return {
+          id: a.id,
+          slug: normalizeSlug(a.slug),
+          name: a.name,
+          handle: a.handle ?? undefined,
+          bio: a.bio ?? undefined,
+          portrait,
+          image: cover,
+          contactEmail: email || undefined,
+        }
+      })
 
     const artworksRaw: Artwork[] = (dbWorks as unknown as DbWork[]).map((w) => ({
       id: w.id,

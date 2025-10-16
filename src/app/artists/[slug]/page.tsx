@@ -37,6 +37,7 @@ export default async function ArtistPage({ params }: Props) {
       bio: true,
       image: true,      // cover
       portrait: true,   // avatar
+      contactEmail: true,
       socials: true,
       handle: true,
     },

@@ -7,6 +7,35 @@ function assertAdmin() {}
 
 type Params = { params: { id: string } };
 
+export async function GET(_req: Request, { params }: Params) {
+  try {
+    assertAdmin();
+    const id = decodeURIComponent(params.id);
+    const artist = await prisma.artist.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        bio: true,
+        image: true,
+        portrait: true,
+        contactEmail: true,
+        socials: true,
+        isArchived: true,
+        deletedAt: true,
+      },
+    });
+    if (!artist || artist.deletedAt) {
+      return NextResponse.json({ error: "Artiste introuvable" }, { status: 404 });
+    }
+    const { deletedAt, ...safe } = artist;
+    return NextResponse.json(safe);
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message ?? "Erreur" }, { status: 400 });
+  }
+}
+
 export async function PATCH(
   req: Request,
   { params }: { params: { id: string } }
@@ -38,6 +67,10 @@ export async function PATCH(
     if (Array.isArray(payload.socials)) data.socials = payload.socials;
     if (typeof payload.image === "string" || payload.image === null) data.image = payload.image;       // cover (mapped -> coverUrl)
     if (typeof payload.portrait === "string" || payload.portrait === null) data.portrait = payload.portrait; // avatar (mapped -> avatarUrl)
+    if (typeof payload.contactEmail === "string" || payload.contactEmail === null) {
+      const email = typeof payload.contactEmail === "string" ? payload.contactEmail.trim() : payload.contactEmail
+      data.contactEmail = email ? email : null
+    }
 
     const updated = await prisma.artist.update({
       where: { id },

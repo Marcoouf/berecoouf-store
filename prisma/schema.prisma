@@ -16,6 +16,7 @@ model Artist {
   socials    String[]  @default([])
   image      String?   @map("coverUrl")
   portrait   String?   @map("avatarUrl")
+  contactEmail String?
   handle     String?
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt

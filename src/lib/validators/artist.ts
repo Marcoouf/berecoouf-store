@@ -7,6 +7,7 @@ export const artistBaseSchema = z.object({
   socials: z.array(z.string().url("URL invalide")).optional().default([]),
   image: z.string().url("URL invalide").optional().nullable(),     // cover (hero)
   portrait: z.string().url("URL invalide").optional().nullable(),  // avatar rond
+  contactEmail: z.string().email("Email invalide").optional().nullable(),
 });
 
 export const artistCreateSchema = artistBaseSchema;

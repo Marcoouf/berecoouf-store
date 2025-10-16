@@ -29,6 +29,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Slug déjà utilisé" }, { status: 409 });
     }
 
+    const contactEmail = input.contactEmail?.trim() || null
+
     const created = await prisma.artist.upsert({
       where: { slug: input.slug },
       create: {
@@ -38,6 +40,7 @@ export async function POST(req: Request) {
         socials: input.socials ?? [],
         image: input.image ?? null,
         portrait: input.portrait ?? null,
+        contactEmail,
       },
       update: {
         name: input.name,
@@ -45,6 +48,7 @@ export async function POST(req: Request) {
         socials: input.socials ?? [],
         image: input.image ?? null,
         portrait: input.portrait ?? null,
+        contactEmail,
         deletedAt: null,
         isArchived: false,
       },

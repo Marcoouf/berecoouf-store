@@ -176,39 +176,43 @@ function Artists({ artists }: { artists: Artist[] }) {
         <SectionTitle kicker="sélection" title="Artistes publiés" />
         <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
           <Stagger>
-            {artists.map((a) => (
-              <Link key={a.id} href={`/artists/${a.slug}`} className="group block focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
-                <div className="aspect-[4/3] overflow-hidden rounded-2xl border relative transition-all duration-300 group-hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)]">
-                  {a.image ? (
-                    <Image
-                      src={a.image}
-                      alt={`Œuvre représentative de ${a.name}`}
-                      fill
-                      className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
-                      sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw"
-                    />
-                  ) : (
-                    <div className="absolute inset-0 bg-accent flex items-center justify-center text-white/90 font-medium">
-                      <span className="px-3 text-sm text-center line-clamp-2">{a.name}</span>
-                    </div>
-                  )}
-                </div>
-                <div className="mt-3 flex items-center gap-3">
-                  {a.portrait ? (
-                    <Image src={a.portrait} alt={`Portrait de ${a.name}`} width={32} height={32} className="rounded-full object-cover" sizes="32px" />
-                  ) : (
-                    <div className="w-8 h-8 rounded-full bg-accent text-white flex items-center justify-center text-xs font-bold">
-                      {a.name?.charAt(0) ?? '?'}
-                    </div>
-                  )}
-                  <div>
-                    <div className="text-sm font-medium group-hover:text-accent transition">{a.name}</div>
-                    {a.handle ? <div className="text-xs text-neutral-500">{a.handle}</div> : null}
+            {artists.map((a) => {
+              const coverSrc = a.image ?? a.portrait ?? null
+              const avatarSrc = a.portrait ?? a.image ?? null
+              return (
+                <Link key={a.id} href={`/artists/${a.slug}`} className="group block focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+                  <div className="aspect-[4/3] overflow-hidden rounded-2xl border relative transition-all duration-300 group-hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)]">
+                    {coverSrc ? (
+                      <Image
+                        src={coverSrc}
+                        alt={`Œuvre représentative de ${a.name}`}
+                        fill
+                        className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                        sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 bg-accent flex items-center justify-center text-white/90 font-medium">
+                        <span className="px-3 text-sm text-center line-clamp-2">{a.name}</span>
+                      </div>
+                    )}
                   </div>
-                </div>
-                {a.bio ? <p className="mt-2 text-sm text-neutral-600 line-clamp-2">{a.bio}</p> : null}
-              </Link>
-            ))}
+                  <div className="mt-3 flex items-center gap-3">
+                    {avatarSrc ? (
+                      <Image src={avatarSrc} alt={`Portrait de ${a.name}`} width={32} height={32} className="rounded-full object-cover" sizes="32px" />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-accent text-white flex items-center justify-center text-xs font-bold">
+                        {a.name?.charAt(0) ?? '?'}
+                      </div>
+                    )}
+                    <div>
+                      <div className="text-sm font-medium group-hover:text-accent transition">{a.name}</div>
+                      {a.handle ? <div className="text-xs text-neutral-500">{a.handle}</div> : null}
+                    </div>
+                  </div>
+                  {a.bio ? <p className="mt-2 text-sm text-neutral-600 line-clamp-2">{a.bio}</p> : null}
+                </Link>
+              )
+            })}
           </Stagger>
         </div>
       </Container>
@@ -217,15 +221,28 @@ function Artists({ artists }: { artists: Artist[] }) {
 }
 
 function ArtworkCard({ art, onAdd, artistsById }: { art: Artwork; onAdd: (a: Artwork, f: any) => void; artistsById: Record<string, string> }) {
-  const [formatId, setFormatId] = React.useState((art.formats ?? (art as any).variants ?? [])[0]?.id ?? null)
+  const formatsList = React.useMemo(() => {
+    const base = art as any
+    if (Array.isArray(art.formats)) return art.formats as any[]
+    if (Array.isArray(base?.variants)) return base.variants as any[]
+    return [] as any[]
+  }, [art])
+
+  const [formatId, setFormatId] = React.useState(() => formatsList[0]?.id ?? null)
+
+  React.useEffect(() => {
+    if (!formatsList.some((f) => f.id === formatId)) {
+      setFormatId(formatsList[0]?.id ?? null)
+    }
+  }, [formatsList, formatId])
+
   const selected = React.useMemo(() => {
-    const list = (art.formats ?? (art as any).variants ?? []) as any[]
-    return list.find((f) => f.id === formatId) ?? null
-  }, [formatId, art.formats, (art as any).variants])
+    return formatsList.find((f) => f.id === formatId) ?? null
+  }, [formatsList, formatId])
 
   const slug = art.slug ?? art.id
 
-  const formats = (art.formats ?? (art as any).variants ?? []) as any[]
+  const formats = formatsList
 
   return (
     <div className="group flex h-full flex-col">

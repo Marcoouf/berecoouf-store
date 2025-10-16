@@ -17,6 +17,7 @@ type ArtistFull = {
   bio?: string | null;
   image?: string | null;     // cover
   portrait?: string | null;  // avatar
+  contactEmail?: string | null;
   socials?: string[];
 };
 
@@ -58,6 +59,23 @@ async function apiUpdate(id: string, payload: Partial<ArtistFull>) {
   const body = ct.includes("application/json") ? await res.json() : { error: await res.text() };
   if (!res.ok) throw new Error(body?.error || "Mise à jour échouée");
   return body as { id: string; slug: string; name: string };
+}
+async function apiGet(id: string): Promise<ArtistFull> {
+  const res = await fetch(`/api/admin/artists/${encodeURIComponent(id)}`, { cache: "no-store" });
+  const ct = res.headers.get("content-type") || "";
+  const body = ct.includes("application/json") ? await res.json() : { error: await res.text() };
+  if (!res.ok) throw new Error(body?.error || "Lecture échouée");
+  const artist = body as ArtistFull & { isArchived?: boolean };
+  return {
+    id: artist.id,
+    name: artist.name,
+    slug: artist.slug,
+    bio: artist.bio ?? "",
+    image: artist.image ?? null,
+    portrait: artist.portrait ?? null,
+    contactEmail: artist.contactEmail ?? null,
+    socials: artist.socials ?? [],
+  };
 }
 async function apiArchive(id: string) {
   const res = await fetch(`/api/admin/artists/${encodeURIComponent(id)}/archive`, { method: "POST" });
@@ -117,6 +135,8 @@ export default function AdminArtistsPage() {
   const [portraitPreview, setPortraitPreview] = useState<string | null>(null);
   const [uploadingCover, setUploadingCover] = useState(false);
   const [uploadingPortrait, setUploadingPortrait] = useState(false);
+  const [formLoading, setFormLoading] = useState(false);
+  const formDisabled = formLoading && isEditing;
 
   async function refresh() {
     setLoading(true);
@@ -134,16 +154,28 @@ export default function AdminArtistsPage() {
   useEffect(() => { refresh(); }, []);
 
   function startCreate() {
-    setEditing({ name: "", slug: "", bio: "", image: "", portrait: "", socials: [] });
+    setEditing({ name: "", slug: "", bio: "", image: "", portrait: "", contactEmail: "", socials: [] });
     setCoverPreview(null);
     setPortraitPreview(null);
+    setFormLoading(false);
   }
-  function startEditById(id: string) {
+  async function startEditById(id: string) {
     const r = rows.find((x) => x.id === id);
     if (!r) return;
-    setEditing({ id: r.id, name: r.name, slug: r.slug, bio: "", image: "", portrait: "", socials: [] });
+    setFormLoading(true);
+    setEditing({ id: r.id, name: r.name, slug: r.slug, bio: "", image: "", portrait: "", contactEmail: "", socials: [] });
     setCoverPreview(null);
     setPortraitPreview(null);
+    try {
+      const full = await apiGet(r.id);
+      setEditing(full);
+      setCoverPreview(full.image ?? null);
+      setPortraitPreview(full.portrait ?? null);
+    } catch (e: any) {
+      alert(e?.message || "Impossible de charger l’artiste");
+    } finally {
+      setFormLoading(false);
+    }
   }
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
@@ -155,6 +187,7 @@ export default function AdminArtistsPage() {
       bio: editing.bio?.trim() || null,
       image: editing.image?.trim() || null,
       portrait: editing.portrait?.trim() || null,
+      contactEmail: editing.contactEmail?.trim() || null,
       socials: editing.socials ?? [],
     };
     try {
@@ -251,24 +284,41 @@ export default function AdminArtistsPage() {
             </div>
 
             <form onSubmit={submit} className="mt-3 grid gap-3">
+              {formLoading && <div className="text-xs text-neutral-500">Chargement des informations…</div>}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <label className="grid gap-1">
                   <span className="text-xs text-neutral-600">Nom *</span>
                   <input className="rounded border px-2 py-1" value={editing.name}
+                         disabled={formDisabled}
                          onChange={(e) => setEditing((s) => ({ ...(s as ArtistFull), name: e.target.value }))}
                          required />
                 </label>
                 <label className="grid gap-1">
                   <span className="text-xs text-neutral-600">Slug *</span>
                   <input className="rounded border px-2 py-1" value={editing.slug}
+                         disabled={formDisabled}
                          onChange={(e) => setEditing((s) => ({ ...(s as ArtistFull), slug: e.target.value }))}
                          pattern="[a-z0-9-]+" required />
                 </label>
               </div>
 
               <label className="grid gap-1">
+                <span className="text-xs text-neutral-600">Email de contact (notification commandes)</span>
+                <input
+                  className="rounded border px-2 py-1"
+                  type="email"
+                  placeholder="artiste@example.com"
+                  value={editing.contactEmail ?? ""}
+                  disabled={formDisabled}
+                  onChange={(e) => setEditing((s) => ({ ...(s as ArtistFull), contactEmail: e.target.value || null }))}
+                />
+                <span className="text-[11px] text-neutral-500">Utilisé pour avertir l’artiste lors d’une commande réussie.</span>
+              </label>
+
+              <label className="grid gap-1">
                 <span className="text-xs text-neutral-600">Bio</span>
                 <textarea className="rounded border px-2 py-1" rows={4}
+                          disabled={formDisabled}
                           value={editing.bio ?? ""}
                           onChange={(e) => setEditing((s) => ({ ...(s as ArtistFull), bio: e.target.value }))} />
               </label>
@@ -278,12 +328,16 @@ export default function AdminArtistsPage() {
                 <label className="grid gap-1">
                   <span className="text-xs text-neutral-600">Image de couverture (upload ou URL)</span>
                   <input type="file" accept="image/*" onChange={handleCoverFileChange}
+                         disabled={formDisabled}
                          className="block w-full text-sm" />
                   {coverPreview && (
+                    // aperçus locaux (blob:) → next/image incompatible
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img src={coverPreview} alt="Prévisualisation couverture" className="mt-2 h-24 w-24 rounded border object-cover" />
                   )}
                   <input className="mt-2 rounded border px-2 py-1" placeholder="https://…"
                          value={editing.image ?? ""}
+                         disabled={formDisabled}
                          onChange={(e) => setEditing((s) => ({ ...(s as ArtistFull), image: e.target.value || null }))} />
                   {uploadingCover && <div className="text-xs text-neutral-500 mt-1">Upload couverture en cours…</div>}
                 </label>
@@ -292,12 +346,15 @@ export default function AdminArtistsPage() {
                 <label className="grid gap-1">
                   <span className="text-xs text-neutral-600">Portrait (upload ou URL)</span>
                   <input type="file" accept="image/*" onChange={handlePortraitFileChange}
+                         disabled={formDisabled}
                          className="block w-full text-sm" />
                   {portraitPreview && (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img src={portraitPreview} alt="Prévisualisation portrait" className="mt-2 h-24 w-24 rounded-full border object-cover" />
                   )}
                   <input className="mt-2 rounded border px-2 py-1" placeholder="https://…"
                          value={editing.portrait ?? ""}
+                         disabled={formDisabled}
                          onChange={(e) => setEditing((s) => ({ ...(s as ArtistFull), portrait: e.target.value || null }))} />
                   {uploadingPortrait && <div className="text-xs text-neutral-500 mt-1">Upload portrait en cours…</div>}
                 </label>
@@ -306,13 +363,14 @@ export default function AdminArtistsPage() {
               <label className="grid gap-1">
                 <span className="text-xs text-neutral-600">Réseaux (1 par ligne ou séparés par virgule)</span>
                 <textarea className="rounded border px-2 py-1" rows={3}
+                          disabled={formDisabled}
                           value={socialsToTextarea(editing.socials)}
                           onChange={(e) => setEditing((s) => ({ ...(s as ArtistFull), socials: parseSocials(e.target.value) }))} />
               </label>
 
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" className="rounded border px-3 py-1.5 text-sm" onClick={() => setEditing(null)}>Annuler</button>
-                <button type="submit" className={clsx("rounded px-3 py-1.5 text-sm text-white", "bg-black hover:bg-neutral-800")}>{isEditing ? "Enregistrer" : "Créer"}</button>
+                <button type="submit" disabled={formDisabled} className={clsx("rounded px-3 py-1.5 text-sm text-white", "bg-black hover:bg-neutral-800 disabled:opacity-60 disabled:cursor-not-allowed")}>{isEditing ? "Enregistrer" : "Créer"}</button>
               </div>
             </form>
           </div>
