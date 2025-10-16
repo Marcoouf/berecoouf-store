@@ -141,6 +141,13 @@ export default function CartProvider({ children }: { children: React.ReactNode }
 
   const checkout: CartCtx['checkout'] = async (options) => {
     if (items.length === 0 || checkingOut) return
+    
+    const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+    if (!stripePublishableKey) {
+      window.location.href = '/cart'
+      return
+    }
+
     setCheckingOut(true)
     try {
       const mapped = items.map(i => ({
@@ -155,7 +162,8 @@ export default function CartProvider({ children }: { children: React.ReactNode }
       await goToCheckout({ items: mapped, email: options?.email })
     } catch (e) {
       console.error(e)
-      alert('Une erreur est survenue lors de la création du paiement. Réessayez.')
+      alert('Une erreur est survenue lors de la création du paiement. Réessayez ou finalisez depuis le panier complet.')
+      window.location.href = '/cart'
     } finally {
       setCheckingOut(false)
     }

@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react'
 import Link from 'next/link'
-import Image from '@/components/SmartImage'
+import SmartImage from '@/components/SmartImage'
 import { euro } from '@/lib/format'
 import { useCartCtx } from '@/components/CartContext'
 
@@ -82,12 +82,32 @@ export default function GlobalCartDrawer() {
             items.map((i: any) => (
               <div key={i?.key} className="flex gap-3 border rounded-lg p-3">
                 <div className="relative h-16 w-16 overflow-hidden rounded border">
-                  <Image
-                    src={i?.artwork?.image ?? ''}
-                    alt={i?.artwork?.title ?? 'Œuvre'}
-                    fill
-                    className="object-cover"
-                  />
+                  {(() => {
+                    const imgSrc =
+                      i?.artwork?.cover?.url ??
+                      i?.artwork?.image ??
+                      i?.artwork?.mockup ??
+                      (Array.isArray(i?.artwork?.images) ? i?.artwork?.images[0]?.url : undefined);
+
+                    if (!imgSrc) {
+                      return (
+                        <div className="absolute inset-0 flex items-center justify-center text-[10px] text-neutral-400">
+                          Image à venir
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <SmartImage
+                        src={imgSrc}
+                        alt={i?.artwork?.title ? `Visuel — ${i.artwork.title}` : 'Œuvre'}
+                        fill
+                        className="object-cover"
+                        sizes="64px"
+                        draggable={false}
+                      />
+                    );
+                  })()}
                 </div>
 
                 <div className="min-w-0 flex-1">
@@ -118,7 +138,9 @@ export default function GlobalCartDrawer() {
                     <input
                       id={`qty-${i?.key}`}
                       type="number"
+                      inputMode="numeric"
                       min={1}
+                      step={1}
                       value={i?.qty ?? 1}
                       onChange={(e) => updateQty(i?.key, Math.max(1, Number(e.target.value)))}
                       className="w-16 rounded border px-2 py-1 text-sm"

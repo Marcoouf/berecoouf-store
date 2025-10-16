@@ -103,6 +103,10 @@ function asArray<T>(x: T | T[] | null | undefined): T[] {
 // DB stocke en centimes → on renvoie des centimes (identité)
 const fromCents = (n: number | null | undefined) => (typeof n === 'number' ? Math.round(n) : undefined)
 
+const normalizeSlug = (slug: string | null | undefined) =>
+  typeof slug === 'string' && slug.length > 0 ? slug.trim().toLowerCase() : ''
+
+
 // --- Normalisation d'une œuvre ---
 function normalizeArtwork(raw: Artwork, artistIndex: Map<string, Artist>): Artwork {
   const imagesCandidates: Array<string | { url: string }> = [
@@ -204,7 +208,7 @@ export async function getCatalog(): Promise<{ artists: Artist[]; artworks: Artwo
       .filter((a) => !a.isArchived)
       .map((a) => ({
         id: a.id,
-        slug: a.slug,
+        slug: normalizeSlug(a.slug),
         name: a.name,
         handle: a.handle ?? undefined,
         bio: a.bio ?? undefined,
@@ -214,7 +218,7 @@ export async function getCatalog(): Promise<{ artists: Artist[]; artworks: Artwo
 
     const artworksRaw: Artwork[] = (dbWorks as unknown as DbWork[]).map((w) => ({
       id: w.id,
-      slug: w.slug,
+      slug: normalizeSlug(w.slug),
       title: w.title,
       image: w.imageUrl || undefined,
       mockup: w.mockupUrl || undefined,

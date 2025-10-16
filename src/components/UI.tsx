@@ -1,30 +1,22 @@
 'use client'
 
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React from 'react'
 import Image from '@/components/SmartImage'
 import NextImage from 'next/image'
 import Link from 'next/link'
 import type { Artwork, Artist, CartItem } from '@/lib/types'
 import { useCart } from '@/components/CartContext'
 import { FadeIn, Stagger } from '@/components/Motion'
-import { motion, useScroll, useSpring } from 'framer-motion'
+import { euro } from '@/lib/format'
 
-import { euro } from '@/lib/format';
-
-// Prix utilitaire — retourne un prix en centimes, robuste (format sélectionné > min des formats > priceMin > price)
-function unitPriceFrom(art: Artwork, selected?: { price: number } | null): number {
-  if (selected && typeof selected.price === 'number') return selected.price
-  if (Array.isArray(art.formats) && art.formats.length > 0) {
-    const prices = art.formats.map(f => Number(f.price)).filter(n => Number.isFinite(n))
-    if (prices.length) return Math.min(...prices)
-  }
-  if (typeof (art as any).priceMin === 'number') return (art as any).priceMin
-  if (typeof art.price === 'number') return art.price
-  return 0
+type HeroHighlight = {
+  image?: string | null
+  title?: string | null
+  artistName?: string | null
+  edition?: string | null
+  priceLabel?: string | null
 }
 
-
-// === Container local (on NE l'importe PAS) ===
 function Container({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return <div className={`mx-auto w-full max-w-6xl px-4 sm:px-6 ${className}`}>{children}</div>
 }
@@ -49,133 +41,67 @@ function SectionTitle({ kicker, title, right }: { kicker?: string; title: string
   )
 }
 
-function Header({ onOpenCart }: { onOpenCart: () => void }) {
-  const { scrollYProgress } = useScroll()
-  const scaleX = useSpring(scrollYProgress, { stiffness: 120, damping: 30, restDelta: 0.001 })
-
-  return (
-    <header className="sticky top-0 z-40 w-full border-b border-line/70 bg-white/70 backdrop-blur">
-      <Container className="py-3 flex items-center justify-between">
-        <Link href="/" className="text-sm tracking-widest uppercase">Vague</Link>
-        <nav className="hidden gap-6 md:flex text-sm text-neutral-600">
-          <Link href="/artists" className="hover:underline underline-offset-4">Artistes</Link>
-          <Link href="/artworks" className="hover:underline underline-offset-4">Œuvres</Link>
-          <a href="#about" className="hover:underline underline-offset-4">À propos</a>
-        </nav>
-        <button
-          onClick={onOpenCart}
-          className="rounded-full border border-accent px-3 py-1 text-sm text-accent hover:bg-accent-light transition"
-        >
-          Panier
-        </button>
-      </Container>
-
-      {/* Progress bar collée sous le header */}
-      <div className="relative h-[3px] bg-accent/25">
-        <motion.div
-          className="absolute left-0 top-0 h-[3px] w-full bg-accent origin-left shadow-[0_1px_0_rgba(0,0,0,0.06)]"
-          style={{ scaleX }}
-        />
-      </div>
-    </header>
-  )
-}
-
-function Hero({ candidates = [] as string[] }: { candidates?: string[] }) {
-  const [src, setSrc] = useState<string | null>(null)
-  const [ready, setReady] = useState(false)
-
-  useEffect(() => {
-    let active = true
-    async function pick() {
-      try {
-        const r = await fetch('/api/hero-images')
-        const json = await r.json()
-        const arr = Array.isArray(json?.files) ? json.files.filter(Boolean) : []
-        // Filtre les mockups renvoyés par l'API (exclut chemins contenant "mockup")
-        const noMockups = arr.filter((s: string) => typeof s === 'string' && !/mockup/i.test(s))
-        const pool = noMockups.length ? noMockups : candidates
-        if (!active || pool.length === 0) return
-        const i = Math.floor(Math.random() * pool.length)
-        setReady(false)
-        setSrc(String(pool[i]))
-      } catch {
-        const pool = candidates
-        if (!active || pool.length === 0) return
-        const i = Math.floor(Math.random() * pool.length)
-        setReady(false)
-        setSrc(String(pool[i]))
-      }
-    }
-    pick()
-    return () => { active = false }
-  }, [candidates])
+function Hero({ highlight }: { highlight?: HeroHighlight | null }) {
+  const altText = highlight?.title
+    ? `Œuvre « ${highlight.title} »${highlight?.artistName ? ` par ${highlight.artistName}` : ''}`
+    : 'Illustration mise en avant'
 
   return (
     <section className="border-b border-neutral-200/60">
       <Container className="py-12 md:py-24">
-        <div className="grid items-end gap-10 md:grid-cols-2">
+        <div className="grid items-center gap-10 md:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)]">
           <FadeIn>
             <div>
-              <h1 className="text-4xl md:text-5xl font-medium tracking-tight leading-tight">
-                Éditions d&apos;art contemporaines
-                <span className="block text-neutral-500">en séries limitées</span>
+              <div className="inline-flex items-center gap-2 rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-xs font-medium uppercase tracking-widest text-accent">
+                Editions limitées
+              </div>
+              <h1 className="mt-4 text-4xl md:text-5xl font-medium tracking-tight leading-tight">
+                Illustrations contemporaines
+                <span className="block text-neutral-500">à collectionner ou offrir</span>
               </h1>
               <p className="mt-6 max-w-prose text-neutral-600">
-                Une sélection pointue d&apos;illustrations originales et de tirages numérotés, réalisés par des artistes émergents et confirmés.
+                Tirages certifiés, numérotés et emballés avec soin. Chaque pièce inclut sa licence numérique et un certificat d’authenticité signé.
               </p>
 
-              {/* Boutons identiques (accent) */}
+              {highlight?.priceLabel && (
+                <p className="mt-3 text-sm text-neutral-500">
+                  Œuvre mise en avant&nbsp;: {highlight?.title} — {highlight.priceLabel}
+                  {highlight?.artistName ? ` · ${highlight.artistName}` : ''}
+                  {highlight?.edition ? ` · ${highlight.edition}` : ''}
+                </p>
+              )}
+
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Link
-                  href="#gallery"
-                  className="rounded-full bg-accent hover:bg-accent-dark text-ink font-medium px-4 py-2 text-sm shadow-sm transition"
+                  href="/artworks"
+                  className="inline-flex items-center justify-center rounded-full bg-accent text-ink px-5 py-2.5 text-sm font-semibold shadow-sm transition hover:bg-accent-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >
-                  Découvrir
+                  Découvrir la galerie
                 </Link>
                 <Link
                   href="/artists"
-                  className="rounded-full bg-accent hover:bg-accent-dark text-ink font-medium px-4 py-2 text-sm shadow-sm transition"
+                  className="inline-flex items-center justify-center rounded-full border border-neutral-300 px-5 py-2.5 text-sm font-semibold text-neutral-800 transition hover:border-accent hover:text-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >
-                  Nos artistes
+                  Rencontrer les artistes
                 </Link>
               </div>
             </div>
           </FadeIn>
 
           <FadeIn delay={0.1}>
-            {/* Conteneur invisible mais stable (ratio + min-height) */}
-            <div
-              className="relative aspect-[4/3] min-h-[260px] sm:min-h-[320px] md:min-h-[420px] lg:min-h-[520px] overflow-hidden flex items-center justify-center"
-              aria-busy={!ready}
-            >
-              {/* Image : fade-in une fois chargée */}
-              {src && (
+            <div className="relative aspect-[4/3] min-h-[260px] sm:min-h-[320px] md:min-h-[420px] lg:min-h-[520px] overflow-hidden rounded-3xl border bg-neutral-50" aria-busy={false}>
+              {highlight?.image ? (
                 <NextImage
-                  src={src}
-                  alt="Hero artwork"
+                  src={highlight.image}
+                  alt={altText}
                   fill
-                  unoptimized
                   priority
                   sizes="(min-width: 1024px) 40vw, (min-width: 768px) 50vw, 100vw"
-                  className={`object-contain transition-opacity duration-500 ${ready ? 'opacity-100' : 'opacity-0'}`}
-                  onLoad={() => setTimeout(() => setReady(true), 150)}
-                  onError={() => {
-                    // tente une autre image candidate si possible
-                    const pool = candidates || []
-                    if (pool.length > 0) {
-                      const alt = pool.find(u => u !== src)
-                      if (alt) { setSrc(alt); return }
-                    }
-                    setReady(true)
-                  }}
+                  className="object-contain"
                 />
-              )}
-
-              {/* Loader subtil (skeleton pulse) tant que l'image n'est pas prête */}
-              {!ready && (
-                <div className="absolute inset-0">
-                  <div className="h-full w-full bg-mist animate-pulse" aria-hidden="true" />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center bg-neutral-100 text-neutral-400">
+                  <span className="text-sm">Visuel d’œuvre indisponible</span>
                 </div>
               )}
             </div>
@@ -185,20 +111,78 @@ function Hero({ candidates = [] as string[] }: { candidates?: string[] }) {
     </section>
   )
 }
+
+
+function CollectionsTeaser({ artworks, artistsById }: { artworks: Artwork[]; artistsById: Record<string, string> }) {
+  const { add } = useCart()
+
+  const handleAdd = React.useCallback(
+    (art: Artwork, selected: any) => {
+      const unit =
+        (selected?.price as number | undefined) ??
+        ((art as any).basePrice as number | undefined) ??
+        ((art as any).priceMin as number | undefined) ??
+        0
+
+      const item: CartItem = {
+        key: `${art.id}-${selected?.id ?? 'std'}`,
+        qty: 1,
+        artwork: {
+          id: art.id,
+          title: art.title,
+          image: (art as any).image ?? (art as any).mockup ?? null,
+        },
+        format: selected ? { id: selected.id, label: selected.label, price: selected.price } : undefined,
+        unitPriceCents: unit,
+      }
+
+      add(item as any)
+    },
+    [add],
+  )
+
+  if (!artworks.length) return null
+
+  return (
+    <section id="collections" className="border-b border-neutral-200/60">
+      <Container className="py-12 md:py-16">
+        <SectionTitle
+          kicker="pour explorer"
+          title="Collections mises en avant"
+          right={
+            <Link href="/artworks" className="text-sm text-accent hover:text-accent-dark underline-offset-4 hover:underline">
+              Voir toute la galerie
+            </Link>
+          }
+        />
+        <div className="grid items-stretch gap-5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
+          <Stagger>
+            {artworks.map((a) => (
+              <ArtworkCard key={a.id} art={a} onAdd={handleAdd} artistsById={artistsById} />
+            ))}
+          </Stagger>
+        </div>
+      </Container>
+    </section>
+  )
+}
+
 function Artists({ artists }: { artists: Artist[] }) {
+  if (!artists.length) return null
+
   return (
     <section id="artists" className="border-b border-neutral-200/60">
       <Container className="py-14 md:py-20">
         <SectionTitle kicker="sélection" title="Artistes publiés" />
         <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
           <Stagger>
-            {artists.map(a => (
-              <Link key={a.id} href={`/artists/${a.slug}`} className="group block">
+            {artists.map((a) => (
+              <Link key={a.id} href={`/artists/${a.slug}`} className="group block focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
                 <div className="aspect-[4/3] overflow-hidden rounded-2xl border relative transition-all duration-300 group-hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)]">
                   {a.image ? (
                     <Image
                       src={a.image}
-                      alt={a.name}
+                      alt={`Œuvre représentative de ${a.name}`}
                       fill
                       className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
                       sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw"
@@ -211,7 +195,7 @@ function Artists({ artists }: { artists: Artist[] }) {
                 </div>
                 <div className="mt-3 flex items-center gap-3">
                   {a.portrait ? (
-                    <Image src={a.portrait} alt={a.name} width={32} height={32} className="rounded-full object-cover" sizes="32px" />
+                    <Image src={a.portrait} alt={`Portrait de ${a.name}`} width={32} height={32} className="rounded-full object-cover" sizes="32px" />
                   ) : (
                     <div className="w-8 h-8 rounded-full bg-accent text-white flex items-center justify-center text-xs font-bold">
                       {a.name?.charAt(0) ?? '?'}
@@ -219,10 +203,10 @@ function Artists({ artists }: { artists: Artist[] }) {
                   )}
                   <div>
                     <div className="text-sm font-medium group-hover:text-accent transition">{a.name}</div>
-                    <div className="text-xs text-neutral-500">{a.handle}</div>
+                    {a.handle ? <div className="text-xs text-neutral-500">{a.handle}</div> : null}
                   </div>
                 </div>
-                <p className="mt-2 text-sm text-neutral-600 line-clamp-2">{a.bio}</p>
+                {a.bio ? <p className="mt-2 text-sm text-neutral-600 line-clamp-2">{a.bio}</p> : null}
               </Link>
             ))}
           </Stagger>
@@ -233,18 +217,18 @@ function Artists({ artists }: { artists: Artist[] }) {
 }
 
 function ArtworkCard({ art, onAdd, artistsById }: { art: Artwork; onAdd: (a: Artwork, f: any) => void; artistsById: Record<string, string> }) {
-  const [formatId, setFormatId] = useState((art.formats ?? (art as any).variants ?? [])[0]?.id ?? null)
-  const selected = useMemo(() => {
+  const [formatId, setFormatId] = React.useState((art.formats ?? (art as any).variants ?? [])[0]?.id ?? null)
+  const selected = React.useMemo(() => {
     const list = (art.formats ?? (art as any).variants ?? []) as any[]
     return list.find((f) => f.id === formatId) ?? null
   }, [formatId, art.formats, (art as any).variants])
 
-  // Fallback si un artwork n'a pas de slug
   const slug = art.slug ?? art.id
+
+  const formats = (art.formats ?? (art as any).variants ?? []) as any[]
 
   return (
     <div className="group flex h-full flex-col">
-      {/* Visuel cliquable */}
       <Link
         href={`/artworks/${slug}`}
         scroll
@@ -254,11 +238,10 @@ function ArtworkCard({ art, onAdd, artistsById }: { art: Artwork; onAdd: (a: Art
         {art.image ? (
           <Image
             src={art.image}
-            alt={art.title}
+            alt={`Visuel de l’œuvre ${art.title}`}
             fill
             className="object-contain bg-white transition-transform duration-500 group-hover:scale-105"
             sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw"
-            priority={false}
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center bg-accent text-ink">
@@ -267,7 +250,6 @@ function ArtworkCard({ art, onAdd, artistsById }: { art: Artwork; onAdd: (a: Art
         )}
       </Link>
 
-      {/* Titre / Prix */}
       <div className="mt-3 flex items-start justify-between gap-4">
         <div>
           <Link
@@ -280,14 +262,13 @@ function ArtworkCard({ art, onAdd, artistsById }: { art: Artwork; onAdd: (a: Art
           <div className="text-xs text-neutral-500">{artistsById[art.artistId] ?? 'Artiste'}</div>
         </div>
         <div className="ml-auto text-sm tabular-nums">
-          {art.priceMinFormatted ?? euro(art.priceMin ?? 0)}
+          {art.priceMinFormatted ?? euro((art as any).priceMin ?? 0)}
         </div>
       </div>
 
-      {/* Formats — interactions locales */}
-      {(() => { const list = (art.formats ?? (art as any).variants ?? []) as any[]; return list.length > 0 })() && (
+      {formats.length > 0 && (
         <div className="mt-2 min-h-[72px] grid grid-cols-2 gap-2 xs:grid-cols-[repeat(auto-fit,minmax(140px,1fr))]">
-          {((art.formats ?? (art as any).variants ?? []) as any[]).map((f) => {
+          {formats.map((f) => {
             const isSel = f.id === formatId
             return (
               <button
@@ -300,7 +281,7 @@ function ArtworkCard({ art, onAdd, artistsById }: { art: Artwork; onAdd: (a: Art
                 className={[
                   'inline-flex h-8 w-full items-center justify-center rounded-full px-3',
                   'text-[12px] font-medium whitespace-nowrap',
-                  'border transition-colors',
+                  'border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
                   isSel
                     ? 'bg-accent-300 text-ink border-accent-300'
                     : 'bg-white text-neutral-700 border-neutral-200 hover:bg-accent-100 hover:border-accent-300 hover:text-accent-700',
@@ -313,7 +294,6 @@ function ArtworkCard({ art, onAdd, artistsById }: { art: Artwork; onAdd: (a: Art
         </div>
       )}
 
-      {/* CTA en bas */}
       <div className="mt-auto pt-3">
         <button
           type="button"
@@ -321,7 +301,7 @@ function ArtworkCard({ art, onAdd, artistsById }: { art: Artwork; onAdd: (a: Art
             e.stopPropagation()
             onAdd(art, selected)
           }}
-          className="w-full rounded-lg bg-accent-300 hover:bg-accent-400 text-ink font-medium px-3 py-2 text-sm transition"
+          className="w-full rounded-lg bg-accent-300 hover:bg-accent-400 text-ink font-medium px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           Ajouter au panier
         </button>
@@ -332,138 +312,55 @@ function ArtworkCard({ art, onAdd, artistsById }: { art: Artwork; onAdd: (a: Art
 
 function Gallery({ artworks, artistsById }: { artworks: Artwork[]; artistsById: Record<string, string> }) {
   const { add } = useCart()
-  const handleAdd = React.useCallback((art: Artwork, selected: any) => {
-    const unit =
-      (selected?.price as number | undefined) ??
-      ((art as any).basePrice as number | undefined) ??
-      ((art as any).priceMin as number | undefined) ??
-      0;
+  const handleAdd = React.useCallback(
+    (art: Artwork, selected: any) => {
+      const unit =
+        (selected?.price as number | undefined) ??
+        ((art as any).basePrice as number | undefined) ??
+        ((art as any).priceMin as number | undefined) ??
+        0
 
-    const item: CartItem = {
-      key: `${art.id}-${selected?.id ?? 'std'}`,
-      qty: 1,
-      artwork: {
-        id: art.id,
-        title: art.title,
-        image: (art as any).image ?? (art as any).mockup ?? null,
-      },
-      format: selected
-        ? { id: selected.id, label: selected.label, price: selected.price }
-        : undefined,
-      unitPriceCents: unit,
-    };
+      const item: CartItem = {
+        key: `${art.id}-${selected?.id ?? 'std'}`,
+        qty: 1,
+        artwork: {
+          id: art.id,
+          title: art.title,
+          image: (art as any).image ?? (art as any).mockup ?? null,
+        },
+        format: selected ? { id: selected.id, label: selected.label, price: selected.price } : undefined,
+        unitPriceCents: unit,
+      }
 
-    add(item as any);
-  }, [add]);
+      add(item as any)
+    },
+    [add],
+  )
+
+  if (!artworks.length) {
+    return (
+      <section id="gallery" className="border-b border-neutral-200/60">
+        <Container className="py-10 sm:py-14 md:py-20">
+          <SectionTitle kicker="catalogue" title="Galerie" />
+          <p className="text-sm text-neutral-600">Le catalogue est en cours de mise à jour. Revenez bientôt pour découvrir les nouvelles œuvres.</p>
+        </Container>
+      </section>
+    )
+  }
+
   return (
     <section id="gallery" className="border-b border-neutral-200/60">
       <Container className="py-10 sm:py-14 md:py-20">
         <SectionTitle kicker="catalogue" title="Galerie" />
         <div className="grid items-stretch gap-5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
           <Stagger>
-            {artworks.map(a => (
+            {artworks.map((a) => (
               <ArtworkCard key={a.id} art={a} onAdd={handleAdd} artistsById={artistsById} />
             ))}
           </Stagger>
         </div>
       </Container>
     </section>
-  )
-}
-
-function CartDrawer({ artistsById }: { artistsById: Record<string, string> }) {
-  const { items, total, updateQty, remove, clear, open, closeCart } = useCart()
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const handle = (e: MouseEvent) => {
-      if (open && ref.current && !ref.current.contains(e.target as Node)) closeCart()
-    }
-    document.addEventListener('mousedown', handle)
-    return () => document.removeEventListener('mousedown', handle)
-  }, [open, closeCart])
-
-  if (!open) return null
-  return (
-    <div className="fixed inset-0 z-50 flex md:justify-end bg-black/20 backdrop-blur-sm">
-      <aside ref={ref} className="h-full w-full md:max-w-md md:border-l bg-white px-4 sm:px-6 py-5">
-        <div className="mb-6 flex items-center justify-between">
-          <h3 className="text-lg font-medium">Panier</h3>
-          <button onClick={closeCart} className="rounded-full border border-accent px-3 py-1 text-sm text-accent hover:bg-accent-light transition">
-            Fermer
-          </button>
-        </div>
-
-        {items.length === 0 ? (
-          <p className="text-sm text-neutral-600">Votre panier est vide.</p>
-        ) : (
-          <div className="flex h-full flex-col">
-            <ul className="flex-1 space-y-4 overflow-auto pr-2">
-              {items.map((i: any) => {
-                const qty = i?.qty ?? 1;
-                // Prix unitaire robuste : priorité au nouveau champ, sinon anciens champs
-                const unit = (i?.unitPriceCents ?? i?.format?.price ?? i?.artwork?.price ?? i?.price ?? 0) as number;
-
-                // Données visuelles robustes (gère anciens / nouveaux formats)
-                const title = i?.artwork?.title ?? i?.title ?? 'Œuvre';
-                const img =
-                  i?.artwork?.image ??
-                  i?.image ??
-                  i?.artwork?.mockup ??
-                  i?.mockup ??
-                  null;
-
-                return (
-                  <li key={i?.key ?? `${title}-${Math.random()}`} className="flex gap-3">
-                    <div className="h-16 w-16 rounded border overflow-hidden relative bg-neutral-100">
-                      {img ? (
-                        <Image src={img} alt={title} fill className="object-cover" />
-                      ) : (
-                        <div className="h-full w-full" />
-                      )}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="truncate font-medium">{title}</div>
-                          <div className="text-xs text-neutral-500 mt-0.5">
-                            {i?.format?.label ?? 'Format standard'}
-                          </div>
-                        </div>
-
-                        <div className="ml-auto tabular-nums">
-                          {euro(unit * qty)}
-                        </div>
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-
-            <div className="mt-6 space-y-3 border-t pt-4">
-              <div className="flex justify-between text-sm">
-                <span>Total</span>
-                <span className="tabular-nums">{euro(total)}</span>
-              </div>
-              <Link
-                href="/cart"
-                className="w-full inline-flex items-center justify-center rounded-lg border px-3 py-2 text-sm hover:bg-neutral-50"
-              >
-                Voir le panier complet
-              </Link>
-              <button className="w-full rounded-lg bg-accent hover:bg-accent-dark text-ink font-medium px-3 py-2 text-sm transition">
-                Procéder au paiement
-              </button>
-              <button onClick={clear} className="w-full rounded-lg border border-accent px-3 py-2 text-xs text-accent hover:bg-accent-light transition">
-                Vider le panier
-              </button>
-            </div>
-          </div>
-        )}
-      </aside>
-    </div>
   )
 }
 
@@ -477,34 +374,77 @@ export default function Site({ openCartOnLoad = false, catalog }: { openCartOnLo
   }, [openCartOnLoad, openCart])
 
   React.useEffect(() => {
-    if (catalog) return // si on a déjà reçu les données du serveur, pas de fetch client
+    if (catalog) return
     let active = true
-    fetch('/api/catalog')
-      .then(r => r.json())
+    fetch('/api/catalog', { cache: 'no-store' })
+      .then((r) => r.json())
       .then((data) => {
         if (!active) return
         setArtistsState(Array.isArray(data.artists) ? data.artists : [])
         setArtworksState(Array.isArray(data.artworks) ? data.artworks : [])
       })
       .catch(console.error)
-    return () => { active = false }
+    return () => {
+      active = false
+    }
   }, [catalog])
 
-  const artistsById = React.useMemo(() => Object.fromEntries(artistsState.map(a => [a.id, a.name])), [artistsState])
+  const artistsById = React.useMemo(() => Object.fromEntries(artistsState.map((a) => [a.id, a.name])), [artistsState])
 
-  const heroCandidates = React.useMemo(() => {
-    // N'utiliser que l'image d'œuvre (pas les mockups)
-    return (artworksState || [])
-      .map(a => (a as any).image)
-      .filter((u): u is string => typeof u === 'string' && u.length > 0)
+  const [heroHighlight, setHeroHighlight] = React.useState<HeroHighlight | null>(null)
+
+  React.useEffect(() => {
+    const pool = Array.isArray(artworksState) ? artworksState : []
+    if (pool.length === 0) { setHeroHighlight(null); return }
+
+    // Favor artworks that have an image/mocked image; otherwise use full pool
+    const withImage = pool.filter((a: any) =>
+      Boolean(a?.cover?.url || a?.image || a?.mockup || (Array.isArray(a?.images) && a.images[0]?.url))
+    )
+    const list = withImage.length ? withImage : pool
+    const pick = list[Math.floor(Math.random() * list.length)]
+
+    const image =
+      (pick as any).cover?.url ??
+      (pick as any).image ??
+      (pick as any).mockup ??
+      (Array.isArray((pick as any).images) ? (pick as any).images[0]?.url : undefined)
+
+    setHeroHighlight({
+      image: typeof image === 'string' ? image : undefined,
+      title: pick.title,
+      artistName: artistsById[pick.artistId] ?? null,
+      edition: (pick as any).edition ?? null,
+      priceLabel: pick.priceMinFormatted ?? ((pick as any).priceMin ? euro((pick as any).priceMin) : null),
+    })
+  }, [artworksState, artistsById])
+
+  const [featuredThree, setFeaturedThree] = React.useState<Artwork[]>([])
+
+  React.useEffect(() => {
+    const pool = Array.isArray(artworksState) ? [...artworksState] : []
+    if (pool.length === 0) { setFeaturedThree([]); return }
+
+    const hasImage = (a: any) =>
+      Boolean(a?.cover?.url || a?.image || a?.mockup || (Array.isArray(a?.images) && a.images[0]?.url))
+
+    const base = (pool.filter(hasImage).length >= 3 ? pool.filter(hasImage) : pool).slice()
+
+    // Fisher–Yates shuffle
+    for (let i = base.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[base[i], base[j]] = [base[j], base[i]]
+    }
+
+    setFeaturedThree(base.slice(0, Math.min(3, base.length)) as Artwork[])
   }, [artworksState])
 
   return (
     <div className="min-h-screen bg-white text-neutral-900 antialiased pb-12 sm:pb-0">
-      <Hero candidates={heroCandidates} />
+      <Hero highlight={heroHighlight} />
+      <CollectionsTeaser artworks={featuredThree} artistsById={artistsById} />
       <Artists artists={artistsState} />
       <Gallery artworks={artworksState} artistsById={artistsById} />
-      <CartDrawer artistsById={artistsById} />
     </div>
   )
 }
