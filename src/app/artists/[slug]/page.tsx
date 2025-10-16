@@ -89,12 +89,15 @@ export default async function ArtistPage({ params }: Props) {
   }
 
   // JSON-LD Artist schema for SEO (ok to keep here: not inside MDX articles)
+  const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || '').replace(/\/$/, '')
+  const canonicalUrl = `${siteUrl || ''}/artists/${artist.slug}`
+
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'Person',
     name: artist.name,
     description: artist.bio || undefined,
-    url: `https://www.point-bleu.art/artists/${artist.slug}`,
+    url: canonicalUrl,
     image: heroSrc || undefined,
     sameAs: (artist as any)?.socials?.filter(Boolean) ?? [],
   }

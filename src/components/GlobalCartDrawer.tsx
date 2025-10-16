@@ -111,20 +111,37 @@ export default function GlobalCartDrawer() {
                     </button>
                   </div>
 
-                  <div className="mt-2 flex items-center gap-2">
-                    <label htmlFor={`qty-${i?.key}`} className="text-xs text-neutral-500">
-                      Qté
-                    </label>
-                    <input
-                      id={`qty-${i?.key}`}
-                      type="number"
-                      min={1}
-                      value={i?.qty ?? 1}
-                      onChange={(e) => updateQty(i?.key, Math.max(1, Number(e.target.value)))}
-                      className="w-16 rounded border px-2 py-1 text-sm"
-                    />
+                  <div className="mt-2 flex items-center gap-2" role="group" aria-label="Quantité">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        updateQty(i?.key, Math.max(1, Number(i?.qty ?? 1) - 1))
+                      }}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-line text-sm hover:bg-neutral-50"
+                      aria-label={`Diminuer la quantité pour ${i?.artwork?.title ?? 'l’œuvre'}`}
+                      disabled={(i?.qty ?? 1) <= 1}
+                    >
+                      −
+                    </button>
+                    <span className="min-w-[2ch] text-center text-sm tabular-nums" aria-live="polite">
+                      {i?.qty ?? 1}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        updateQty(i?.key, Math.max(1, Number(i?.qty ?? 1) + 1))
+                      }}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-line text-sm hover:bg-neutral-50"
+                      aria-label={`Augmenter la quantité pour ${i?.artwork?.title ?? 'l’œuvre'}`}
+                    >
+                      +
+                    </button>
                     <div className="ml-auto tabular-nums">
-                      {euro(Number(i?.unitPriceCents ?? 0))}
+                      {euro(Number(i?.unitPriceCents ?? 0) * Number(i?.qty ?? 1))}
                     </div>
                   </div>
                 </div>
@@ -135,7 +152,7 @@ export default function GlobalCartDrawer() {
 
         {/* Footer */}
         <div className="border-t border-line/60 p-4 space-y-3">
-          <div className="flex justify-between text-sm">
+          <div className="flex justify-between text-sm" aria-live="polite">
             <span>Sous-total</span>
             <span className="tabular-nums">{euro(subtotal)}</span>
           </div>

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { motion, useScroll, useSpring, useReducedMotion } from 'framer-motion'
 import { useCartCtx } from '@/components/CartContext'
 import { useCartCount } from '@/state/cart'
-import { usePathname } from 'next/navigation'
+import { usePathname, useSearchParams } from 'next/navigation'
 import { useState, type ReactNode } from 'react'
 
 function Container({ children, className = '' }: { children: ReactNode; className?: string }) {
@@ -17,7 +17,9 @@ export default function HeaderGlobal() {
 
   const prefersReduced = useReducedMotion()
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const is = (p: string) => (pathname ?? '').startsWith(p)
+  const isRecent = pathname === '/artworks' && searchParams?.get('sort') === 'recent'
 
   // Cart (compteur + ouverture) — éviter la désynchro SSR/CSR
   const { openCart, open, hydrated } = useCartCtx()
@@ -77,18 +79,30 @@ export default function HeaderGlobal() {
         {/* Navigation */}
         <nav className="hidden gap-6 md:flex text-sm text-neutral-700">
           <Link
+            href="/artworks?sort=recent"
+            className={`link-underline hover:text-accent-700 ${isRecent ? 'text-accent-700' : ''}`}
+          >
+            Nouveautés
+          </Link>
+          <a href="/#collections" className="link-underline hover:text-accent-700">
+            Collections
+          </a>
+          <Link
+            href="/artworks"
+            className={`link-underline hover:text-accent-700 ${is('/artworks') ? 'text-accent-700' : ''}`}
+          >
+            Galerie
+          </Link>
+          <Link
             href="/artists"
             className={`link-underline hover:text-accent-700 ${is('/artists') ? 'text-accent-700' : ''}`}
           >
             Artistes
           </Link>
-          <Link
-            href="/artworks"
-            className={`link-underline hover:text-accent-700 ${is('/artworks') ? 'text-accent-700' : ''}`}
-          >
-            Œuvres
+          <Link href="/carte-cadeau" className="link-underline hover:text-accent-700">
+            Carte cadeau
           </Link>
-          <a href="/#about" className={`link-underline hover:text-accent-700 ${is('/#about') ? 'text-accent-700' : ''}`}>
+          <a href="/#about" className="link-underline hover:text-accent-700">
             À propos
           </a>
         </nav>
@@ -120,17 +134,29 @@ export default function HeaderGlobal() {
             {cartLabel}
           </button>
         </motion.div>
+        <span className="sr-only" aria-live="polite">
+          {hydrated ? `Panier : ${count} article${count > 1 ? 's' : ''}` : ''}
+        </span>
       </Container>
 
       {/* Mobile menu */}
       {menuOpen && (
         <div id="mobile-menu" className="md:hidden border-t border-line/70 bg-white">
           <Container className="py-3 flex flex-col gap-2 text-sm text-center">
+            <Link href="/artworks?sort=recent" onClick={() => setMenuOpen(false)} className="py-2 hover:text-accent-700 transition-colors">
+              Nouveautés
+            </Link>
+            <a href="/#collections" onClick={() => setMenuOpen(false)} className="py-2 hover:text-accent-700 transition-colors">
+              Collections
+            </a>
+            <Link href="/artworks" onClick={() => setMenuOpen(false)} className="py-2 hover:text-accent-700 transition-colors">
+              Galerie
+            </Link>
             <Link href="/artists" onClick={() => setMenuOpen(false)} className="py-2 hover:text-accent-700 transition-colors">
               Artistes
             </Link>
-            <Link href="/artworks" onClick={() => setMenuOpen(false)} className="py-2 hover:text-accent-700 transition-colors">
-              Œuvres
+            <Link href="/carte-cadeau" onClick={() => setMenuOpen(false)} className="py-2 hover:text-accent-700 transition-colors">
+              Carte cadeau
             </Link>
             <a href="/#about" onClick={() => setMenuOpen(false)} className="py-2 hover:text-accent-700 transition-colors">
               À propos
