@@ -13,6 +13,12 @@ function getOrigin(req: NextRequest) {
   return `${proto}://${host}`
 }
 
+function isVerbose(req: NextRequest) {
+  if (process.env.VERBOSE_CHECKOUT === '1') return true
+  const origin = req.headers.get('origin') || ''
+  return /localhost|127\.0\.0\.1/i.test(origin)
+}
+
 // Util small: borne inférieure (>= 1) pour les quantités
 const clampQty = (n: unknown) => {
   const q = typeof n === 'number' ? Math.floor(n) : 0
@@ -147,7 +153,7 @@ export async function POST(req: NextRequest) {
               workId: v.workId,
               variantId: v.id,
               qty: clampQty(it.qty),
-              unitPriceCents: v.price, // centimes stockés tels quels
+              unitPrice: v.price, // en centimes, conformément au schéma Prisma
             }
           }),
         },
@@ -178,8 +184,16 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ url: session.url })
   } catch (err: any) {
-    console.error('checkout error W', err)
-    const message = process.env.NODE_ENV !== 'production' ? String(err?.message || err) : 'checkout_failed'
-    return NextResponse.json({ error: 'checkout_failed', message }, { status: 500 })
+    // Affiche le détail en local ou si VERBOSE_CHECKOUT=1
+    const rawMsg =
+      err?.raw?.message || err?.message || (typeof err === 'string' ? err : 'checkout_failed')
+    console.error('checkout_error:', rawMsg, err?.raw || '')
+
+    const verbose = isVerbose(req) || process.env.NODE_ENV !== 'production'
+    const payload = verbose
+      ? { error: 'checkout_failed', message: String(rawMsg) }
+      : { error: 'checkout_failed' }
+
+    return NextResponse.json(payload, { status: 400 })
   }
 }
