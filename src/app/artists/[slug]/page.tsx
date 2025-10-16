@@ -1,6 +1,6 @@
 import SmartImage from '@/components/SmartImage'
 import Link from 'next/link'
-import { prisma } from '@/lib/db'
+import { prisma } from '@/lib/prisma'
 import type { Metadata } from 'next'
 import Breadcrumb from '@/components/Breadcrumb'
 import { euro } from '@/lib/format'

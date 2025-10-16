@@ -9,16 +9,16 @@ datasource db {
 }
 
 model Artist {
-  id         String   @id @default(cuid())
-  slug       String   @unique
+  id         String    @id @default(cuid())
+  slug       String    @unique
   name       String
   bio        String?
-  socials    String[] @default([])      // <-- manquante en DB
-  image      String?  @map("coverUrl")  // mapping sur ta colonne existante
-  portrait   String?  @map("avatarUrl")
+  socials    String[]  @default([])
+  image      String?   @map("coverUrl")
+  portrait   String?   @map("avatarUrl")
   handle     String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
   isArchived Boolean   @default(false)
   deletedAt  DateTime?
   works      Work[]
@@ -27,9 +27,9 @@ model Artist {
 }
 
 model Work {
-  id          String    @id @default(cuid())
+  id          String      @id @default(cuid())
   title       String
-  slug        String    @unique
+  slug        String      @unique
   description String?
   year        Int?
   technique   String?
@@ -39,25 +39,68 @@ model Work {
   imageUrl    String
   mockupUrl   String?
   basePrice   Int?
-  published   Boolean   @default(true)
+  published   Boolean     @default(true)
   artistId    String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
   variants    Variant[]
-  artist      Artist    @relation(fields: [artistId], references: [id])
+  orderItems  OrderItem[]
+  artist      Artist      @relation(fields: [artistId], references: [id])
 
   @@index([artistId])
 }
 
 model Variant {
-  id        String   @id @default(cuid())
-  workId    String
-  label     String
-  price     Int
-  order     Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  work      Work     @relation(fields: [workId], references: [id], onDelete: Cascade)
+  id         String      @id @default(cuid())
+  workId     String
+  label      String
+  price      Int
+  order      Int         @default(0)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  work       Work        @relation(fields: [workId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
 
   @@index([workId])
+}
+
+enum OrderStatus {
+  pending
+  paid
+  cancelled
+  refunded
+}
+
+model Order {
+  id              String      @id @default(cuid())
+  email           String?
+  total           Int // en centimes (subtotal produits ; les frais de port viennent de Stripe)
+  status          OrderStatus @default(pending)
+  stripeSessionId String?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  items OrderItem[]
+
+  @@index([status])
+  @@index([stripeSessionId])
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  workId    String
+  variantId String
+  qty       Int      @default(1)
+  unitPrice Int // en centimes
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  work    Work    @relation(fields: [workId], references: [id])
+  variant Variant @relation(fields: [variantId], references: [id])
+
+  @@index([orderId])
+  @@index([workId])
+  @@index([variantId])
 }

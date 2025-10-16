@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import SmartImage from '@/components/SmartImage'
 import Breadcrumb from '@/components/Breadcrumb'
-import { prisma } from '@/lib/db'
+import { prisma } from '@/lib/prisma'
 
 const PLACEHOLDER_DATA_URL =
   'data:image/svg+xml;utf8,' +

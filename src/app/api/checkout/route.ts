@@ -1,132 +1,168 @@
 // src/app/api/checkout/route.ts
-import { NextResponse } from "next/server";
-import { stripe } from "@/lib/stripe";
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { stripe } from '@/lib/stripe'
+import type Stripe from 'stripe'
 
-type CartItem = {
-  workId: string;
-  variantId: string;
-  title: string;
-  artistName?: string;
-  image?: string;
-  price: number; // euros OU centimes selon la source → normalisé ci-dessous
-  qty: number;
-};
-
-export const runtime = "nodejs"; // Stripe SDK Node
-
-// Normalise un prix potentiellement fourni en euros → centimes
-// Heuristique: si < 1000 on considère que c'est des euros (160 → 16000), sinon déjà en centimes
-const toCents = (n: number) => (n < 1000 ? Math.round(n * 100) : Math.round(n));
-
-// Découpe une longue chaîne en segments compatibles metadata Stripe (<= 500 chars par valeur)
-const chunk = (str: string, size = 450) => {
-  const out: string[] = []
-  for (let i = 0; i < str.length; i += size) out.push(str.slice(i, i + size))
-  return out
+// Util small: borne inférieure (>= 1) pour les quantités
+const clampQty = (n: unknown) => {
+  const q = typeof n === 'number' ? Math.floor(n) : 0
+  return q > 0 ? q : 1
 }
 
-export async function POST(req: Request) {
-  try {
-    const { items, email } = (await req.json()) as { items: CartItem[]; email?: string };
+// Stripe attend des montants en centimes (EUR).
+const toStripeAmount = (cents: number) => {
+  const n = Number(cents)
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : 0
+}
 
-    if (!Array.isArray(items) || items.length === 0) {
-      return NextResponse.json({ error: "Panier vide" }, { status: 400 });
+type IncomingItem = {
+  workId: string
+  variantId: string
+  qty?: number
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json().catch(() => ({}))
+    const email: string | undefined = typeof body?.email === 'string' ? body.email : undefined
+    const items: IncomingItem[] = Array.isArray(body?.items) ? body.items : []
+
+    if (!items.length) {
+      return NextResponse.json({ error: 'empty_cart' }, { status: 400 })
     }
 
-    // Normalise les lignes et BLOQUE si un prix est nul/invalid (on ne "filtre" pas silencieusement)
-    const normalized = items.map((i) => {
-      const qty = Number.isFinite(i.qty) && i.qty > 0 ? Math.floor(i.qty) : 1
-      const unit = toCents(Number(i.price || 0))
-      return { ...i, qty, unit }
+    // 1) On va chercher UNIQUEMENT les variants en base
+    const variantIds = [...new Set(items.map((i) => i.variantId).filter(Boolean))]
+    if (!variantIds.length) {
+      return NextResponse.json({ error: 'invalid_payload' }, { status: 400 })
+    }
+
+    type VariantWithWork = {
+      id: string
+      price: number
+      label: string
+      workId: string
+      work: { id: string; title: string; slug: string }
+    }
+
+    const variants: VariantWithWork[] = await prisma.variant.findMany({
+      where: { id: { in: variantIds } },
+      select: {
+        id: true,
+        price: true,
+        label: true,
+        workId: true,
+        work: { select: { id: true, title: true, slug: true } },
+      },
     })
 
-    const zeroItems = normalized.filter((n) => !Number.isFinite(n.unit) || n.unit <= 0)
-    if (zeroItems.length) {
+    const vMap = new Map(variants.map((v) => [v.id, v]))
+
+    // 2) Construire les lignes Stripe + valider les prix > 0
+    const zeroPrice: Array<{ workId: string; variantId: string }> = []
+    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = []
+    let orderTotal = 0
+
+    for (const it of items) {
+      const v = vMap.get(it.variantId)
+      if (!v || v.workId !== it.workId) {
+        // variant inexistant ou ne correspond pas à l’œuvre → on ignore dans Stripe, mais on NE crée pas l’order
+        zeroPrice.push({ workId: it.workId, variantId: it.variantId })
+        continue
+      }
+
+      const unitCents = toStripeAmount(v.price ?? 0)
+      const qty = clampQty(it.qty)
+
+      if (unitCents <= 0) {
+        zeroPrice.push({ workId: it.workId, variantId: it.variantId })
+        continue
+      }
+
+      orderTotal += unitCents * qty
+
+      lineItems.push({
+        quantity: qty,
+        price_data: {
+          currency: 'eur',
+          unit_amount: unitCents,
+          product_data: {
+            name: `${v.work.title} — ${v.label}`,
+            metadata: {
+              workId: v.workId,
+              variantId: v.id,
+              slug: v.work.slug,
+              variant: v.label,
+            },
+          },
+        },
+      })
+    }
+
+    // Si au moins un item a un prix 0 ou variant invalide → on bloque
+    if (zeroPrice.length) {
       return NextResponse.json(
         {
-          error: "zero_price_item",
+          error: 'zero_price_item',
           message:
-            "Un ou plusieurs articles ont un prix invalide (0€). Corrigez le prix dans l’admin puis réessayez.",
-          items: zeroItems.map(({ workId, variantId }) => ({ workId, variantId })),
+            'Un ou plusieurs articles ont un prix invalide (0€) ou un variant introuvable. Corrigez le prix dans l’admin puis réessayez.',
+          items: zeroPrice,
         },
-        { status: 400 }
+        { status: 400 },
       )
     }
 
-    const line_items = normalized.map((n) => ({
-      quantity: n.qty,
-      price_data: {
-        currency: "eur",
-        unit_amount: n.unit,
-        product_data: {
-          name: n.title || "Œuvre",
-          description: n.artistName ? `par ${n.artistName}` : undefined,
-          // Stripe accepte des URLs absolues uniquement; si ce n'est pas le cas, on ignore l'image
-          images: n.image && /^https?:\/\//.test(n.image) ? [n.image] : undefined,
-          // IDs utiles par ligne, lus dans le webhook
-          metadata: {
-            workId: n.workId,
-            variantId: n.variantId,
-          },
+    if (!lineItems.length || orderTotal <= 0) {
+      return NextResponse.json({ error: 'empty_or_invalid' }, { status: 400 })
+    }
+
+    // 3) Créer la commande "pending" AVANT Stripe (propre)
+    const order = await (prisma as any).order.create({
+      data: {
+        email: email ?? null,
+        status: 'pending',
+        total: orderTotal, // centimes
+        items: {
+          create: items.map((it) => {
+            const v = vMap.get(it.variantId)!
+            return {
+              workId: v.workId,
+              variantId: v.id,
+              qty: clampQty(it.qty),
+              unitPriceCents: v.price, // centimes stockés tels quels
+            }
+          }),
         },
       },
-    } as const))
+      select: { id: true },
+    })
 
-    const siteUrl = process.env.SITE_URL ?? "http://localhost:3000";
+    // 4) Créer la session Stripe – metadata ultra compacte (orderId seulement)
+    const baseUrl =
+      process.env.NEXT_PUBLIC_BASE_URL ||
+      `${req.nextUrl.protocol}//${req.nextUrl.host}`.replace(':///', '://')
 
     const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      line_items,
-      success_url: `${siteUrl}/merci?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${siteUrl}/cart?cancelled=1`,
+      mode: 'payment',
       customer_email: email,
-      // --- Adresse & livraison (vente physique) ---
-      shipping_address_collection: {
-        allowed_countries: ["FR", "BE", "CH", "DE", "ES", "IT", "NL", "LU"],
+      line_items: lineItems,
+      success_url: `${baseUrl}/merci?orderId=${order.id}`,
+      cancel_url: `${baseUrl}/cart?cancel=1`,
+      metadata: {
+        orderId: order.id,
       },
-      phone_number_collection: { enabled: true },
-      shipping_options: [
-        {
-          shipping_rate_data: {
-            type: "fixed_amount",
-            fixed_amount: { amount: toCents(6), currency: "eur" },
-            display_name: "Standard (3–6 j)",
-            delivery_estimate: {
-              minimum: { unit: "business_day", value: 3 },
-              maximum: { unit: "business_day", value: 6 },
-            },
-          },
-        },
-        {
-          shipping_rate_data: {
-            type: "fixed_amount",
-            fixed_amount: { amount: toCents(12), currency: "eur" },
-            display_name: "Express (24–48h)",
-            delivery_estimate: {
-              minimum: { unit: "business_day", value: 1 },
-              maximum: { unit: "business_day", value: 2 },
-            },
-          },
-        },
-      ],
-      // Métadonnées compactes (évite la limite Stripe de 500 chars/valeur)
-      // Exemple: "2*w-01:varA|1*w-05:varB|1*w-03:varC"
-      payment_intent_data: {
-        metadata: (() => {
-          const compact = normalized
-            .map((n) => `${n.qty}*${n.workId}${n.variantId ? ":" + n.variantId : ""}`)
-            .join("|")
-          const parts = chunk(compact, 450)
-          const meta: Record<string, string> = { items_count: String(normalized.length) }
-          parts.forEach((p, i) => (meta[`items_${i + 1}`] = p))
-          return meta
-        })(),
-      },
-    });
+    })
 
-    return NextResponse.json({ url: session.url });
-  } catch (e) {
-    console.error("checkout error", e);
-    return NextResponse.json({ error: "checkout_failed" }, { status: 500 });
+    // 5) Sauvegarder l’id de session Stripe
+    await (prisma as any).order.update({
+      where: { id: order.id },
+      data: { stripeSessionId: session.id },
+    })
+
+    return NextResponse.json({ url: session.url })
+  } catch (err) {
+    console.error('checkout error W', err)
+    return NextResponse.json({ error: 'checkout_failed' }, { status: 500 })
   }
 }

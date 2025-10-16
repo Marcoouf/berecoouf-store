@@ -1,30 +1,43 @@
-import { headers } from 'next/headers'
-import { artists, artworks } from '@/lib/data'
+// src/app/sitemap.ts
+import type { MetadataRoute } from 'next'
+import { prisma } from '../lib/prisma'
 
-function base() {
-  const h = headers()
-  const host = h.get('x-forwarded-host') ?? h.get('host')
-  const proto = h.get('x-forwarded-proto') ?? 'http'
-  return (process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '')) || `${proto}://${host}`
-}
+export const revalidate = 3600 // 1h
 
-export default async function sitemap() {
-  const b = base()
-  const now = new Date().toISOString()
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  const base = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://point-bleu.vercel.app'
+  const now = new Date()
 
-  const staticUrls = [
-    { url: `${b}/`, lastModified: now, changeFrequency: 'weekly', priority: 1 },
-    { url: `${b}/artists`, lastModified: now, changeFrequency: 'weekly', priority: 0.8 },
-    { url: `${b}/artworks`, lastModified: now, changeFrequency: 'weekly', priority: 0.8 },
+  const artists = await prisma.artist.findMany({
+    where: { isArchived: false, deletedAt: null },
+    select: { slug: true, updatedAt: true },
+    orderBy: { slug: 'asc' },
+  })
+
+  const works = await prisma.work.findMany({
+    select: { slug: true, updatedAt: true },
+    orderBy: { slug: 'asc' },
+  })
+
+  const staticPages: MetadataRoute.Sitemap = [
+    { url: `${base}/`, lastModified: now },
+    { url: `${base}/artists`, lastModified: now },
+    { url: `${base}/artworks`, lastModified: now },
   ]
 
-  const artistUrls = artists.map(a => ({
-    url: `${b}/artists/${a.slug}`, lastModified: now, changeFrequency: 'monthly', priority: 0.6,
-  }))
+  const artistUrls: MetadataRoute.Sitemap = artists.map(
+    (a: { slug: string; updatedAt: Date }) => ({
+      url: `${base}/artists/${a.slug}`,
+      lastModified: a.updatedAt,
+    })
+  )
 
-  const artworkUrls = artworks.map(w => ({
-    url: `${b}/artworks/${w.slug}`, lastModified: now, changeFrequency: 'monthly', priority: 0.7,
-  }))
+  const workUrls: MetadataRoute.Sitemap = works.map(
+    (w: { slug: string; updatedAt: Date }) => ({
+      url: `${base}/artworks/${w.slug}`,
+      lastModified: w.updatedAt,
+    })
+  )
 
-  return [...staticUrls, ...artistUrls, ...artworkUrls]
+  return [...staticPages, ...artistUrls, ...workUrls]
 }

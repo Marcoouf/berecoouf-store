@@ -10,8 +10,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'admin_disabled' }, { status: 404 })
   }
   // Anti-bruteforce léger
-  if (!rateLimit(req, 10, 60_000)) {
-    return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
+if (!rateLimit(req, { limit: 10, windowMs: 60_000 })) {
+        return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
   }
   try {
     const { key } = await req.json().catch(() => ({}))

@@ -45,8 +45,8 @@ export async function POST(req: Request) {
     if (notAdmin) return notAdmin
   }
 
-  if (!rateLimit(req, 10, 60_000)) {
-    return NextResponse.json(
+if (!rateLimit(req, { limit: 10, windowMs: 60_000 })) {
+      return NextResponse.json(
       { ok: false, error: "rate_limited" },
       { status: 429, headers: { "Access-Control-Allow-Origin": "*" } }
     )

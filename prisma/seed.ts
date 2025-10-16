@@ -2,7 +2,7 @@
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import prisma from '../src/lib/prisma'
+import { prisma } from '../src/lib/prisma'
 
 // -- Petit helper si ton slug util n’existe pas :
 function toSlug(s: string) {

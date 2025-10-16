@@ -32,25 +32,54 @@ function getBlobToken(): string {
 }
 
 /**
+ * Optionally get the RW token; return null if not configured.
+ * Useful for read paths where a public URL might already suffice.
+ */
+function getOptionalBlobToken(): string | null {
+  const token = process.env.BLOB_READ_WRITE_TOKEN?.trim()
+  return token || null
+}
+
+/**
  * Try read a JSON file from Vercel Blob and parse it as Catalog.
- * Falls back to `NEXT_PUBLIC_CATALOG_URL` (public URL) if provided.
+ * 1) Prefer the public URL (NEXT_PUBLIC_CATALOG_URL) if present.
+ * 2) Otherwise, try the RW token lookup (if configured).
+ *    When multiple blob versions exist for the same key, pick the most recent.
+ * Returns `null` if nothing can be read (no throw on missing token in read path).
  */
 export async function readCatalogFromBlob(): Promise<Catalog | null> {
-  // 1) If a public URL is provided, use it directly — it's faster & cacheable
+  // 1) Public URL path — fastest & cache-controllable edge CDN
   const publicUrl = process.env.NEXT_PUBLIC_CATALOG_URL?.trim()
   if (publicUrl) {
     try {
       const r = await fetch(publicUrl, { cache: 'no-store' })
       if (r.ok) return (await r.json()) as Catalog
-    } catch {/* ignore and try the token-based path */}
+    } catch {
+      // ignore and try token-based path
+    }
   }
 
-  // 2) Token-based lookup
-  const token = getBlobToken()
-  const key = getCatalogKey()
+  // 2) Token-based lookup (optional here; don't throw if not configured)
+  const token = getOptionalBlobToken()
+  const key = process.env.CATALOG_BLOB_KEY?.trim() || null
+  if (!token || !key) return null
 
   const { blobs } = await list({ prefix: key, token })
-  const file = blobs.find(b => b.pathname === key) ?? blobs[0]
+  if (!blobs?.length) return null
+
+  // Filter to exact pathname if present; otherwise use all results for prefix
+  const samePath = blobs.filter((b) => b.pathname === key)
+  const pickFrom = samePath.length ? samePath : blobs
+
+  // Pick the newest by uploadedAt (fallback to 0 if not present)
+  const file = pickFrom
+    .slice()
+    .sort((a: any, b: any) => {
+      const da = new Date(a?.uploadedAt ?? 0).getTime()
+      const db = new Date(b?.uploadedAt ?? 0).getTime()
+      return db - da
+    })[0]
+
   if (!file) return null
 
   const res = await fetch(file.url, { cache: 'no-store' })

@@ -195,9 +195,9 @@ function Artists({ artists }: { artists: Artist[] }) {
             {artists.map(a => (
               <Link key={a.id} href={`/artists/${a.slug}`} className="group block">
                 <div className="aspect-[4/3] overflow-hidden rounded-2xl border relative transition-all duration-300 group-hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)]">
-                  {a.cover ? (
+                  {a.image ? (
                     <Image
-                      src={a.cover}
+                      src={a.image}
                       alt={a.name}
                       fill
                       className="object-cover transition-transform duration-500 group-hover:scale-[1.02]"
@@ -210,8 +210,8 @@ function Artists({ artists }: { artists: Artist[] }) {
                   )}
                 </div>
                 <div className="mt-3 flex items-center gap-3">
-                  {a.avatar ? (
-                    <Image src={a.avatar} alt={a.name} width={32} height={32} className="rounded-full object-cover" sizes="32px" />
+                  {a.portrait ? (
+                    <Image src={a.portrait} alt={a.name} width={32} height={32} className="rounded-full object-cover" sizes="32px" />
                   ) : (
                     <div className="w-8 h-8 rounded-full bg-accent text-white flex items-center justify-center text-xs font-bold">
                       {a.name?.charAt(0) ?? '?'}

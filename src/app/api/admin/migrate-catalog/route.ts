@@ -74,8 +74,8 @@ async function uploadLocalToBlob(localRelPath: string) {
 
 export async function POST(req: Request) {
   // Sécurité: rate limit + clé admin côté serveur (header x-admin-key recommandé) OU session via middleware
-  if (!rateLimit(req, 5, 10_000)) {
-    return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
+if (!rateLimit(req, { limit: 10, windowMs: 10_000 })) {
+      return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
   }
   const denied = assertAdmin(req)
   if (denied) return denied
