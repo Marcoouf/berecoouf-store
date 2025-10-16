@@ -4,6 +4,15 @@ import { prisma } from '@/lib/prisma'
 import { stripe } from '@/lib/stripe'
 import type Stripe from 'stripe'
 
+function getOrigin(req: NextRequest) {
+  const h = req.headers
+  const fromHeader = h.get('origin')
+  if (fromHeader) return fromHeader
+  const proto = h.get('x-forwarded-proto') ?? 'http'
+  const host = h.get('host') ?? 'localhost:3000'
+  return `${proto}://${host}`
+}
+
 // Util small: borne inférieure (>= 1) pour les quantités
 const clampQty = (n: unknown) => {
   const q = typeof n === 'number' ? Math.floor(n) : 0
@@ -24,6 +33,13 @@ type IncomingItem = {
 
 export async function POST(req: NextRequest) {
   try {
+    if (!process.env.STRIPE_SECRET_KEY) {
+      return NextResponse.json(
+        { error: 'stripe_not_configured', message: 'Clé Stripe manquante (STRIPE_SECRET_KEY).' },
+        { status: 500 },
+      )
+    }
+
     const body = await req.json().catch(() => ({}))
     const email: string | undefined = typeof body?.email === 'string' ? body.email : undefined
     const items: IncomingItem[] = Array.isArray(body?.items) ? body.items : []
@@ -75,7 +91,8 @@ export async function POST(req: NextRequest) {
       const unitCents = toStripeAmount(v.price ?? 0)
       const qty = clampQty(it.qty)
 
-      if (unitCents <= 0) {
+      if (!Number.isFinite(unitCents) || unitCents < 50) {
+        // Stripe impose un minimum de 50 centimes
         zeroPrice.push({ workId: it.workId, variantId: it.variantId })
         continue
       }
@@ -139,16 +156,15 @@ export async function POST(req: NextRequest) {
     })
 
     // 4) Créer la session Stripe – metadata ultra compacte (orderId seulement)
-    const baseUrl =
-      process.env.NEXT_PUBLIC_BASE_URL ||
-      `${req.nextUrl.protocol}//${req.nextUrl.host}`.replace(':///', '://')
+    const origin = process.env.NEXT_PUBLIC_BASE_URL || getOrigin(req)
 
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       customer_email: email,
       line_items: lineItems,
-      success_url: `${baseUrl}/merci?orderId=${order.id}`,
-      cancel_url: `${baseUrl}/cart?cancel=1`,
+      success_url: `${origin}/merci?orderId=${order.id}&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/cart?cancel=1`,
+      allow_promotion_codes: true,
       metadata: {
         orderId: order.id,
       },
@@ -161,8 +177,9 @@ export async function POST(req: NextRequest) {
     })
 
     return NextResponse.json({ url: session.url })
-  } catch (err) {
+  } catch (err: any) {
     console.error('checkout error W', err)
-    return NextResponse.json({ error: 'checkout_failed' }, { status: 500 })
+    const message = process.env.NODE_ENV !== 'production' ? String(err?.message || err) : 'checkout_failed'
+    return NextResponse.json({ error: 'checkout_failed', message }, { status: 500 })
   }
 }
