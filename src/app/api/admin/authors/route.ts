@@ -113,7 +113,7 @@ export async function POST(req: Request) {
     )
   } catch (error: any) {
     if (error instanceof z.ZodError) {
-      return NextResponse.json({ error: error.errors.map((e) => e.message).join(', ') }, { status: 400 })
+      return NextResponse.json({ error: error.issues.map((issue) => issue.message).join(', ') }, { status: 400 })
     }
     return NextResponse.json({ error: error?.message || 'Erreur serveur' }, { status: 400 })
   }

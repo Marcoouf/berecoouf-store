@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
 import { withAuth } from 'next-auth/middleware'
+import type { NextRequestWithAuth } from 'next-auth/middleware'
 
 export default withAuth(
-  function middleware(req: NextRequest) {
-    const token = req.nextauth.token
+  function middleware(req: NextRequestWithAuth) {
+    const token = req.nextauth?.token
     if (!token) {
       const loginUrl = new URL('/login', req.nextUrl.origin)
       loginUrl.searchParams.set('callbackUrl', req.nextUrl.pathname + req.nextUrl.search)

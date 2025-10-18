@@ -60,15 +60,17 @@ function toEuros(cents: number | null | undefined) {
 }
 
 function buildForm(detail: WorkDetail): FormState {
-  const variants =
-    (detail.variants ?? []).map((variant) => ({
-      id: variant.id,
-      label: variant.label,
-      price: variant.price ? (variant.price / 100).toString() : '',
-    })) || []
+  const variants: FormState['variants'] =
+    (detail.variants ?? []).map(
+      (variant): FormState['variants'][number] => ({
+        id: variant.id || undefined,
+        label: variant.label,
+        price: variant.price ? (variant.price / 100).toString() : '',
+      }),
+    ) || []
 
   if (variants.length === 0) {
-    variants.push({ id: undefined, label: '', price: '' })
+    variants.push({ label: '', price: '' })
   }
 
   return {
