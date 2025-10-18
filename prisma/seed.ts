@@ -198,6 +198,25 @@ const work = await prisma.work.upsert({
   }
 
   console.log('✅ Seed terminé.')
+
+  const adminEmailRaw = (process.env.SEED_ADMIN_EMAIL || process.env.ADMIN_EMAIL || '').trim()
+  const adminEmail = adminEmailRaw.toLowerCase()
+  if (adminEmail) {
+    await prisma.user.upsert({
+      where: { email: adminEmail },
+      update: {
+        role: 'admin',
+        name: process.env.SEED_ADMIN_NAME?.trim() || null,
+      },
+      create: {
+        email: adminEmail,
+        role: 'admin',
+        name: process.env.SEED_ADMIN_NAME?.trim() || 'Admin',
+        passwordHash: null,
+      },
+    })
+    console.log(`👤 Admin ajouté/confirmé : ${adminEmail}`)
+  }
 }
 
 main()

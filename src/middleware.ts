@@ -1,33 +1,41 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { withAuth } from 'next-auth/middleware'
 
-export function middleware(req: NextRequest) {
-  const url = req.nextUrl.clone()
-  const { pathname } = url
+export default withAuth(
+  function middleware(req: NextRequest) {
+    const token = req.nextauth.token
+    if (!token) {
+      const loginUrl = new URL('/login', req.nextUrl.origin)
+      loginUrl.searchParams.set('callbackUrl', req.nextUrl.pathname + req.nextUrl.search)
+      return NextResponse.redirect(loginUrl)
+    }
 
-  // Index
-  if (pathname === '/artistes') {
-    url.pathname = '/artists'
-    return NextResponse.rewrite(url)
-  }
-  if (pathname === '/galerie') {
-    url.pathname = '/artworks'
-    return NextResponse.rewrite(url)
-  }
+    const pathname = req.nextUrl.pathname
+    const role = token.role
 
-  // Slugs
-  if (pathname.startsWith('/artiste/')) {
-    url.pathname = pathname.replace('/artiste/', '/artists/')
-    return NextResponse.rewrite(url)
-  }
-  if (pathname.startsWith('/oeuvre/')) {
-    url.pathname = pathname.replace('/oeuvre/', '/artworks/')
-    return NextResponse.rewrite(url)
-  }
+    if (pathname.startsWith('/admin') && role !== 'admin') {
+      return NextResponse.redirect(new URL('/dashboard', req.nextUrl.origin))
+    }
 
-  return NextResponse.next()
-}
+    if (pathname.startsWith('/dashboard') && role !== 'admin' && !token.artistIds?.length) {
+      // Auteur sans artiste lié → refuse l’accès jusqu’à assignation
+      const contactUrl = new URL('/login', req.nextUrl.origin)
+      contactUrl.searchParams.set('error', 'not_authorized')
+      return NextResponse.redirect(contactUrl)
+    }
+
+    return NextResponse.next()
+  },
+  {
+    callbacks: {
+      authorized({ token }) {
+        return !!token
+      },
+    },
+  },
+)
 
 export const config = {
-  matcher: ['/artistes','/galerie','/artiste/:path*','/oeuvre/:path*'],
+  matcher: ['/admin/:path*', '/dashboard/:path*'],
 }

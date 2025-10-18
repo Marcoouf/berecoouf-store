@@ -20,6 +20,8 @@ Ouvre http://localhost:3000
 - `RESEND_API_KEY` — clé API Resend (facultatif mais requis pour l’envoi d’emails).
 - `RESEND_FROM` — expéditeur, ex. `Vague <noreply@vague.art>`.
 - `SALES_NOTIF_OVERRIDE` — adresse email interne recevant le récapitulatif commande.
+- `NEXTAUTH_SECRET` — secret aléatoire (openssl rand -base64 32) pour signer les sessions NextAuth.
+- `NEXTAUTH_URL` — URL publique utilisée par NextAuth (identique à `NEXT_PUBLIC_BASE_URL`).
 
 Le checkout crée une commande en base (status `pending`), Stripe redirige vers `/merci`, puis le webhook confirme la commande (`paid`) et déclenche les emails :
 
@@ -39,6 +41,17 @@ pnpm run check:artists
 ```
 
 Le script retourne un code de sortie non nul si un artiste n’a pas d’email (pratique pour les CI/CD).
+
+### Comptes auteurs / admins
+
+- Utilise `SEED_ADMIN_EMAIL` (et optionnellement `SEED_ADMIN_NAME`) pour créer/mettre à jour un compte admin lors du `pnpm run seed`.
+- Les modèles Prisma incluent désormais `User`, `ArtistAuthor` et le lien `Work.createdById`, nécessaires à l’espace auteur.
+- Authentification NextAuth en place :
+  - `/login` pour la connexion via email + mot de passe.
+  - `/dashboard` réservé aux auteurs/administrateurs (protégé par middleware).
+  - `/admin` reste réservé aux rôles `admin`.
+- Depuis le back-office, page `/admin/authors`, tu peux créer, modifier ou supprimer des comptes auteurs (mot de passe + artistes associés).
+- Pour une création manuelle, insère une entrée `User` avec `role = 'author'`, un `passwordHash` (bcrypt) et associe-la via `ArtistAuthor` à l’artiste voulu.
 
 ## Déploiement (Vercel)
 
