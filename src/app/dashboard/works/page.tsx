@@ -545,6 +545,7 @@ export default function AuthorWorksPage() {
             onClick: toggleCreatePanel,
             variant: 'primary',
           },
+          { type: 'link', href: '/dashboard/profile', label: 'Modifier mon profil' },
           { type: 'link', href: '/dashboard', label: '← Retour au tableau de bord' },
         ]}
       />
