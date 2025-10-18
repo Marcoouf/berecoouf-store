@@ -48,10 +48,10 @@ function Hero({ highlight }: { highlight?: HeroHighlight | null }) {
 
   return (
     <section className="border-b border-neutral-200/60">
-      <Container className="py-12 md:py-24">
-        <div className="grid items-center gap-10 md:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)]">
+      <Container className="py-16 md:py-24">
+        <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           <FadeIn>
-            <div>
+            <div className="mx-auto flex max-w-xl flex-col items-center text-center lg:mx-0 lg:max-w-2xl lg:items-start lg:text-left">
               <div className="inline-flex items-center gap-2 rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-xs font-medium uppercase tracking-widest text-accent">
                 Editions limitées
               </div>
@@ -89,21 +89,26 @@ function Hero({ highlight }: { highlight?: HeroHighlight | null }) {
           </FadeIn>
 
           <FadeIn delay={0.1}>
-            <div className="relative aspect-[4/3] min-h-[260px] sm:min-h-[320px] md:min-h-[420px] lg:min-h-[520px] overflow-hidden rounded-3xl border bg-neutral-50" aria-busy={false}>
-              {highlight?.image ? (
-                <NextImage
-                  src={highlight.image}
-                  alt={altText}
-                  fill
-                  priority
-                  sizes="(min-width: 1024px) 40vw, (min-width: 768px) 50vw, 100vw"
-                  className="object-contain"
-                />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center bg-neutral-100 text-neutral-400">
-                  <span className="text-sm">Visuel d’œuvre indisponible</span>
-                </div>
-              )}
+            <div className="flex w-full justify-center lg:justify-end">
+              <div
+                className="relative w-full max-w-[540px] min-h-[320px] sm:min-h-[420px] md:min-h-[520px]"
+                aria-busy={false}
+              >
+                {highlight?.image ? (
+                  <NextImage
+                    src={highlight.image}
+                    alt={altText}
+                    fill
+                    priority
+                    sizes="(min-width: 1024px) 40vw, (min-width: 768px) 50vw, 100vw"
+                    className="absolute inset-0 h-full w-full object-contain"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-neutral-400">
+                    <span className="text-sm">Visuel d’œuvre indisponible</span>
+                  </div>
+                )}
+              </div>
             </div>
           </FadeIn>
         </div>
