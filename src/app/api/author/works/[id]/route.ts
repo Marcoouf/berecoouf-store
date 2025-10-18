@@ -1,122 +1,15 @@
 import { NextResponse } from 'next/server'
 import { getAuthSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-
-function parseNumber(value: unknown): number | null {
-  if (value === null || value === undefined) return null
-  if (typeof value === 'string') {
-    const trimmed = value.trim()
-    if (!trimmed) return null
-    const normalized = trimmed.replace(',', '.')
-    const n = Number(normalized)
-    return Number.isFinite(n) ? n : null
-  }
-  if (value === '') return null
-  const n = Number(value)
-  return Number.isFinite(n) ? n : null
-}
-
-function sanitizeUrl(value: unknown): string | null {
-  if (typeof value !== 'string') return null
-  const trimmed = value.trim()
-  if (!trimmed) return null
-  return trimmed
-}
-
-function toCents(raw: number | null): number | null {
-  if (raw === null) return null
-  const abs = Math.abs(raw)
-  if (abs >= 10000) return Math.round(raw)
-  return Math.round(raw * 100)
-}
-
-type VariantInput = {
-  id?: string
-  label: string
-  price: number
-  order: number
-}
-
-function normalizeVariants(raw: unknown): { variants: VariantInput[]; errors: string[] } {
-  if (!Array.isArray(raw)) return { variants: [], errors: [] }
-
-  const errors: string[] = []
-  const variants: VariantInput[] = []
-
-  raw.forEach((entry, index) => {
-    const idValue = typeof (entry as any)?.id === 'string' ? (entry as any).id : undefined
-    const label = typeof (entry as any)?.label === 'string' ? (entry as any).label.trim() : ''
-    const priceRaw = parseNumber((entry as any)?.price)
-
-    if (!label) {
-      errors.push(`variant_${index}_label`)
-      return
-    }
-    if (priceRaw === null || priceRaw <= 0) {
-      errors.push(`variant_${index}_price`)
-      return
-    }
-
-    const price = toCents(priceRaw)
-    if (price === null || price <= 0) {
-      errors.push(`variant_${index}_price`)
-      return
-    }
-
-    variants.push({
-      id: idValue,
-      label,
-      price,
-      order: index,
-    })
-  })
-
-  return { variants, errors }
-}
-
-function mapWorkResponse(work: {
-  id: string
-  slug: string
-  title: string
-  description: string | null
-  year: number | null
-  technique: string | null
-  paper: string | null
-  dimensions: string | null
-  edition: string | null
-  imageUrl: string | null
-  mockupUrl: string | null
-  basePrice: number | null
-  published: boolean
-  artist: { id: string; name: string; slug: string } | null
-  variants: Array<{ id: string; label: string; price: number; order: number }>
-}) {
-  return {
-    id: work.id,
-    slug: work.slug,
-    title: work.title,
-    description: work.description,
-    year: work.year,
-    technique: work.technique,
-    paper: work.paper,
-    dimensions: work.dimensions,
-    edition: work.edition,
-    image: work.imageUrl,
-    mockup: work.mockupUrl,
-    basePriceCents: work.basePrice ?? null,
-    published: work.published,
-    artist: work.artist,
-    variants: work.variants
-      .slice()
-      .sort((a, b) => a.order - b.order)
-      .map((variant) => ({
-        id: variant.id,
-        label: variant.label,
-        price: variant.price,
-        order: variant.order,
-      })),
-  }
-}
+import {
+  mapWorkDetail,
+  normalizeVariants,
+  parseNumber,
+  sanitizeUrl,
+  toCents,
+  type VariantInput,
+} from '../utils'
+import { revalidateWorkPaths } from '@/lib/revalidate'
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const session = await getAuthSession()
@@ -146,7 +39,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
   }
 
-  return NextResponse.json(mapWorkResponse(work))
+  return NextResponse.json(mapWorkDetail(work))
 }
 
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
@@ -318,5 +211,42 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     throw error
   }
 
-  return NextResponse.json({ ok: true, work: mapWorkResponse(result) })
+  return NextResponse.json({ ok: true, work: mapWorkDetail(result) })
+}
+
+export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+  const session = await getAuthSession()
+  const user = session?.user
+
+  if (!user) {
+    return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+  }
+
+  const artistIds = Array.isArray(user.artistIds) ? user.artistIds : []
+  if (artistIds.length === 0) {
+    return NextResponse.json({ ok: false, error: 'not_authorized' }, { status: 403 })
+  }
+
+  const work = await prisma.work.findUnique({
+    where: { id: params.id },
+    select: { id: true, artistId: true, slug: true },
+  })
+
+  if (!work || !artistIds.includes(work.artistId)) {
+    return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
+  }
+
+  const linkedOrders = await prisma.orderItem.count({ where: { workId: params.id } })
+  if (linkedOrders > 0) {
+    return NextResponse.json({ ok: false, error: 'work_has_orders' }, { status: 409 })
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.variant.deleteMany({ where: { workId: params.id } })
+    await tx.work.delete({ where: { id: params.id } })
+  })
+
+  revalidateWorkPaths(work.slug)
+
+  return NextResponse.json({ ok: true })
 }

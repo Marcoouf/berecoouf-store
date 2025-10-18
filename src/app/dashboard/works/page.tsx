@@ -54,6 +54,23 @@ type FormState = {
   }>
 }
 
+type ArtistOption = {
+  id: string
+  name: string
+  slug: string
+}
+
+type WorksResponse = {
+  works: WorkSummary[]
+  artists: ArtistOption[]
+}
+
+type CreateFormState = {
+  title: string
+  artistId: string
+  image: string
+}
+
 function toEuros(cents: number | null | undefined) {
   if (!cents) return ''
   return (cents / 100).toString()
@@ -117,6 +134,12 @@ export default function AuthorWorksPage() {
   const [works, setWorks] = useState<WorkSummary[]>([])
   const [loadingList, setLoadingList] = useState(true)
   const [listError, setListError] = useState<string | null>(null)
+  const [availableArtists, setAvailableArtists] = useState<ArtistOption[]>([])
+  const [showCreate, setShowCreate] = useState(false)
+  const [createForm, setCreateForm] = useState<CreateFormState>({ title: '', artistId: '', image: '' })
+  const [creating, setCreating] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
+  const [flash, setFlash] = useState<string | null>(null)
 
   const [selectedWorkId, setSelectedWorkId] = useState<string | null>(null)
   const [detail, setDetail] = useState<WorkDetail | null>(null)
@@ -127,6 +150,7 @@ export default function AuthorWorksPage() {
   const [error, setError] = useState<string | null>(null)
   const [uploadingCover, setUploadingCover] = useState(false)
   const [uploadingMockup, setUploadingMockup] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -134,10 +158,20 @@ export default function AuthorWorksPage() {
       setLoadingList(true)
       setListError(null)
       try {
-        const data = await fetchJSON<WorkSummary[]>('/api/author/works')
+        const data = await fetchJSON<WorksResponse>('/api/author/works')
         if (!active) return
-        setWorks(data)
-        setSelectedWorkId(data[0]?.id ?? null)
+        const worksPayload = Array.isArray(data?.works) ? data.works : []
+        const artistsPayload = Array.isArray(data?.artists) ? data.artists : []
+        setWorks(worksPayload)
+        setAvailableArtists(artistsPayload)
+        if (worksPayload.length === 0) {
+          setSelectedWorkId(null)
+        } else {
+          setSelectedWorkId((prev) => {
+            if (prev && worksPayload.some((work) => work.id === prev)) return prev
+            return worksPayload[0]?.id ?? null
+          })
+        }
       } catch (err: any) {
         if (!active) return
         setListError(err?.message || 'Impossible de charger vos œuvres')
@@ -152,9 +186,28 @@ export default function AuthorWorksPage() {
   }, [])
 
   useEffect(() => {
+    setCreateForm((prev) => {
+      if (availableArtists.length === 0) {
+        return { ...prev, artistId: '' }
+      }
+      if (prev.artistId && availableArtists.some((artist) => artist.id === prev.artistId)) {
+        return prev
+      }
+      return { ...prev, artistId: availableArtists[0].id }
+    })
+  }, [availableArtists])
+
+  useEffect(() => {
+    if (!flash) return
+    const timeout = window.setTimeout(() => setFlash(null), 4000)
+    return () => window.clearTimeout(timeout)
+  }, [flash])
+
+  useEffect(() => {
     if (!selectedWorkId) {
       setDetail(null)
       setForm(null)
+       setLoadingDetail(false)
       return
     }
 
@@ -221,6 +274,136 @@ export default function AuthorWorksPage() {
       if (next.length === 0) next.push({ id: undefined, label: '', price: '' })
       return { ...prev, variants: next }
     })
+  }
+
+  const toggleCreatePanel = () => {
+    if (showCreate) {
+      setShowCreate(false)
+      setCreateError(null)
+      setCreateForm((form) => ({ ...form, title: '', image: '' }))
+    } else {
+      setShowCreate(true)
+    }
+  }
+
+  const handleCreateField = <K extends keyof CreateFormState>(key: K, value: CreateFormState[K]) => {
+    setCreateError(null)
+    setCreateForm((prev) => ({ ...prev, [key]: value }))
+  }
+
+  async function handleCreateWork(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    if (creating) return
+
+    if (availableArtists.length === 0) {
+      setCreateError("Aucun artiste n'est rattaché à ton compte pour le moment.")
+      return
+    }
+
+    const title = createForm.title.trim()
+    const artistId = (createForm.artistId || availableArtists[0]?.id || '').trim()
+
+    if (!title) {
+      setCreateError('Ajoute un titre pour créer une œuvre.')
+      return
+    }
+    if (!artistId) {
+      setCreateError('Sélectionne un artiste associé à ton compte.')
+      return
+    }
+
+    setCreating(true)
+    setCreateError(null)
+
+    try {
+      const payload = {
+        title,
+        artistId,
+        image: createForm.image.trim() || undefined,
+      }
+      const res = await fetch('/api/author/works', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || data?.ok === false || !data?.work) {
+        const code = data?.error || 'Création impossible'
+        if (code === 'no_artist_access') {
+          setCreateError("Aucun artiste n'est rattaché à ton compte.")
+        } else if (code === 'title_required') {
+          setCreateError('Ajoute un titre pour créer une œuvre.')
+        } else if (typeof code === 'string') {
+          setCreateError(code)
+        } else {
+          setCreateError('Création impossible.')
+        }
+        return
+      }
+
+      const newWork = data.work as WorkSummary
+      setWorks((prev) => [newWork, ...prev.filter((work) => work.id !== newWork.id)])
+      setFlash('Nouvelle œuvre créée ✅')
+      setShowCreate(false)
+      setCreateForm({ title: '', artistId, image: '' })
+      setCreateError(null)
+      setDetail(null)
+      setForm(null)
+      setSelectedWorkId(newWork.id)
+    } catch (err: any) {
+      setCreateError(err?.message || 'Création impossible.')
+    } finally {
+      setCreating(false)
+    }
+  }
+
+  async function handleDeleteWork() {
+    if (!detail || deleting) return
+    const confirmDelete = window.confirm('Supprimer définitivement cette œuvre ?')
+    if (!confirmDelete) return
+
+    setDeleting(true)
+    setError(null)
+    setMessage(null)
+
+    try {
+      const res = await fetch(`/api/author/works/${detail.id}`, { method: 'DELETE' })
+      let data: any = {}
+      try {
+        data = await res.json()
+      } catch {
+        data = {}
+      }
+      if (!res.ok || data?.ok === false) {
+        const code = data?.error || 'delete_failed'
+        if (code === 'work_has_orders') {
+          setError('Impossible de supprimer cette œuvre car elle est liée à des commandes.')
+        } else if (typeof code === 'string') {
+          setError(code)
+        } else {
+          setError('Suppression impossible.')
+        }
+        return
+      }
+
+      setFlash('Œuvre supprimée ✅')
+      setWorks((prev) => {
+        const next = prev.filter((work) => work.id !== detail.id)
+        if (next.length === 0) {
+          setSelectedWorkId(null)
+        } else if (!next.some((work) => work.id === selectedWorkId)) {
+          setSelectedWorkId(next[0].id)
+        }
+        return next
+      })
+      setDetail(null)
+      setForm(null)
+      setLoadingDetail(false)
+    } catch (err: any) {
+      setError(err?.message || 'Suppression impossible.')
+    } finally {
+      setDeleting(false)
+    }
   }
 
   async function onSave(e: React.FormEvent<HTMLFormElement>) {
@@ -356,9 +539,95 @@ export default function AuthorWorksPage() {
         title="Mes œuvres"
         subtitle="Modifie les informations et visuels de tes œuvres publiées."
         actions={[
+          {
+            type: 'button',
+            label: showCreate ? 'Fermer le formulaire' : 'Nouvelle œuvre',
+            onClick: toggleCreatePanel,
+            variant: 'primary',
+          },
           { type: 'link', href: '/dashboard', label: '← Retour au tableau de bord' },
         ]}
       />
+
+      {flash ? (
+        <div className="mb-6 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+          {flash}
+        </div>
+      ) : null}
+
+      {showCreate ? (
+        <div className="mb-6 rounded-2xl border border-neutral-200 bg-white/80 p-6 shadow-sm">
+          <h2 className="text-lg font-semibold text-neutral-900">Ajouter une nouvelle œuvre</h2>
+          <p className="mt-1 text-sm text-neutral-500">
+            Renseigne un titre et l’artiste concerné. Tu pourras compléter les autres informations ensuite.
+          </p>
+          {createError ? (
+            <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              {createError}
+            </div>
+          ) : null}
+          {availableArtists.length === 0 ? (
+            <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+              Aucun artiste n’est rattaché à ton compte pour le moment. Contacte un administrateur pour en ajouter un.
+            </div>
+          ) : (
+            <form className="mt-4 space-y-4" onSubmit={handleCreateWork}>
+              <div>
+                <label className="block text-sm font-medium text-neutral-700">Artiste</label>
+                <select
+                  value={createForm.artistId}
+                  onChange={(e) => handleCreateField('artistId', e.target.value)}
+                  className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-2 focus:ring-ink/10"
+                  required
+                >
+                  {availableArtists.map((artist) => (
+                    <option key={artist.id} value={artist.id}>
+                      {artist.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-neutral-700">Titre</label>
+                <input
+                  type="text"
+                  value={createForm.title}
+                  onChange={(e) => handleCreateField('title', e.target.value)}
+                  placeholder="Titre de l’œuvre"
+                  className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-2 focus:ring-ink/10"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-neutral-700">Image (URL optionnelle)</label>
+                <input
+                  type="url"
+                  value={createForm.image}
+                  onChange={(e) => handleCreateField('image', e.target.value)}
+                  placeholder="https://…"
+                  className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-2 focus:ring-ink/10"
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  type="submit"
+                  disabled={creating}
+                  className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-white hover:bg-ink/90 disabled:opacity-60"
+                >
+                  {creating ? 'Création…' : 'Créer l’œuvre'}
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleCreatePanel}
+                  className="text-sm text-neutral-500 underline underline-offset-4 hover:text-neutral-700"
+                >
+                  Annuler
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      ) : null}
 
       {loadingList ? (
         <div className="rounded-lg border p-4 text-sm text-neutral-500">Chargement des œuvres…</div>
@@ -366,7 +635,7 @@ export default function AuthorWorksPage() {
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{listError}</div>
       ) : works.length === 0 ? (
         <div className="rounded-lg border p-4 text-sm text-neutral-600">
-          Aucune œuvre n’est associée à ton compte pour le moment.
+          Aucune œuvre n’est associée à ton compte pour le moment. Utilise le bouton Nouvelle œuvre ci-dessus pour commencer.
         </div>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
@@ -637,7 +906,7 @@ export default function AuthorWorksPage() {
                   Œuvre publiée et visible sur le site
                 </label>
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
                   <button
                     type="submit"
                     disabled={saving}
@@ -653,6 +922,14 @@ export default function AuthorWorksPage() {
                       Voir la fiche publique
                     </Link>
                   ) : null}
+                  <button
+                    type="button"
+                    onClick={handleDeleteWork}
+                    disabled={deleting}
+                    className="ml-auto rounded-md border border-red-300 px-3 py-2 text-sm font-medium text-red-700 transition hover:bg-red-50 disabled:opacity-60"
+                  >
+                    {deleting ? 'Suppression…' : 'Supprimer cette œuvre'}
+                  </button>
                 </div>
               </form>
             ) : (

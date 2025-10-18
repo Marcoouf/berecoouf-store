@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getAuthSession } from '@/lib/auth'
+import LogoutButton from '@/components/LogoutButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,10 +16,15 @@ export default async function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12">
-      <h1 className="text-2xl font-semibold tracking-tight">Tableau de bord</h1>
-      <p className="mt-2 text-sm text-neutral-600">
-        Bonjour{user.name ? ` ${user.name}` : ''}! Vous êtes connecté en tant que <strong>{user.role}</strong>.
-      </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Tableau de bord</h1>
+          <p className="mt-2 text-sm text-neutral-600">
+            Bonjour{user.name ? ` ${user.name}` : ''}! Vous êtes connecté en tant que <strong>{user.role}</strong>.
+          </p>
+        </div>
+        <LogoutButton />
+      </div>
 
       <div className="mt-6 space-y-4">
         {user.artistSlugs.length > 0 ? (

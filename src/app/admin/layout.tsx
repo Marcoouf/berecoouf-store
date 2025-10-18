@@ -1,13 +1,18 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 import Link from 'next/link'
+import { signOut } from 'next-auth/react'
 import { AdminNav } from '@/components/admin/AdminNav'
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     document.body.classList.add('admin-page')
     return () => document.body.classList.remove('admin-page')
+  }, [])
+
+  const handleSignOut = useCallback(() => {
+    signOut({ callbackUrl: '/login' })
   }, [])
 
   return (
@@ -20,12 +25,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </p>
             <p className="text-sm font-medium text-neutral-900">Vague — Éditions d’art</p>
           </div>
-          <Link
-            href="/"
-            className="text-sm font-medium text-neutral-600 underline-offset-4 hover:text-neutral-900 hover:underline"
-          >
-            ← Retour au site
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/"
+              className="text-sm font-medium text-neutral-600 underline-offset-4 hover:text-neutral-900 hover:underline"
+            >
+              ← Retour au site
+            </Link>
+            <button
+              type="button"
+              onClick={handleSignOut}
+              className="rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100"
+            >
+              Déconnexion
+            </button>
+          </div>
         </div>
       </header>
 
