@@ -54,9 +54,14 @@ async function main() {
       text: `Email de test envoyé le ${now}. Si tu reçois ce message, la configuration Resend fonctionne.`,
       html: `<p>Email de test envoyé le <strong>${now}</strong>.</p><p>Si tu vois ce message, la configuration Resend fonctionne ✅.</p>`,
     })
-    console.log('✅ Email de test envoyé.')
-    console.log(`   ID: ${result.id ?? '(id inconnu)'}`)
-    console.log(`   To: ${to}`)
+    if (result.error) {
+      console.error('❌ Échec de l’envoi :', result.error.message ?? result.error)
+      process.exitCode = 1
+    } else {
+      console.log('✅ Email de test envoyé.')
+      console.log(`   ID: ${result.data?.id ?? '(id inconnu)'}`)
+      console.log(`   To: ${to}`)
+    }
   } catch (err: any) {
     console.error('❌ Échec de l’envoi :', err?.message ?? err)
     process.exitCode = 1

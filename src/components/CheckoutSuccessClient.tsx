@@ -1,7 +1,8 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
+import { useCartCtx } from '@/components/CartContext'
 
 /**
  * Client-only helper mounted on /merci
@@ -13,6 +14,8 @@ export default function CheckoutSuccessClient() {
   const router = useRouter()
   const search = useSearchParams()
   const sessionId = search.get('session_id') || null
+  const { clear, hydrated } = useCartCtx()
+  const clearedRef = useRef(false)
 
   // Defensive: make sure nothing is blocking pointer events on this page
   useEffect(() => {
@@ -22,6 +25,13 @@ export default function CheckoutSuccessClient() {
       el.style.pointerEvents = 'none'
     })
   }, [])
+
+  // Vide le panier une fois la commande confirmée (après hydratation côté client)
+  useEffect(() => {
+    if (!hydrated || !sessionId || clearedRef.current) return
+    clear()
+    clearedRef.current = true
+  }, [hydrated, sessionId, clear])
 
   return (
     <div className="mt-6 flex flex-col items-center gap-3 pointer-events-auto">

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useMemo, useState, useEffect } from 'react'
+import React, { createContext, useContext, useMemo, useState, useEffect, useCallback } from 'react'
 import type { CartItem } from '@/lib/types'
 
 const STORAGE_KEY = 'cart-v1'
@@ -76,7 +76,7 @@ export default function CartProvider({ children }: { children: React.ReactNode }
     safeSave(STORAGE_KEY, { items })
   }, [items, hydrated])
 
-  const add: CartCtx['add'] = (item) => {
+  const add: CartCtx['add'] = useCallback((item) => {
     setItems(prev => {
       const key = item.key
       const found = prev.find(i => i.key === key)
@@ -92,19 +92,21 @@ export default function CartProvider({ children }: { children: React.ReactNode }
     // Déclenche le signal d’anim (timestamp unique)
     setLastAdded(Date.now())
     setOpen(true)
-  }
+  }, [])
 
-  const remove: CartCtx['remove'] = (key) =>
+  const remove: CartCtx['remove'] = useCallback((key) => {
     setItems(prev => prev.filter(i => i.key !== key))
+  }, [])
 
-  const updateQty: CartCtx['updateQty'] = (key, qty) =>
+  const updateQty: CartCtx['updateQty'] = useCallback((key, qty) => {
     setItems(prev =>
       prev.map(i =>
         i.key === key ? { ...i, qty: Math.max(1, qty) } : i
-      )
+      ),
     )
+  }, [])
 
-  const clear = () => setItems([])
+  const clear = useCallback(() => setItems([]), [])
 
   const total = useMemo(
     () => items.reduce((acc, i) => acc + i.unitPriceCents * i.qty, 0),
@@ -116,16 +118,16 @@ export default function CartProvider({ children }: { children: React.ReactNode }
     [items]
   )
 
-  const openCart = () => setOpen(true)
-  const closeCart = () => setOpen(false)
-  const toggleCart = () => setOpen(o => !o)
+  const openCart = useCallback(() => setOpen(true), [])
+  const closeCart = useCallback(() => setOpen(false), [])
+  const toggleCart = useCallback(() => setOpen(o => !o), [])
 
-  const overlayClick: CartCtx['overlayClick'] = (e) => {
+  const overlayClick: CartCtx['overlayClick'] = useCallback((e) => {
     // ferme uniquement si on clique directement sur l’overlay
     if (e.currentTarget === e.target) {
       setOpen(false)
     }
-  }
+  }, [])
 
   async function goToCheckout(payload: any) {
     const res = await fetch('/api/checkout', {

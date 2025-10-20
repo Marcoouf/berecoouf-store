@@ -60,7 +60,7 @@ export async function POST(req: Request) {
   const totalCents = session.amount_total ?? 0
   const currency = (session.currency || 'eur').toUpperCase()
   const customerDetails = session.customer_details
-  const shippingDetails = session.shipping_details
+  const shippingDetails = (session as Stripe.Checkout.Session & { shipping_details?: any }).shipping_details ?? null
 
   const formatAddress = (addr: Stripe.Address | null | undefined) => {
     if (!addr) return null
@@ -353,7 +353,7 @@ export async function POST(req: Request) {
             reason: response.error.message ?? 'unknown_error',
           })
         } else {
-          console.log('webhook artist email sent', entry.to, response?.id ?? '')
+          console.log('webhook artist email sent', entry.to, response?.data?.id ?? '')
         }
       } catch (err: any) {
         artistSendFailures.push({ to: entry.to, artist: entry.artistName, reason: err?.message || 'unknown_error' })
@@ -451,7 +451,7 @@ export async function POST(req: Request) {
       if (response?.error) {
         console.error('webhook admin email error', response.error)
       } else {
-        console.log('webhook admin email sent', adminTo, response?.id ?? '')
+        console.log('webhook admin email sent', adminTo, response?.data?.id ?? '')
       }
     } else if (adminTo) {
       console.log('Webhook OK, notification admin non envoyée (Resend non configuré).')
