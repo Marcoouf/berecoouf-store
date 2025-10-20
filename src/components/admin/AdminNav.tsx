@@ -34,6 +34,11 @@ const NAV_ITEMS: NavItem[] = [
     description: 'Associer comptes et artistes',
   },
   {
+    href: '/admin/logs',
+    label: 'Connexions',
+    description: 'Historique des accès',
+  },
+  {
     href: '/admin/tools',
     label: 'Outils',
     description: 'Maintenance & scripts',

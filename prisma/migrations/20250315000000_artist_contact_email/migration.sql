@@ -1,2 +1,2 @@
 ALTER TABLE "Artist"
-ADD COLUMN "contactEmail" TEXT;
+ADD COLUMN IF NOT EXISTS "contactEmail" TEXT;

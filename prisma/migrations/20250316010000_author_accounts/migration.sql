@@ -1,7 +1,12 @@
--- CreateEnum
-CREATE TYPE "UserRole" AS ENUM ('admin', 'author');
+DO $$
+BEGIN
+    CREATE TYPE "public"."UserRole" AS ENUM ('admin', 'author');
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END
+$$;
 
-CREATE TABLE "public"."User" (
+CREATE TABLE IF NOT EXISTS "public"."User" (
     "id" TEXT NOT NULL,
     "email" TEXT NOT NULL,
     "name" TEXT,
@@ -13,8 +18,7 @@ CREATE TABLE "public"."User" (
     CONSTRAINT "User_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "public"."ArtistAuthor" (
+CREATE TABLE IF NOT EXISTS "public"."ArtistAuthor" (
     "userId" TEXT NOT NULL,
     "artistId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -22,8 +26,7 @@ CREATE TABLE "public"."ArtistAuthor" (
     CONSTRAINT "ArtistAuthor_pkey" PRIMARY KEY ("userId","artistId")
 );
 
--- CreateTable
-CREATE TABLE "public"."Account" (
+CREATE TABLE IF NOT EXISTS "public"."Account" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "type" TEXT NOT NULL,
@@ -44,8 +47,7 @@ CREATE TABLE "public"."Account" (
     CONSTRAINT "Account_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "public"."Session" (
+CREATE TABLE IF NOT EXISTS "public"."Session" (
     "id" TEXT NOT NULL,
     "sessionToken" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
@@ -56,51 +58,59 @@ CREATE TABLE "public"."Session" (
     CONSTRAINT "Session_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "public"."VerificationToken" (
+CREATE TABLE IF NOT EXISTS "public"."VerificationToken" (
     "identifier" TEXT NOT NULL,
     "token" TEXT NOT NULL,
     "expires" TIMESTAMP(3) NOT NULL
 );
 
--- AlterTable
-ALTER TABLE "public"."Work" ADD COLUMN "createdById" TEXT;
+ALTER TABLE "public"."Work" ADD COLUMN IF NOT EXISTS "createdById" TEXT;
 
--- CreateIndex
-CREATE UNIQUE INDEX "User_email_key" ON "public"."User"("email");
+CREATE UNIQUE INDEX IF NOT EXISTS "User_email_key" ON "public"."User"("email");
+CREATE INDEX IF NOT EXISTS "ArtistAuthor_artistId_idx" ON "public"."ArtistAuthor"("artistId");
+CREATE INDEX IF NOT EXISTS "Work_createdById_idx" ON "public"."Work"("createdById");
+CREATE UNIQUE INDEX IF NOT EXISTS "Account_provider_providerAccountId_key" ON "public"."Account"("provider", "providerAccountId");
+CREATE INDEX IF NOT EXISTS "Session_userId_idx" ON "public"."Session"("userId");
+CREATE UNIQUE INDEX IF NOT EXISTS "Session_sessionToken_key" ON "public"."Session"("sessionToken");
+CREATE UNIQUE INDEX IF NOT EXISTS "VerificationToken_token_key" ON "public"."VerificationToken"("token");
+CREATE UNIQUE INDEX IF NOT EXISTS "VerificationToken_identifier_token_key" ON "public"."VerificationToken"("identifier", "token");
 
--- CreateIndex
-CREATE INDEX "ArtistAuthor_artistId_idx" ON "public"."ArtistAuthor"("artistId");
+DO $$
+BEGIN
+    ALTER TABLE "public"."ArtistAuthor" ADD CONSTRAINT "ArtistAuthor_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END
+$$;
 
--- CreateIndex
-CREATE INDEX "Work_createdById_idx" ON "public"."Work"("createdById");
+DO $$
+BEGIN
+    ALTER TABLE "public"."ArtistAuthor" ADD CONSTRAINT "ArtistAuthor_artistId_fkey" FOREIGN KEY ("artistId") REFERENCES "public"."Artist"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END
+$$;
 
--- CreateIndex
-CREATE UNIQUE INDEX "Account_provider_providerAccountId_key" ON "public"."Account"("provider", "providerAccountId");
+DO $$
+BEGIN
+    ALTER TABLE "public"."Work" ADD CONSTRAINT "Work_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END
+$$;
 
--- CreateIndex
-CREATE INDEX "Session_userId_idx" ON "public"."Session"("userId");
+DO $$
+BEGIN
+    ALTER TABLE "public"."Account" ADD CONSTRAINT "Account_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END
+$$;
 
--- CreateIndex
-CREATE UNIQUE INDEX "Session_sessionToken_key" ON "public"."Session"("sessionToken");
-
--- CreateIndex
-CREATE UNIQUE INDEX "VerificationToken_token_key" ON "public"."VerificationToken"("token");
-
--- CreateIndex
-CREATE UNIQUE INDEX "VerificationToken_identifier_token_key" ON "public"."VerificationToken"("identifier", "token");
-
--- AddForeignKey
-ALTER TABLE "public"."ArtistAuthor" ADD CONSTRAINT "ArtistAuthor_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "public"."ArtistAuthor" ADD CONSTRAINT "ArtistAuthor_artistId_fkey" FOREIGN KEY ("artistId") REFERENCES "public"."Artist"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "public"."Work" ADD CONSTRAINT "Work_createdById_fkey" FOREIGN KEY ("createdById") REFERENCES "public"."User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "public"."Account" ADD CONSTRAINT "Account_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "public"."Session" ADD CONSTRAINT "Session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$
+BEGIN
+    ALTER TABLE "public"."Session" ADD CONSTRAINT "Session_userId_fkey" FOREIGN KEY ("userId") REFERENCES "public"."User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END
+$$;

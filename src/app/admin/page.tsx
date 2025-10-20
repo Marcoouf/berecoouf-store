@@ -21,6 +21,11 @@ const cards = [
     href: '/admin/authors',
   },
   {
+    title: 'Connexions',
+    description: 'Consulter l’historique des connexions auteurs et admin.',
+    href: '/admin/logs',
+  },
+  {
     title: 'Outils & maintenance',
     description: 'Scripts utilitaires (ex. migration vers Blob) et opérations ponctuelles.',
     href: '/admin/tools',

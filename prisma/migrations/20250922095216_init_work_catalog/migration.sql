@@ -1,5 +1,4 @@
--- CreateTable
-CREATE TABLE "public"."Artist" (
+CREATE TABLE IF NOT EXISTS "public"."Artist" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
@@ -13,8 +12,7 @@ CREATE TABLE "public"."Artist" (
     CONSTRAINT "Artist_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "public"."Work" (
+CREATE TABLE IF NOT EXISTS "public"."Work" (
     "id" TEXT NOT NULL,
     "title" TEXT NOT NULL,
     "slug" TEXT NOT NULL,
@@ -35,8 +33,7 @@ CREATE TABLE "public"."Work" (
     CONSTRAINT "Work_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "public"."Variant" (
+CREATE TABLE IF NOT EXISTS "public"."Variant" (
     "id" TEXT NOT NULL,
     "workId" TEXT NOT NULL,
     "label" TEXT NOT NULL,
@@ -48,20 +45,23 @@ CREATE TABLE "public"."Variant" (
     CONSTRAINT "Variant_pkey" PRIMARY KEY ("id")
 );
 
--- CreateIndex
-CREATE UNIQUE INDEX "Artist_slug_key" ON "public"."Artist"("slug");
+CREATE UNIQUE INDEX IF NOT EXISTS "Artist_slug_key" ON "public"."Artist"("slug");
+CREATE UNIQUE INDEX IF NOT EXISTS "Work_slug_key" ON "public"."Work"("slug");
+CREATE INDEX IF NOT EXISTS "Work_artistId_idx" ON "public"."Work"("artistId");
+CREATE INDEX IF NOT EXISTS "Variant_workId_idx" ON "public"."Variant"("workId");
 
--- CreateIndex
-CREATE UNIQUE INDEX "Work_slug_key" ON "public"."Work"("slug");
+DO $$
+BEGIN
+    ALTER TABLE "public"."Work" ADD CONSTRAINT "Work_artistId_fkey" FOREIGN KEY ("artistId") REFERENCES "public"."Artist"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END
+$$;
 
--- CreateIndex
-CREATE INDEX "Work_artistId_idx" ON "public"."Work"("artistId");
-
--- CreateIndex
-CREATE INDEX "Variant_workId_idx" ON "public"."Variant"("workId");
-
--- AddForeignKey
-ALTER TABLE "public"."Work" ADD CONSTRAINT "Work_artistId_fkey" FOREIGN KEY ("artistId") REFERENCES "public"."Artist"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "public"."Variant" ADD CONSTRAINT "Variant_workId_fkey" FOREIGN KEY ("workId") REFERENCES "public"."Work"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$
+BEGIN
+    ALTER TABLE "public"."Variant" ADD CONSTRAINT "Variant_workId_fkey" FOREIGN KEY ("workId") REFERENCES "public"."Work"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END
+$$;
