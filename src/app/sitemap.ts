@@ -3,21 +3,29 @@ import type { MetadataRoute } from 'next'
 import { prisma } from '../lib/prisma'
 
 export const revalidate = 3600 // 1h
+export const dynamic = 'force-dynamic'
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://point-bleu.vercel.app'
   const now = new Date()
 
-  const artists = await prisma.artist.findMany({
-    where: { isArchived: false, deletedAt: null },
-    select: { slug: true, updatedAt: true },
-    orderBy: { slug: 'asc' },
-  })
+  let artists: { slug: string; updatedAt: Date }[] = []
+  let works: { slug: string; updatedAt: Date }[] = []
 
-  const works = await prisma.work.findMany({
-    select: { slug: true, updatedAt: true },
-    orderBy: { slug: 'asc' },
-  })
+  try {
+    artists = await prisma.artist.findMany({
+      where: { isArchived: false, deletedAt: null },
+      select: { slug: true, updatedAt: true },
+      orderBy: { slug: 'asc' },
+    })
+
+    works = await prisma.work.findMany({
+      select: { slug: true, updatedAt: true },
+      orderBy: { slug: 'asc' },
+    })
+  } catch (err) {
+    console.error('sitemap_fetch_failed', err)
+  }
 
   const staticPages: MetadataRoute.Sitemap = [
     { url: `${base}/`, lastModified: now },
