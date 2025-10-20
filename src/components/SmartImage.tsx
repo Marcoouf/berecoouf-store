@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import NextImage, { type ImageProps } from 'next/image';
 import clsx from 'clsx';
 
@@ -45,8 +46,20 @@ export default function SmartImage(props: SmartImageProps) {
     alt,
     src,
     sizes,
+    onContextMenu,
+    onDragStart,
     ...rest
   } = props;
+
+  const handleContextMenu = (event: React.MouseEvent<HTMLImageElement>) => {
+    event.preventDefault();
+    onContextMenu?.(event);
+  };
+
+  const handleDragStart = (event: React.DragEvent<HTMLImageElement>) => {
+    event.preventDefault();
+    onDragStart?.(event);
+  };
 
   const wrapperClasses = wrapperClassName ?? wrapperClass;
 
@@ -74,6 +87,10 @@ export default function SmartImage(props: SmartImageProps) {
           fill
           sizes={resolvedSizes}
           className={imgClasses}
+          draggable={false}
+          data-protect="true"
+          onContextMenu={handleContextMenu}
+          onDragStart={handleDragStart}
           {...rest}
         />
       );
@@ -86,6 +103,10 @@ export default function SmartImage(props: SmartImageProps) {
           fill
           sizes={resolvedSizes}
           className={imgClasses}
+          draggable={false}
+          data-protect="true"
+          onContextMenu={handleContextMenu}
+          onDragStart={handleDragStart}
           {...rest}
         />
       </div>
@@ -100,6 +121,10 @@ export default function SmartImage(props: SmartImageProps) {
       height={1080}
       sizes={resolvedSizes}
       className={imgClasses}
+      draggable={false}
+      data-protect="true"
+      onContextMenu={handleContextMenu}
+      onDragStart={handleDragStart}
       {...rest}
     />
   );

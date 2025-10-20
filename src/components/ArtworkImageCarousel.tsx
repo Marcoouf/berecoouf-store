@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useRef, useState, useEffect, useCallback } from 'react'
-import Image from 'next/image'
+import SmartImage from '@/components/SmartImage'
 
 type Props = {
   title: string
@@ -88,7 +88,7 @@ export default function ArtworkImageCarousel({
         >
           {/* Piste d'images (superposition, on affiche 1/1 avec opacité) */}
           {slides.map((src, i) => (
-            <Image
+            <SmartImage
               key={`${src}-${i}`}
               src={src}
               alt={title}
@@ -96,7 +96,7 @@ export default function ArtworkImageCarousel({
               priority={priority && i === 0}
               sizes="(min-width:1024px) 40vw, (min-width:768px) 50vw, 100vw"
               className={`h-full w-full object-contain transition-opacity duration-200 ${i === idx ? 'opacity-100' : 'opacity-0'}`}
-              draggable={false}
+              wrapperClassName="absolute inset-0"
             />
           ))}
 

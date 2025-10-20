@@ -9,6 +9,7 @@ import ScrollManager from '@/components/ScrollManager'
 import ClientLayout from '@/components/ClientLayout'
 import { Suspense } from 'react'
 import Footer from '@/components/Footer'
+import ImageProtection from '@/components/ImageProtection'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
 const garamond = EB_Garamond({ subsets: ['latin'], variable: '--font-serif' })
@@ -30,6 +31,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
              useSearchParams / usePathname (ScrollManager, ClientLayout, GlobalCartDrawer, etc.) */}
           <Suspense fallback={<div className="sr-only" aria-hidden="true">Chargement…</div>}>
             <ScrollManager />
+            <ImageProtection />
             <HeaderGlobal />
             <CustomCursor />
             <ClientLayout>{children}</ClientLayout>

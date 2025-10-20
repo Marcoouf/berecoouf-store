@@ -2,7 +2,6 @@
 
 import React from 'react'
 import Image from '@/components/SmartImage'
-import NextImage from 'next/image'
 import Link from 'next/link'
 import type { Artwork, Artist, CartItem } from '@/lib/types'
 import { useCart } from '@/components/CartContext'
@@ -95,13 +94,14 @@ function Hero({ highlight }: { highlight?: HeroHighlight | null }) {
                 aria-busy={false}
               >
                 {highlight?.image ? (
-                  <NextImage
+                  <Image
                     src={highlight.image}
                     alt={altText}
                     fill
                     priority
                     sizes="(min-width: 1024px) 40vw, (min-width: 768px) 50vw, 100vw"
                     className="absolute inset-0 h-full w-full object-contain"
+                    wrapperClassName="absolute inset-0"
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-neutral-400">
