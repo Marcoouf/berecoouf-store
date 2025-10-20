@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "check:artists": "tsx scripts/check-artists-contact-email.ts",
+    "email:test": "tsx scripts/send-test-email.ts",
     "seed": "prisma db seed",
     "postinstall": "prisma generate"
   },

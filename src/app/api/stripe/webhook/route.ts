@@ -59,6 +59,25 @@ export async function POST(req: Request) {
   const email = session.customer_details?.email || session.customer_email || ''
   const totalCents = session.amount_total ?? 0
   const currency = (session.currency || 'eur').toUpperCase()
+  const customerDetails = session.customer_details
+  const shippingDetails = session.shipping_details
+
+  const formatAddress = (addr: Stripe.Address | null | undefined) => {
+    if (!addr) return null
+    const parts = [
+      addr.line1,
+      addr.line2,
+      [addr.postal_code, addr.city].filter(Boolean).join(' '),
+      addr.state,
+      addr.country,
+    ]
+      .flat()
+      .map((part) => (part || '').toString().trim())
+      .filter(Boolean)
+
+    return parts.length ? parts.join('<br />') : null
+  }
+  const shippingAddressHtml = formatAddress(shippingDetails?.address)
 
   type Item = { workId: string; variantId: string | null; qty: number; unitPrice: number }
   const items: Item[] = []
@@ -268,7 +287,16 @@ export async function POST(req: Request) {
   // 4) Notification email (optionnelle, pas bloquante)
   const artistSendFailures: Array<{ to: string; artist: string; reason: string }> = []
 
-  if (resend) {
+  const disableArtistEmails = process.env.RESEND_DISABLE_ARTIST_EMAILS === '1'
+
+  console.log('webhook resend status', {
+    resendConfigured: Boolean(resend),
+    adminOverride: process.env.SALES_NOTIF_OVERRIDE ?? '',
+    artistGroups: artistGroups.size,
+    disableArtistEmails,
+  })
+
+  if (resend && !disableArtistEmails) {
     for (const entry of artistGroups.values()) {
       if (!entry.to) continue
       try {
@@ -310,19 +338,34 @@ export async function POST(req: Request) {
           <p style="margin-top:12px;">Vous recevrez les détails logistiques très bientôt. Merci !</p>
         `
 
-        await resend.emails.send({
+        console.log('webhook artist email send ->', entry.to)
+        const response = await resend.emails.send({
           from: process.env.RESEND_FROM || 'Vague <noreply@vague.art>',
           to: entry.to,
           subject: `Nouvelle commande — ${entry.artistName}`,
           html,
         })
+        if (response?.error) {
+          console.error('webhook artist email error', entry.to, response.error)
+          artistSendFailures.push({
+            to: entry.to,
+            artist: entry.artistName,
+            reason: response.error.message ?? 'unknown_error',
+          })
+        } else {
+          console.log('webhook artist email sent', entry.to, response?.id ?? '')
+        }
       } catch (err: any) {
         artistSendFailures.push({ to: entry.to, artist: entry.artistName, reason: err?.message || 'unknown_error' })
         console.error('webhook artist email error', entry.to, err)
       }
     }
   } else if (artistGroups.size) {
-    console.log('Webhook OK, notifications artistes non envoyées (Resend non configuré).')
+    if (disableArtistEmails) {
+      console.log('Webhook OK, notifications artistes désactivées via RESEND_DISABLE_ARTIST_EMAILS.')
+    } else {
+      console.log('Webhook OK, notifications artistes non envoyées (Resend non configuré).')
+    }
   }
 
   try {
@@ -367,6 +410,19 @@ export async function POST(req: Request) {
         <p><strong>Session Stripe :</strong> ${session.id}</p>
         <p><strong>Client :</strong> ${email || '(inconnu)'}</p>
         <p><strong>Total :</strong> ${fmtCurrency(orderTotalCents)}</p>
+        <div style="margin:16px 0; padding:12px; border:1px solid #e5e5e5; border-radius:8px;">
+          <h3 style="margin:0 0 8px 0;">Coordonnées client</h3>
+          <p style="margin:4px 0;">
+            <strong>Nom :</strong> ${shippingDetails?.name || customerDetails?.name || '—'}<br />
+            ${customerDetails?.email ? `<strong>Email :</strong> ${customerDetails.email}<br />` : ''}
+            ${shippingDetails?.phone || customerDetails?.phone ? `<strong>Téléphone :</strong> ${shippingDetails?.phone ?? customerDetails?.phone}<br />` : ''}
+            ${
+              shippingAddressHtml
+                ? `<strong>Adresse :</strong><br /><span>${shippingAddressHtml}</span>`
+                : '<strong>Adresse :</strong> —'
+            }
+          </p>
+        </div>
         <table style="border-collapse:collapse; margin-top:16px;">
           <thead>
             <tr>
@@ -385,12 +441,18 @@ export async function POST(req: Request) {
         ${fallbackWarnings}
       `
 
-      await resend.emails.send({
+      console.log('webhook admin email send ->', adminTo)
+      const response = await resend.emails.send({
         from: process.env.RESEND_FROM || 'Vague <noreply@vague.art>',
         to: adminTo,
         subject: 'Nouvelle commande — récapitulatif',
         html,
       })
+      if (response?.error) {
+        console.error('webhook admin email error', response.error)
+      } else {
+        console.log('webhook admin email sent', adminTo, response?.id ?? '')
+      }
     } else if (adminTo) {
       console.log('Webhook OK, notification admin non envoyée (Resend non configuré).')
     }
