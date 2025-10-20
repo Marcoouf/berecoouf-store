@@ -77,12 +77,36 @@ export default async function MerciPage({ searchParams }: Props) {
           )}
         </section>
 
+        <section className="mt-6 grid gap-3 md:grid-cols-2">
+          <a
+            href={`mailto:contact@point-bleu.fr?subject=Reçu%20commande%20${encodeURIComponent(session.id)}`}
+            className="group inline-flex items-center justify-center gap-2 rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100 focus:outline-none focus:ring-2 focus:ring-accent/40"
+          >
+            <span aria-hidden className="text-base">
+              📄
+            </span>
+            Télécharger le reçu PDF
+          </a>
+          <Link
+            href="/faq#expedition"
+            className="group inline-flex items-center justify-center gap-2 rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100 focus:outline-none focus:ring-2 focus:ring-accent/40"
+          >
+            <span aria-hidden className="text-base">🚚</span>
+            Suivre la préparation et l’envoi
+          </Link>
+        </section>
+
+        <p className="mt-4 flex items-center gap-2 rounded-lg bg-neutral-50 px-3 py-2 text-sm text-neutral-600">
+          <span aria-hidden className="text-lg">✅</span>
+          Les tirages sont préparés sous 3 à 5 jours ouvrés. Tu recevras un email dès que le colis partira.
+        </p>
+
         <div className="mt-6">
           <Link
             href="/"
             className="inline-flex rounded-lg border px-4 py-2 text-sm hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-accent/40"
           >
-            Retourner à la galerie
+            Continuer les achats
           </Link>
         </div>
       </main>

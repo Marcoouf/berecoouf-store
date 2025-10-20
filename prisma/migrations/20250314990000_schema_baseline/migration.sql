@@ -163,6 +163,14 @@ CREATE TABLE "public"."VerificationToken" (
     "expires" TIMESTAMP(3) NOT NULL
 );
 
+-- CreateTable
+CREATE TABLE "public"."ProcessedEvent" (
+    "id" TEXT NOT NULL,
+    "processedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "ProcessedEvent_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "Artist_slug_key" ON "public"."Artist"("slug");
 

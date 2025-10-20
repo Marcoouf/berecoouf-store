@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useCartCtx } from '@/components/CartContext'
 
 /**
@@ -16,6 +16,7 @@ export default function CheckoutSuccessClient() {
   const sessionId = search.get('session_id') || null
   const { clear, hydrated } = useCartCtx()
   const clearedRef = useRef(false)
+  const [showToast, setShowToast] = useState(false)
 
   // Defensive: make sure nothing is blocking pointer events on this page
   useEffect(() => {
@@ -31,29 +32,43 @@ export default function CheckoutSuccessClient() {
     if (!hydrated || !sessionId || clearedRef.current) return
     clear()
     clearedRef.current = true
+    setShowToast(true)
+    const timer = setTimeout(() => setShowToast(false), 4000)
+    return () => clearTimeout(timer)
   }, [hydrated, sessionId, clear])
 
   return (
-    <div className="mt-6 flex flex-col items-center gap-3 pointer-events-auto">
-      <button
-        type="button"
-        onClick={(e) => {
-          e.preventDefault()
-          e.stopPropagation()
-          router.push('/')
-        }}
-        className="rounded-full bg-accent hover:bg-accent-dark text-ink font-medium px-4 py-2 text-sm shadow-sm transition"
-        aria-label="Retourner à l’accueil"
-      >
-        Retourner à la galerie
-      </button>
-
-      {/* Affichage discret du session_id en data-attr pour debug si présent */}
-      {sessionId ? (
-        <span data-session-id={sessionId} className="sr-only">
-          {sessionId}
-        </span>
+    <>
+      {showToast ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed bottom-6 right-6 z-50 rounded-full bg-emerald-500/95 px-4 py-3 text-sm font-medium text-white shadow-lg"
+        >
+          Panier vidé après paiement
+        </div>
       ) : null}
-    </div>
+      <div className="mt-6 flex flex-col items-center gap-3 pointer-events-auto">
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            router.push('/')
+          }}
+          className="rounded-full bg-accent hover:bg-accent-dark text-ink font-medium px-4 py-2 text-sm shadow-sm transition"
+          aria-label="Retourner à l’accueil"
+        >
+          Retourner à la galerie
+        </button>
+
+        {/* Affichage discret du session_id en data-attr pour debug si présent */}
+        {sessionId ? (
+          <span data-session-id={sessionId} className="sr-only">
+            {sessionId}
+          </span>
+        ) : null}
+      </div>
+    </>
   )
 }

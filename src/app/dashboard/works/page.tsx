@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader'
 
 type WorkSummary = {
@@ -829,11 +830,13 @@ export default function AuthorWorksPage() {
                 <div className="rounded-lg border border-neutral-200 p-4">
                   <h3 className="text-sm font-semibold text-neutral-700">Image principale</h3>
                   {form.image ? (
-                    <div className="mt-3">
-                      <img
+                    <div className="relative mt-3 h-40 w-full overflow-hidden rounded-lg">
+                      <Image
                         src={form.image}
-                        alt=""
-                        className="h-40 w-full rounded-lg object-cover"
+                        alt={`Image principale ${form.title || ''}`.trim()}
+                        fill
+                        sizes="(min-width: 1024px) 420px, 100vw"
+                        className="object-cover"
                       />
                     </div>
                   ) : (
@@ -865,11 +868,13 @@ export default function AuthorWorksPage() {
                 <div className="rounded-lg border border-neutral-200 p-4">
                   <h3 className="text-sm font-semibold text-neutral-700">Mockup (optionnel)</h3>
                   {form.mockup ? (
-                    <div className="mt-3">
-                      <img
+                    <div className="relative mt-3 h-40 w-full overflow-hidden rounded-lg">
+                      <Image
                         src={form.mockup}
-                        alt=""
-                        className="h-40 w-full rounded-lg object-cover"
+                        alt={`Mockup ${form.title || ''}`.trim()}
+                        fill
+                        sizes="(min-width: 1024px) 420px, 100vw"
+                        className="object-cover"
                       />
                     </div>
                   ) : (

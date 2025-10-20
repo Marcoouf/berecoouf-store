@@ -17,7 +17,20 @@ function truncate(text: string | null | undefined, max = 90) {
   return `${text.slice(0, max - 1)}…`
 }
 
-export default async function AdminLogsPage() {
+type SearchParams = {
+  search?: string
+  from?: string
+  to?: string
+  export?: 'csv'
+}
+
+function parseDate(value?: string | null) {
+  if (!value) return null
+  const d = new Date(value)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
+export default async function AdminLogsPage({ searchParams }: { searchParams?: SearchParams }) {
   const session = await getAuthSession()
 
   if (!session?.user) {
@@ -27,9 +40,21 @@ export default async function AdminLogsPage() {
     redirect('/admin?error=not_authorized')
   }
 
+  const fromDate = parseDate(searchParams?.from)
+  const toDate = parseDate(searchParams?.to)
+  const searchTerm = (searchParams?.search || '').trim().toLowerCase()
+
+  const whereClause: any = {}
+  if (fromDate || toDate) {
+    whereClause.createdAt = {}
+    if (fromDate) whereClause.createdAt.gte = fromDate
+    if (toDate) whereClause.createdAt.lte = toDate
+  }
+
   const events = await prisma.loginEvent.findMany({
     orderBy: { createdAt: 'desc' },
     take: 200,
+    where: whereClause,
     include: {
       user: {
         select: {
@@ -41,20 +66,96 @@ export default async function AdminLogsPage() {
     },
   })
 
-  const totalEvents = events.length
-  const uniqueUsers = new Set(events.map((evt) => evt.userId)).size
+  const filteredEvents = events.filter((evt) => {
+    if (!searchTerm) return true
+    const haystack = [
+      evt.ip ?? '',
+      evt.user?.email ?? '',
+      evt.user?.name ?? '',
+      evt.userAgent ?? '',
+    ]
+      .join(' ')
+      .toLowerCase()
+    return haystack.includes(searchTerm)
+  })
+
+  const totalEvents = filteredEvents.length
+  const uniqueUsers = new Set(filteredEvents.map((evt) => evt.userId)).size
   const formatter = new Intl.DateTimeFormat('fr-FR', {
     dateStyle: 'short',
     timeStyle: 'medium',
   })
+
+  if (searchParams?.export === 'csv') {
+    const header = ['date', 'utilisateur', 'email', 'ip', 'user_agent']
+    const rows = filteredEvents.map((evt) => [
+      formatter.format(evt.createdAt),
+      evt.user?.name ?? '',
+      evt.user?.email ?? '',
+      evt.ip ?? '',
+      evt.userAgent ?? '',
+    ])
+    const csv = [header, ...rows]
+      .map((cols) => cols.map((c) => `"${(c ?? '').replace(/"/g, '""')}"`).join(','))
+      .join('\n')
+    const filenameDate = new Date().toISOString().split('T')[0]
+    return new Response(csv, {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': `attachment; filename="login-events-${filenameDate}.csv"`,
+      },
+    })
+  }
 
   return (
     <div className="mx-auto w-full max-w-5xl px-6 py-10">
       <AdminPageHeader
         title="Historique des connexions"
         subtitle="Liste des 200 dernières connexions auteurs et administrateurs, avec IP et agent."
-        actions={[{ type: 'link', href: '/admin', label: '← Retour admin' }]}
+        actions={[
+          { type: 'link', href: '/admin', label: '← Retour admin' },
+          { type: 'link', href: '/admin/logs?export=csv', label: 'Export CSV' },
+        ]}
       />
+
+      <form className="mb-6 grid gap-4 rounded-2xl border border-neutral-200 bg-white/80 p-4 shadow-sm md:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
+        <div className="md:col-span-2">
+          <label className="text-xs font-medium uppercase text-neutral-500">Rechercher</label>
+          <input
+            type="search"
+            name="search"
+            defaultValue={searchParams?.search ?? ''}
+            placeholder="Email, IP, agent…"
+            className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-2 focus:ring-ink/10"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-medium uppercase text-neutral-500">Du</label>
+          <input
+            type="date"
+            name="from"
+            defaultValue={searchParams?.from ?? ''}
+            className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-2 focus:ring-ink/10"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-medium uppercase text-neutral-500">Au</label>
+          <input
+            type="date"
+            name="to"
+            defaultValue={searchParams?.to ?? ''}
+            className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-2 focus:ring-ink/10"
+          />
+        </div>
+        <div className="flex items-end">
+          <button
+            type="submit"
+            className="w-full rounded-md bg-ink px-3 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-ink/90"
+          >
+            Filtrer
+          </button>
+        </div>
+      </form>
 
       <div className="mb-6 grid gap-3 md:grid-cols-3">
         <div className="rounded-xl border border-neutral-200 bg-white/80 p-4 shadow-sm">
