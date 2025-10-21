@@ -4,6 +4,7 @@ import Link from 'next/link'
 type Action =
   | { type: 'link'; label: string; href: string }
   | { type: 'button'; label: string; onClick: () => void; variant?: 'primary' | 'secondary' }
+  | { type: 'node'; node: React.ReactNode }
 
 type Props = {
   title: string
@@ -31,6 +32,9 @@ export function AdminPageHeader({ title, subtitle, actions }: Props) {
                   {action.label}
                 </Link>
               )
+            }
+            if (action.type === 'node') {
+              return <React.Fragment key={`node-${index}`}>{action.node}</React.Fragment>
             }
             return (
               <button

@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader'
 import { getAuthSession } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import RefreshClientButton from './RefreshClientButton'
 
 function formatUser(label?: { name?: string | null; email?: string | null }) {
   if (!label) return 'Compte supprimé'
@@ -22,6 +23,7 @@ type SearchParams = {
   from?: string
   to?: string
   export?: 'csv'
+  _?: string
 }
 
 function parseDate(value?: string | null) {
@@ -79,6 +81,10 @@ export default async function AdminLogsPage({ searchParams }: { searchParams?: S
     return haystack.includes(searchTerm)
   })
 
+  const refreshedAtParam = searchParams?._
+  const refreshedAt = refreshedAtParam && !Number.isNaN(Number(refreshedAtParam))
+    ? new Date(Number(refreshedAtParam))
+    : new Date()
   const totalEvents = filteredEvents.length
   const uniqueUsers = new Set(filteredEvents.map((evt) => evt.userId)).size
   const formatter = new Intl.DateTimeFormat('fr-FR', {
@@ -115,6 +121,7 @@ export default async function AdminLogsPage({ searchParams }: { searchParams?: S
         actions={[
           { type: 'link', href: '/admin', label: '← Retour admin' },
           { type: 'link', href: '/admin/logs?export=csv', label: 'Export CSV' },
+          { type: 'node', node: <RefreshClientButton /> },
         ]}
       />
 
@@ -171,9 +178,9 @@ export default async function AdminLogsPage({ searchParams }: { searchParams?: S
         <div className="rounded-xl border border-neutral-200 bg-white/80 p-4 shadow-sm">
           <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">Actualisation</p>
           <p className="mt-1 text-2xl font-semibold text-neutral-900">
-            {events[0] ? formatter.format(events[0].createdAt) : '—'}
+            {formatter.format(refreshedAt)}
           </p>
-          <p className="mt-1 text-xs text-neutral-500">Dernière connexion enregistrée</p>
+          <p className="mt-1 text-xs text-neutral-500">Dernière actualisation manuelle</p>
         </div>
       </div>
 
