@@ -245,6 +245,21 @@ function ArtworkCard({ art, onAdd, artistsById }: { art: Artwork; onAdd: (a: Art
     return formatsList.find((f) => f.id === formatId) ?? null
   }, [formatsList, formatId])
 
+  const priceCents = React.useMemo(() => {
+    const fallback =
+      (selected?.price as number | undefined) ??
+      ((art as any).priceMin as number | undefined) ??
+      ((art as any).price as number | undefined) ??
+      0
+    return Number.isFinite(fallback) ? Number(fallback) : 0
+  }, [selected, art])
+
+  const priceLabel = React.useMemo(() => {
+    return selected?.price
+      ? euro(selected.price)
+      : art.priceMinFormatted ?? euro(priceCents)
+  }, [selected, art.priceMinFormatted, priceCents])
+
   const slug = art.slug ?? art.id
 
   const formats = formatsList
@@ -284,7 +299,7 @@ function ArtworkCard({ art, onAdd, artistsById }: { art: Artwork; onAdd: (a: Art
           <div className="text-xs text-neutral-500">{artistsById[art.artistId] ?? 'Artiste'}</div>
         </div>
         <div className="ml-auto text-sm tabular-nums">
-          {art.priceMinFormatted ?? euro((art as any).priceMin ?? 0)}
+          {priceLabel}
         </div>
       </div>
 

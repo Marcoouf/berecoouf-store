@@ -43,9 +43,17 @@ export default function ArtworkPurchase({ artwork }: { artwork: ArtworkLite }) {
   const [formatId, setFormatId] = useState<string | null>(formats[0]?.id ?? null)
 
   // Réinit quand l’œuvre change
+  const defaultFormatId = formats[0]?.id ?? null
+
   useEffect(() => {
-    setFormatId(formats[0]?.id ?? null)
-  }, [artwork.id, formats])
+    setFormatId(defaultFormatId)
+  }, [artwork.id, defaultFormatId])
+
+  useEffect(() => {
+    if (formatId && !formats.some((f) => f.id === formatId)) {
+      setFormatId(formats[0]?.id ?? null)
+    }
+  }, [formats, formatId])
 
   // Format sélectionné (ou null)
   const selected = useMemo(
