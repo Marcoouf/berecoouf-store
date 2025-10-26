@@ -30,6 +30,7 @@ export async function GET() {
       orderBy: [{ updatedAt: 'desc' }],
       select: {
         id: true,
+        updatedAt: true,
         slug: true,
         title: true,
         artistId: true,

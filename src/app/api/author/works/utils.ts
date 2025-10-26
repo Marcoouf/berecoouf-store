@@ -86,6 +86,7 @@ export type WorkDetailRecord = {
   published: boolean
   artist: { id: string; name: string; slug: string } | null
   variants: Array<{ id: string; label: string; price: number; order: number }>
+  updatedAt: Date
 }
 
 export function mapWorkDetail(work: WorkDetailRecord) {
@@ -104,6 +105,7 @@ export function mapWorkDetail(work: WorkDetailRecord) {
     basePriceCents: work.basePrice ?? null,
     published: work.published,
     artist: work.artist,
+    updatedAt: work.updatedAt?.toISOString() ?? null,
     variants: work.variants
       .slice()
       .sort((a, b) => a.order - b.order)
@@ -126,6 +128,7 @@ export type WorkSummaryRecord = {
   imageUrl: string | null
   mockupUrl: string | null
   artist: { id: string; name: string; slug: string } | null
+  updatedAt: Date
 }
 
 export function mapWorkSummary(work: WorkSummaryRecord) {
@@ -139,5 +142,6 @@ export function mapWorkSummary(work: WorkSummaryRecord) {
     image: work.imageUrl,
     mockup: work.mockupUrl,
     basePriceCents: work.basePrice ?? null,
+    updatedAt: work.updatedAt?.toISOString() ?? null,
   }
 }

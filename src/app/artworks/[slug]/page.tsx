@@ -115,8 +115,10 @@ export default async function Page({ params }: { params: { slug: string } }) {
             title={String(artwork.title)}
             image={String((artwork as any).image ?? '')}
             mockup={(artwork as any).mockup ?? null}
+            images={Array.isArray((artwork as any).images) ? ((artwork as any).images as any[]) : undefined}
             priority
             maxSize={720}
+            className="artwork-carousel"
           />
           <figcaption className="sr-only">{artwork.title}</figcaption>
         </figure>

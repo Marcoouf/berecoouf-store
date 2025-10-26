@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader'
@@ -19,6 +19,7 @@ type WorkSummary = {
   mockup?: string | null
   published: boolean
   basePriceCents: number | null
+  updatedAt: string | null
 }
 
 type WorkDetail = WorkSummary & {
@@ -72,6 +73,9 @@ type CreateFormState = {
   image: string
 }
 
+type StatusFilter = 'all' | 'published' | 'draft'
+type ViewMode = 'gallery' | 'table'
+
 function toEuros(cents: number | null | undefined) {
   if (!cents) return ''
   return (cents / 100).toString()
@@ -105,6 +109,31 @@ function buildForm(detail: WorkDetail): FormState {
     published: detail.published,
     variants,
   }
+}
+
+const euroFormatter = new Intl.NumberFormat('fr-FR', {
+  style: 'currency',
+  currency: 'EUR',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 2,
+})
+
+const dateFormatter = new Intl.DateTimeFormat('fr-FR', {
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+})
+
+function formatPrice(cents: number | null | undefined) {
+  if (typeof cents !== 'number' || Number.isNaN(cents)) return '—'
+  return euroFormatter.format(cents / 100)
+}
+
+function formatUpdatedAt(value: string | null | undefined) {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return dateFormatter.format(date)
 }
 
 async function fetchJSON<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
@@ -141,6 +170,8 @@ export default function AuthorWorksPage() {
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [flash, setFlash] = useState<string | null>(null)
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [viewMode, setViewMode] = useState<ViewMode>('gallery')
 
   const [selectedWorkId, setSelectedWorkId] = useState<string | null>(null)
   const [detail, setDetail] = useState<WorkDetail | null>(null)
@@ -152,6 +183,24 @@ export default function AuthorWorksPage() {
   const [uploadingCover, setUploadingCover] = useState(false)
   const [uploadingMockup, setUploadingMockup] = useState(false)
   const [deleting, setDeleting] = useState(false)
+
+  const { filteredWorks, publishedCount, draftCount } = useMemo(() => {
+    const published = works.filter((work) => work.published)
+    const drafts = works.filter((work) => !work.published)
+
+    let list: WorkSummary[] = works
+    if (statusFilter === 'published') {
+      list = published
+    } else if (statusFilter === 'draft') {
+      list = drafts
+    }
+
+    return {
+      filteredWorks: list,
+      publishedCount: published.length,
+      draftCount: drafts.length,
+    }
+  }, [works, statusFilter])
 
   useEffect(() => {
     let active = true
@@ -197,6 +246,19 @@ export default function AuthorWorksPage() {
       return { ...prev, artistId: availableArtists[0].id }
     })
   }, [availableArtists])
+
+  useEffect(() => {
+    if (filteredWorks.length === 0) {
+      setSelectedWorkId(null)
+      return
+    }
+    setSelectedWorkId((prev) => {
+      if (prev && filteredWorks.some((work) => work.id === prev)) {
+        return prev
+      }
+      return filteredWorks[0]?.id ?? null
+    })
+  }, [filteredWorks])
 
   useEffect(() => {
     if (!flash) return
@@ -496,6 +558,7 @@ export default function AuthorWorksPage() {
                 mockup: updatedWork.mockup || null,
                 published: updatedWork.published,
                 basePriceCents: updatedWork.basePriceCents ?? null,
+                updatedAt: updatedWork.updatedAt ?? new Date().toISOString(),
               }
             : work,
         ),
@@ -540,12 +603,6 @@ export default function AuthorWorksPage() {
         title="Mes œuvres"
         subtitle="Modifie les informations et visuels de tes œuvres publiées."
         actions={[
-          {
-            type: 'button',
-            label: showCreate ? 'Fermer le formulaire' : 'Nouvelle œuvre',
-            onClick: toggleCreatePanel,
-            variant: 'primary',
-          },
           { type: 'link', href: '/dashboard/profile', label: 'Modifier mon profil' },
           { type: 'link', href: '/dashboard', label: '← Retour au tableau de bord' },
         ]}
@@ -636,38 +693,225 @@ export default function AuthorWorksPage() {
       ) : listError ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{listError}</div>
       ) : works.length === 0 ? (
-        <div className="rounded-lg border p-4 text-sm text-neutral-600">
-          Aucune œuvre n’est associée à ton compte pour le moment. Utilise le bouton Nouvelle œuvre ci-dessus pour commencer.
+        <div className="flex flex-col items-start gap-4 rounded-2xl border border-dashed border-neutral-300 bg-white/60 p-6 text-sm text-neutral-600">
+          <div>Aucune œuvre n’est associée à ton compte pour le moment.</div>
+          <button
+            type="button"
+            onClick={() => {
+              setShowCreate(true)
+              window.scrollTo({ top: 0, behavior: 'smooth' })
+            }}
+            className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-white hover:bg-ink/90"
+          >
+            Ajouter une œuvre
+          </button>
         </div>
       ) : (
-        <div className="grid gap-6 lg:grid-cols-[240px_1fr]">
-          <aside className="rounded-2xl border border-neutral-200 bg-white/80 p-4">
-            <div className="mb-3 text-xs font-semibold uppercase text-neutral-500">Œuvres</div>
-            <div className="flex flex-col gap-2">
-              {works.map((work) => (
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(360px,1fr)]">
+          <section className="rounded-2xl border border-neutral-200 bg-white/80 p-4 sm:p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
-                  key={work.id}
-                  onClick={() => setSelectedWorkId(work.id)}
+                  type="button"
+                  onClick={() => setStatusFilter('all')}
                   className={[
-                    'rounded-md border px-3 py-2 text-left text-sm transition',
-                    work.id === selectedWorkId
-                      ? 'border-ink bg-ink text-white shadow'
-                      : 'border-neutral-200 bg-white hover:border-neutral-300',
+                    'inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition',
+                    statusFilter === 'all'
+                      ? 'border-neutral-900 bg-neutral-900 text-white shadow-sm'
+                      : 'border-neutral-300 bg-white text-neutral-600 hover:border-neutral-400',
                   ].join(' ')}
                 >
-                  <div className="font-medium">{work.title}</div>
-                  <div className="text-xs text-neutral-400">
-                    {work.artist?.name ?? work.artistId} · {work.slug}
-                  </div>
-                  {!work.published ? (
-                    <span className="mt-1 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium uppercase text-amber-700">
-                      Non publié
-                    </span>
-                  ) : null}
+                  Toutes
+                  <span className="rounded-full bg-black/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-neutral-700">
+                    {works.length}
+                  </span>
                 </button>
-              ))}
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('published')}
+                  className={[
+                    'inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition',
+                    statusFilter === 'published'
+                      ? 'border-emerald-400 bg-emerald-100 text-emerald-700 shadow-sm'
+                      : 'border-emerald-200 bg-white text-emerald-600 hover:bg-emerald-50',
+                  ].join(' ')}
+                >
+                  Publiées
+                  <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-emerald-600">
+                    {publishedCount}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStatusFilter('draft')}
+                  className={[
+                    'inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium transition',
+                    statusFilter === 'draft'
+                      ? 'border-amber-400 bg-amber-100 text-amber-700 shadow-sm'
+                      : 'border-amber-200 bg-white text-amber-600 hover:bg-amber-50',
+                  ].join(' ')}
+                >
+                  Brouillons
+                  <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[10px] font-semibold uppercase text-amber-600">
+                    {draftCount}
+                  </span>
+                </button>
+              </div>
+              <div className="inline-flex items-center rounded-full border border-neutral-200 bg-neutral-50 p-1 text-xs font-medium text-neutral-600">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('gallery')}
+                  className={[
+                    'rounded-full px-3 py-1 transition',
+                    viewMode === 'gallery' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-700',
+                  ].join(' ')}
+                >
+                  Galerie
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('table')}
+                  className={[
+                    'rounded-full px-3 py-1 transition',
+                    viewMode === 'table' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-500 hover:text-neutral-700',
+                  ].join(' ')}
+                >
+                  Édition
+                </button>
+              </div>
             </div>
-          </aside>
+
+            <div className="mt-4">
+              {filteredWorks.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-neutral-200 bg-neutral-50 p-10 text-center text-sm text-neutral-500">
+                  Aucune œuvre ne correspond à ce filtre.
+                </div>
+              ) : viewMode === 'gallery' ? (
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {filteredWorks.map((work) => {
+                    const isSelected = work.id === selectedWorkId
+                    return (
+                      <button
+                        key={work.id}
+                        type="button"
+                        onClick={() => setSelectedWorkId(work.id)}
+                        className={[
+                          'group relative flex h-full flex-col overflow-hidden rounded-2xl border bg-white text-left transition',
+                          isSelected ? 'border-ink ring-2 ring-ink/20 shadow-sm' : 'border-neutral-200 hover:border-ink/50 hover:shadow-sm',
+                        ].join(' ')}
+                      >
+                        <div className="relative aspect-[4/3] w-full overflow-hidden bg-neutral-100">
+                          {work.image ? (
+                            <Image
+                              src={work.image}
+                              alt={`Visuel ${work.title}`}
+                              fill
+                              sizes="(min-width: 1280px) 260px, (min-width: 640px) 50vw, 100vw"
+                              className="object-cover transition duration-300 group-hover:scale-105"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-xs text-neutral-400">
+                              Pas d’image
+                            </div>
+                          )}
+                          <span
+                            className={[
+                              'absolute left-3 top-3 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                              work.published ? 'bg-emerald-500/90 text-white' : 'bg-amber-400/90 text-white',
+                            ].join(' ')}
+                          >
+                            {work.published ? 'Publié' : 'Brouillon'}
+                          </span>
+                        </div>
+                        <div className="flex flex-1 flex-col gap-2 px-3 pb-3 pt-4">
+                          <div className="text-sm font-semibold text-neutral-900">{work.title}</div>
+                          <div className="text-xs text-neutral-500">{work.artist?.name ?? `Artiste ${work.artistId}`}</div>
+                          <div className="mt-auto flex flex-wrap items-center justify-between gap-2 text-xs text-neutral-500">
+                            <span className="font-medium text-neutral-900">{formatPrice(work.basePriceCents)}</span>
+                            <span>{formatUpdatedAt(work.updatedAt)}</span>
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="mt-2 overflow-hidden rounded-xl border border-neutral-200 shadow-sm">
+                  <table className="min-w-full divide-y divide-neutral-200 text-sm">
+                    <thead className="bg-neutral-50 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                      <tr>
+                        <th scope="col" className="px-4 py-3 text-left">
+                          Œuvre
+                        </th>
+                        <th scope="col" className="px-4 py-3 text-left">
+                          Statut
+                        </th>
+                        <th scope="col" className="px-4 py-3 text-left">
+                          Prix min
+                        </th>
+                        <th scope="col" className="px-4 py-3 text-left">
+                          Modifiée le
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-100 bg-white">
+                      {filteredWorks.map((work) => {
+                        const isSelected = work.id === selectedWorkId
+                        return (
+                          <tr
+                            key={work.id}
+                            onClick={() => setSelectedWorkId(work.id)}
+                            className={[
+                              'cursor-pointer transition',
+                              isSelected ? 'bg-ink/5 ring-1 ring-inset ring-ink/20' : 'hover:bg-neutral-50',
+                            ].join(' ')}
+                          >
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-3">
+                                <div className="relative h-12 w-12 overflow-hidden rounded-md bg-neutral-100">
+                                  {work.image ? (
+                                    <Image
+                                      src={work.image}
+                                      alt={`Visuel ${work.title}`}
+                                      fill
+                                      sizes="48px"
+                                      className="object-cover"
+                                    />
+                                  ) : (
+                                    <div className="flex h-full w-full items-center justify-center text-[10px] uppercase tracking-wide text-neutral-400">
+                                      Pas d’image
+                                    </div>
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="font-medium text-neutral-900">{work.title}</div>
+                                  <div className="text-xs text-neutral-500">
+                                    {work.artist?.name ?? `Artiste ${work.artistId}`}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span
+                                className={[
+                                  'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                                  work.published ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700',
+                                ].join(' ')}
+                              >
+                                {work.published ? 'Publié' : 'Brouillon'}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 font-medium text-neutral-900">{formatPrice(work.basePriceCents)}</td>
+                            <td className="px-4 py-3 text-neutral-500">{formatUpdatedAt(work.updatedAt)}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </section>
 
           <section className="rounded-2xl border border-neutral-200 bg-white/80 p-6 shadow-sm">
             {loadingDetail ? (
@@ -944,6 +1188,24 @@ export default function AuthorWorksPage() {
           </section>
         </div>
       )}
+
+      <button
+        type="button"
+        onClick={() => {
+          if (!showCreate) {
+            setShowCreate(true)
+            window.scrollTo({ top: 0, behavior: 'smooth' })
+          }
+        }}
+        className={[
+          'fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-ink px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-ink/30 transition hover:bg-ink/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink',
+          showCreate ? 'pointer-events-none opacity-0' : 'opacity-100',
+        ].join(' ')}
+        aria-label="Ajouter une œuvre"
+      >
+        <span className="text-base leading-none">+</span>
+        Ajouter une œuvre
+      </button>
     </div>
   )
 }

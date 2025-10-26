@@ -11,6 +11,7 @@ type Props = {
   priority?: boolean
   /** Taille max du carré (en px). Par défaut 720. */
   maxSize?: number
+  className?: string
 }
 
 /**
@@ -29,20 +30,45 @@ export default function ArtworkImageCarousel({
   images = [],
   priority,
   maxSize = 720,
+  className,
 }: Props) {
   const slides = useMemo(() => {
-    // 1) preferred: normalized array of objects { url }
-    const normalized = (images || [])
-      .map((it) => (typeof it === 'string' ? it : it?.url))
-      .filter((u): u is string => !!u);
+    const toStringArray = (
+      input?: Array<{ url?: string | null }> | Array<string | null> | null,
+    ) =>
+      (input || [])
+        .map((it) => (typeof it === 'string' ? it : it?.url))
+        .filter((u): u is string => typeof u === 'string' && u.trim().length > 0)
 
-    if (normalized.length > 0) return normalized;
+    const normalized = toStringArray(images)
+    const legacy = [mockup, image].filter(
+      (src): src is string => typeof src === 'string' && src.trim().length > 0,
+    )
+    const base = normalized.length > 0 ? normalized : legacy
 
-    // 2) legacy props (mockup + image)
-    return [mockup, image].filter(Boolean) as string[];
+    const unique: string[] = []
+    const seen = new Set<string>()
+    base.forEach((src) => {
+      if (seen.has(src)) return
+      seen.add(src)
+      unique.push(src)
+    })
+
+    const prioritized: string[] = []
+    ;[mockup, image]
+      .filter((src): src is string => typeof src === 'string' && seen.has(src))
+      .forEach((src) => {
+        if (!prioritized.includes(src)) prioritized.push(src)
+      })
+    unique.forEach((src) => {
+      if (!prioritized.includes(src)) prioritized.push(src)
+    })
+
+    return prioritized
   }, [images, mockup, image])
   const [idx, setIdx] = useState(0)
   const wrap = useCallback((n: number) => (n + slides.length) % slides.length, [slides.length])
+  const eagerAll = priority && slides.length <= 4
 
   // Nav clavier
   const rootRef = useRef<HTMLDivElement>(null)
@@ -58,19 +84,30 @@ export default function ArtworkImageCarousel({
 
   // Swipe simple
   const startX = useRef<number | null>(null)
-  const onPointerDown = (e: React.PointerEvent) => { startX.current = e.clientX }
+  const onPointerDown = (e: React.PointerEvent) => {
+    startX.current = e.clientX
+  }
+  const resetSwipe = () => {
+    startX.current = null
+  }
   const onPointerUp = (e: React.PointerEvent) => {
     if (startX.current == null) return
     const dx = e.clientX - startX.current
-    startX.current = null
+    resetSwipe()
     if (Math.abs(dx) < 40) return
-    setIdx(i => wrap(i + (dx < 0 ? 1 : -1)))
+    setIdx((i) => wrap(i + (dx < 0 ? 1 : -1)))
   }
 
   if (slides.length === 0) return null
 
   return (
-    <div ref={rootRef} tabIndex={0} aria-roledescription="carousel" aria-label={`Images pour « ${title} »`}>
+    <div
+      ref={rootRef}
+      tabIndex={0}
+      aria-roledescription="carousel"
+      aria-label={`Images pour « ${title} »`}
+      className={className}
+    >
       {/* Wrapper responsive centré : largeur limitée, carré garanti */}
       <div
         className="group relative mx-auto w-full max-w-[min(92vw,theme(maxWidth.7xl))] aspect-square"
@@ -85,21 +122,30 @@ export default function ArtworkImageCarousel({
           className="absolute inset-0 overflow-hidden rounded-2xl border bg-white"
           onPointerDown={onPointerDown}
           onPointerUp={onPointerUp}
+          onPointerLeave={resetSwipe}
         >
-          {/* Piste d'images (superposition, on affiche 1/1 avec opacité) */}
-          {slides.map((src, i) => (
-            <SmartImage
-              key={`${src}-${i}`}
-              src={src}
-              alt={title}
-              fill
-              priority={priority && i === 0}
-              sizes="(min-width:1024px) 40vw, (min-width:768px) 50vw, 100vw"
-              className={`h-full w-full object-contain transition-opacity duration-200 ${i === idx ? 'opacity-100' : 'opacity-0'}`}
-              wrapperClassName="absolute inset-0"
-            />
-          ))}
-
+          <div
+            className="flex h-full w-full transition-transform duration-500 ease-out"
+            style={{ transform: `translateX(-${idx * 100}%)` }}
+          >
+            {slides.map((src, i) => {
+              const isPriority = eagerAll || (priority && i === 0)
+              return (
+                <div key={`${src}-${i}`} className="relative h-full w-full flex-shrink-0">
+                  <SmartImage
+                    src={src}
+                    alt={title}
+                    fill
+                    priority={isPriority}
+                    loading={isPriority ? 'eager' : undefined}
+                    sizes="(min-width:1024px) 40vw, (min-width:768px) 50vw, 100vw"
+                    className="h-full w-full object-contain"
+                    wrapperClassName="absolute inset-0"
+                  />
+                </div>
+              )
+            })}
+          </div>
           {/* Flèches (hover/focus) */}
           {slides.length > 1 && (
             <>

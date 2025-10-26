@@ -51,6 +51,12 @@ export default function SmartImage(props: SmartImageProps) {
     ...rest
   } = props;
 
+  const restProps = { ...(rest as Record<string, any>) };
+  const unoptimized = restProps.unoptimized === true;
+  if (unoptimized) {
+    delete restProps.unoptimized;
+  }
+
   const handleContextMenu = (event: React.MouseEvent<HTMLImageElement>) => {
     event.preventDefault();
     onContextMenu?.(event);
@@ -80,7 +86,19 @@ export default function SmartImage(props: SmartImageProps) {
 
   if (fill) {
     if (!wrapperClasses) {
-      return (
+      const element = unoptimized ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={src}
+          alt={alt}
+          className={imgClasses}
+          draggable={false}
+          data-protect="true"
+          onContextMenu={handleContextMenu}
+          onDragStart={handleDragStart}
+          style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+        />
+      ) : (
         <NextImage
           src={src}
           alt={alt}
@@ -91,25 +109,58 @@ export default function SmartImage(props: SmartImageProps) {
           data-protect="true"
           onContextMenu={handleContextMenu}
           onDragStart={handleDragStart}
-          {...rest}
+          {...restProps}
         />
       );
+      return element;
     }
     return (
       <div className={clsx('relative block w-full h-full', wrapperClasses)}>
-        <NextImage
-          src={src}
-          alt={alt}
-          fill
-          sizes={resolvedSizes}
-          className={imgClasses}
-          draggable={false}
-          data-protect="true"
-          onContextMenu={handleContextMenu}
-          onDragStart={handleDragStart}
-          {...rest}
-        />
+        {unoptimized ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={src}
+            alt={alt}
+            className={imgClasses}
+            draggable={false}
+            data-protect="true"
+            onContextMenu={handleContextMenu}
+            onDragStart={handleDragStart}
+            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+          />
+        ) : (
+          <NextImage
+            src={src}
+            alt={alt}
+            fill
+            sizes={resolvedSizes}
+            className={imgClasses}
+            draggable={false}
+            data-protect="true"
+            onContextMenu={handleContextMenu}
+            onDragStart={handleDragStart}
+            {...restProps}
+          />
+        )}
       </div>
+    );
+  }
+
+  if (unoptimized) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={src}
+        alt={alt}
+        width={1080}
+        height={1080}
+        className={imgClasses}
+        draggable={false}
+        data-protect="true"
+        onContextMenu={handleContextMenu}
+        onDragStart={handleDragStart}
+        style={{ width: '100%', height: '100%', objectFit: fill ? 'contain' : undefined }}
+      />
     );
   }
 
@@ -125,7 +176,7 @@ export default function SmartImage(props: SmartImageProps) {
       data-protect="true"
       onContextMenu={handleContextMenu}
       onDragStart={handleDragStart}
-      {...rest}
+      {...restProps}
     />
   );
 }
