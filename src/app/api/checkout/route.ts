@@ -60,13 +60,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'invalid_payload' }, { status: 400 })
     }
 
-    type VariantWithWork = {
-      id: string
-      price: number
-      label: string
-      workId: string
-      work: { id: string; title: string; slug: string }
-    }
+type VariantWithWork = {
+  id: string
+  price: number
+  label: string
+  workId: string
+  work: { id: string; title: string; slug: string; artist: { id: string; isOnVacation: boolean } | null }
+}
 
     const variants: VariantWithWork[] = await prisma.variant.findMany({
       where: { id: { in: variantIds } },
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
         price: true,
         label: true,
         workId: true,
-        work: { select: { id: true, title: true, slug: true } },
+        work: { select: { id: true, title: true, slug: true, artist: { select: { id: true, isOnVacation: true } } } },
       },
     })
 
@@ -83,6 +83,7 @@ export async function POST(req: NextRequest) {
 
     // 2) Construire les lignes Stripe + valider les prix > 0
     const zeroPrice: Array<{ workId: string; variantId: string }> = []
+    const vacationBlocked: Array<{ workId: string; variantId: string }> = []
     const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = []
     let orderTotal = 0
 
@@ -91,6 +92,11 @@ export async function POST(req: NextRequest) {
       if (!v || v.workId !== it.workId) {
         // variant inexistant ou ne correspond pas à l’œuvre → on ignore dans Stripe, mais on NE crée pas l’order
         zeroPrice.push({ workId: it.workId, variantId: it.variantId })
+        continue
+      }
+
+      if (v.work.artist?.isOnVacation) {
+        vacationBlocked.push({ workId: v.workId, variantId: v.id })
         continue
       }
 
@@ -131,6 +137,17 @@ export async function POST(req: NextRequest) {
           message:
             'Un ou plusieurs articles ont un prix invalide (0€) ou un variant introuvable. Corrigez le prix dans l’admin puis réessayez.',
           items: zeroPrice,
+        },
+        { status: 400 },
+      )
+    }
+
+    if (vacationBlocked.length) {
+      return NextResponse.json(
+        {
+          error: 'artist_unavailable',
+          message: "L'artiste est temporairement indisponible : les commandes seront possibles dès son retour.",
+          items: vacationBlocked,
         },
         { status: 400 },
       )

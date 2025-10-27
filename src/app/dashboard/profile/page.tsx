@@ -15,6 +15,7 @@ import {
 import Image from 'next/image'
 import Link from 'next/link'
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader'
+import { MailIcon, GlobeIcon, InstagramIcon, PaletteIcon, MoonIcon } from '@/components/icons'
 
 type ArtistProfile = {
   id: string
@@ -26,6 +27,7 @@ type ArtistProfile = {
   portrait: string | null
   contactEmail: string | null
   handle: string | null
+  isOnVacation: boolean
 }
 
 type FormState = {
@@ -36,6 +38,7 @@ type FormState = {
   socials: string[]
   image: string
   portrait: string
+  isOnVacation: boolean
 }
 
 type Toast = {
@@ -69,6 +72,7 @@ function buildForm(artist: ArtistProfile): FormState {
     socials: Array.isArray(artist.socials) && artist.socials.length > 0 ? artist.socials.slice() : [''],
     image: artist.image ?? '',
     portrait: artist.portrait ?? '',
+    isOnVacation: Boolean(artist.isOnVacation),
   }
 }
 
@@ -275,6 +279,7 @@ function ImageUploadField({
             />
           ) : (
             <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-sm text-neutral-400">
+              <PaletteIcon className="h-8 w-8 text-neutral-300" />
               <span className="text-base font-medium">Glisse ton image ici</span>
               <span className="text-xs text-neutral-400">PNG ou JPG recommandé</span>
             </div>
@@ -393,7 +398,7 @@ function CompletionCard({
   )
 }
 
-function PublicPreview({ form }: { form: FormState }) {
+function PublicPreview({ form, onPick }: { form: FormState; onPick: (kind: 'portrait' | 'image') => void }) {
   const socials = form.socials.filter((entry) => entry.trim().length > 0).slice(0, 4)
   const handle = form.handle.trim().replace(/^@+/, '')
 
@@ -403,8 +408,16 @@ function PublicPreview({ form }: { form: FormState }) {
         {form.image ? (
           <Image src={form.image} alt="" fill sizes="400px" className="object-cover object-center" />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-sm text-neutral-400">
-            Ajoute une image de couverture
+          <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-sm text-neutral-400">
+            <PaletteIcon className="h-8 w-8 text-neutral-300" />
+            <div>Image de couverture manquante</div>
+            <button
+              type="button"
+              onClick={() => onPick('image')}
+              className="rounded-full bg-ink px-3 py-1 text-xs font-medium text-white transition hover:bg-ink/90"
+            >
+              Ajouter une image
+            </button>
           </div>
         )}
       </div>
@@ -413,15 +426,29 @@ function PublicPreview({ form }: { form: FormState }) {
           {form.portrait ? (
             <Image src={form.portrait} alt="" fill sizes="120px" className="object-cover object-center" />
           ) : (
-            <div className="flex h-full w-full items-center justify-center text-lg font-semibold text-neutral-400">
-              {initialsFromName(form.name || 'Artiste')}
-            </div>
+            <button
+              type="button"
+              onClick={() => onPick('portrait')}
+              className="group flex h-full w-full flex-col items-center justify-center gap-2 text-neutral-400"
+            >
+              <PaletteIcon className="h-6 w-6 text-neutral-300 transition group-hover:text-ink" />
+              <span className="text-xs font-medium">{initialsFromName(form.name || 'Artiste')}</span>
+              <span className="text-[10px] uppercase tracking-wide text-neutral-400 group-hover:text-ink">
+                Ajouter
+              </span>
+            </button>
           )}
         </div>
       </div>
       <div className="px-6 pb-6 pt-4 text-center">
         <div className="text-lg font-semibold text-neutral-900">{form.name || 'Nom de l’artiste'}</div>
         {handle ? <div className="text-sm text-neutral-500">@{handle}</div> : null}
+        {form.isOnVacation ? (
+          <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+            <MoonIcon className="h-4 w-4" />
+            En vacances
+          </div>
+        ) : null}
         <p
           className="mt-3 whitespace-pre-line text-sm text-neutral-600"
           style={{ maxHeight: '7.5rem', overflow: 'hidden' }}
@@ -445,8 +472,9 @@ function PublicPreview({ form }: { form: FormState }) {
             </span>
           )}
         </div>
-        <div className="mt-3 text-xs text-neutral-400">
-          {form.contactEmail ? form.contactEmail : 'Renseigne ton email de contact.'}
+        <div className="mt-3 flex items-center justify-center gap-2 text-xs text-neutral-400">
+          <MailIcon className="h-3.5 w-3.5" aria-hidden="true" />
+          <span>{form.contactEmail ? form.contactEmail : 'Renseigne ton email de contact.'}</span>
         </div>
       </div>
     </div>
@@ -567,6 +595,11 @@ export default function AuthorProfilePage() {
     setSectionsOpen((prev) => ({ ...prev, [key]: !prev[key] }))
   }, [])
 
+  const openAssetPicker = useCallback((kind: 'portrait' | 'image') => {
+    const input = document.getElementById(`${kind}-file-input`) as HTMLInputElement | null
+    input?.click()
+  }, [])
+
   async function handleUpload(kind: 'portrait' | 'image', file: File) {
     if (!selectedArtist) return
     const hint = `${selectedArtist.slug}-${kind}`
@@ -605,6 +638,7 @@ export default function AuthorProfilePage() {
       socials,
       image: form.image.trim() || null,
       portrait: form.portrait.trim() || null,
+      isOnVacation: form.isOnVacation,
     }
 
     try {
@@ -674,8 +708,24 @@ export default function AuthorProfilePage() {
         />
 
         {loadingList ? (
-          <div className="mt-6 rounded-2xl border border-neutral-200 bg-white/80 p-4 text-sm text-neutral-500 shadow-sm">
-            Chargement de tes artistes…
+          <div className="mt-6 space-y-5">
+            <div className="rounded-2xl border border-neutral-200 bg-white/80 p-4 shadow-sm">
+              <div className="h-3 w-24 animate-pulse rounded bg-neutral-200" />
+              <div className="mt-4 flex flex-wrap gap-3">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={`artist-skeleton-${i}`} className="h-12 w-44 animate-pulse rounded-lg border border-neutral-200 bg-neutral-100" />
+                ))}
+              </div>
+            </div>
+            <div className="rounded-2xl border border-neutral-200 bg-white/80 p-6 shadow-sm">
+              <div className="h-4 w-32 animate-pulse rounded bg-neutral-200" />
+              <div className="mt-6 grid gap-4 md:grid-cols-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={`form-skeleton-${i}`} className="h-14 animate-pulse rounded-md bg-neutral-100" />
+                ))}
+              </div>
+              <div className="mt-6 h-24 animate-pulse rounded-xl bg-neutral-100" />
+            </div>
           </div>
         ) : listError ? (
           <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 shadow-sm">
@@ -714,7 +764,7 @@ export default function AuthorProfilePage() {
                 <div className="grid gap-0 xl:grid-cols-[320px_1fr]">
                   <div className="flex flex-col gap-6 border-b border-neutral-100 bg-neutral-50/60 p-6 xl:border-b-0 xl:border-r">
                     <CompletionCard percent={completion.percent} items={completion.items} />
-                    <PublicPreview form={form} />
+                    <PublicPreview form={form} onPick={openAssetPicker} />
                   </div>
 
                   <form className="relative flex flex-col gap-6 p-6 pb-28" onSubmit={onSave}>
@@ -737,13 +787,16 @@ export default function AuthorProfilePage() {
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-neutral-700">Contact</label>
-                          <input
-                            type="email"
-                            value={form.contactEmail}
-                            onChange={(e) => handleField('contactEmail', e.target.value)}
-                            placeholder="artiste@example.com"
-                            className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm transition focus:border-ink focus:outline-none focus:ring-2 focus:ring-ink/10"
-                          />
+                          <div className="mt-1 flex items-center gap-2 rounded-md border border-neutral-300 bg-white px-3 py-2 transition focus-within:border-ink focus-within:ring-2 focus-within:ring-ink/10">
+                            <MailIcon className="h-4 w-4 text-neutral-400" aria-hidden="true" />
+                            <input
+                              type="email"
+                              value={form.contactEmail}
+                              onChange={(e) => handleField('contactEmail', e.target.value)}
+                              placeholder="artiste@example.com"
+                              className="w-full border-0 bg-transparent text-sm text-neutral-700 placeholder:text-neutral-400 focus:outline-none"
+                            />
+                          </div>
                           <p className="mt-1 text-xs text-neutral-400">
                             Adresse utilisée pour les notifications de ventes.
                           </p>
@@ -752,13 +805,51 @@ export default function AuthorProfilePage() {
                       <div className="grid gap-4 md:grid-cols-2">
                         <div>
                           <label className="block text-sm font-medium text-neutral-700">Handle / pseudo</label>
-                          <input
-                            type="text"
-                            value={form.handle}
-                            onChange={(e) => handleField('handle', e.target.value)}
-                            placeholder="Ex. @vague"
-                            className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm transition focus:border-ink focus:outline-none focus:ring-2 focus:ring-ink/10"
-                          />
+                          <div className="mt-1 flex items-center gap-2 rounded-md border border-neutral-300 bg-white px-3 py-2 transition focus-within:border-ink focus-within:ring-2 focus-within:ring-ink/10">
+                            <GlobeIcon className="h-4 w-4 text-neutral-400" aria-hidden="true" />
+                            <input
+                              type="text"
+                              value={form.handle}
+                              onChange={(e) => handleField('handle', e.target.value)}
+                              placeholder="Ex. @vague"
+                              className="w-full border-0 bg-transparent text-sm text-neutral-700 placeholder:text-neutral-400 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <div className="flex items-center gap-2 text-sm font-semibold text-neutral-800">
+                              <MoonIcon className="h-4 w-4 text-amber-500" aria-hidden="true" />
+                              Mode vacances
+                            </div>
+                            <p className="mt-1 text-xs text-neutral-500">
+                              Active cette option pour rendre toutes tes œuvres indisponibles pendant ton absence.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleField('isOnVacation', !form.isOnVacation)}
+                            className={[
+                              'inline-flex items-center justify-between rounded-full px-2 py-1 text-xs font-semibold transition sm:min-w-[140px]',
+                              form.isOnVacation
+                                ? 'bg-amber-500 text-white shadow-sm'
+                                : 'bg-white text-neutral-600 border border-neutral-200 hover:border-amber-300',
+                            ].join(' ')}
+                          >
+                            <span className="px-2 py-1">
+                              {form.isOnVacation ? 'Activé' : 'Désactivé'}
+                            </span>
+                            <span
+                              className={[
+                                'ml-2 flex h-6 w-6 items-center justify-center rounded-full border',
+                                form.isOnVacation ? 'border-white/70 bg-white/20' : 'border-neutral-200 bg-white',
+                              ].join(' ')}
+                            >
+                              {form.isOnVacation ? '✓' : ''}
+                            </span>
+                          </button>
                         </div>
                       </div>
                     </AccordionSection>
@@ -822,24 +913,37 @@ export default function AuthorProfilePage() {
                       onToggle={() => toggleSection('reseaux')}
                     >
                       <div className="space-y-3">
-                        {form.socials.map((entry, index) => (
-                          <div key={`social-${index}`} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-                            <input
-                              type="url"
-                              value={entry}
-                              onChange={(e) => handleSocialChange(index, e.target.value)}
-                              placeholder="https://instagram.com/monprofil"
-                              className="flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm transition focus:border-ink focus:outline-none focus:ring-2 focus:ring-ink/10"
-                            />
-                            <button
-                              type="button"
-                              onClick={() => removeSocial(index)}
-                              className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 transition hover:bg-neutral-50"
-                            >
-                              Retirer
-                            </button>
-                          </div>
-                        ))}
+                        {form.socials.map((entry, index) => {
+                          const slug = entry.trim().toLowerCase()
+                          const IconComponent =
+                            slug.includes('insta') || slug.includes('ig')
+                              ? InstagramIcon
+                              : slug.includes('mailto')
+                              ? MailIcon
+                              : GlobeIcon
+
+                          return (
+                            <div key={`social-${index}`} className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                              <div className="flex flex-1 items-center gap-2 rounded-md border border-neutral-300 bg-white px-3 py-2 transition focus-within:border-ink focus-within:ring-2 focus-within:ring-ink/10">
+                                <IconComponent className="h-4 w-4 text-neutral-400" aria-hidden="true" />
+                                <input
+                                  type="url"
+                                  value={entry}
+                                  onChange={(e) => handleSocialChange(index, e.target.value)}
+                                  placeholder="https://instagram.com/monprofil"
+                                  className="w-full border-0 bg-transparent text-sm text-neutral-700 placeholder:text-neutral-400 focus:outline-none"
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => removeSocial(index)}
+                                className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-600 transition hover:bg-neutral-50"
+                              >
+                                Retirer
+                              </button>
+                            </div>
+                          )
+                        })}
                       </div>
                       <button
                         type="button"

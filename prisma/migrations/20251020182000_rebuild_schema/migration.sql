@@ -1,0 +1,2 @@
+-- Placeholder migration added to match remote history.
+-- The original migration was applied in the shared database but is not required locally.

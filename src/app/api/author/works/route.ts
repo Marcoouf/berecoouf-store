@@ -22,7 +22,7 @@ export async function GET() {
   const [artists, works] = await Promise.all([
     prisma.artist.findMany({
       where: { id: { in: artistIds } },
-      select: { id: true, name: true, slug: true },
+      select: { id: true, name: true, slug: true, isOnVacation: true },
       orderBy: { name: 'asc' },
     }),
     prisma.work.findMany({
@@ -38,14 +38,14 @@ export async function GET() {
         basePrice: true,
         imageUrl: true,
         mockupUrl: true,
-        artist: { select: { id: true, name: true, slug: true } },
+        artist: { select: { id: true, name: true, slug: true, isOnVacation: true } },
       },
     }),
   ])
 
   return NextResponse.json({
     works: works.map(mapWorkSummary),
-    artists,
+    artists: artists.map((artist) => ({ ...artist, isOnVacation: Boolean(artist.isOnVacation) })),
   })
 }
 
@@ -96,7 +96,7 @@ export async function POST(req: Request) {
       createdById: user.id,
     },
     include: {
-      artist: { select: { id: true, name: true, slug: true } },
+      artist: { select: { id: true, name: true, slug: true, isOnVacation: true } },
       variants: {
         orderBy: { order: 'asc' },
         select: { id: true, label: true, price: true, order: true },

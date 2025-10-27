@@ -84,7 +84,7 @@ export type WorkDetailRecord = {
   mockupUrl: string | null
   basePrice: number | null
   published: boolean
-  artist: { id: string; name: string; slug: string } | null
+  artist: { id: string; name: string; slug: string; isOnVacation: boolean } | null
   variants: Array<{ id: string; label: string; price: number; order: number }>
   updatedAt: Date
 }
@@ -104,7 +104,14 @@ export function mapWorkDetail(work: WorkDetailRecord) {
     mockup: work.mockupUrl,
     basePriceCents: work.basePrice ?? null,
     published: work.published,
-    artist: work.artist,
+    artist: work.artist
+      ? {
+          id: work.artist.id,
+          name: work.artist.name,
+          slug: work.artist.slug,
+          isOnVacation: work.artist.isOnVacation,
+        }
+      : null,
     updatedAt: work.updatedAt?.toISOString() ?? null,
     variants: work.variants
       .slice()
@@ -127,7 +134,7 @@ export type WorkSummaryRecord = {
   basePrice: number | null
   imageUrl: string | null
   mockupUrl: string | null
-  artist: { id: string; name: string; slug: string } | null
+  artist: { id: string; name: string; slug: string; isOnVacation: boolean } | null
   updatedAt: Date
 }
 
@@ -137,11 +144,19 @@ export function mapWorkSummary(work: WorkSummaryRecord) {
     slug: work.slug,
     title: work.title,
     artistId: work.artistId,
-    artist: work.artist,
+    artist: work.artist
+      ? {
+          id: work.artist.id,
+          name: work.artist.name,
+          slug: work.artist.slug,
+          isOnVacation: work.artist.isOnVacation,
+        }
+      : null,
     published: work.published,
     image: work.imageUrl,
     mockup: work.mockupUrl,
     basePriceCents: work.basePrice ?? null,
     updatedAt: work.updatedAt?.toISOString() ?? null,
+    artistOnVacation: work.artist?.isOnVacation ?? false,
   }
 }

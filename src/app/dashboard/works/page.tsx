@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader'
+import { MoonIcon } from '@/components/icons'
 
 type WorkSummary = {
   id: string
@@ -14,12 +15,14 @@ type WorkSummary = {
     id: string
     name: string
     slug: string
+    isOnVacation?: boolean
   } | null
   image?: string | null
   mockup?: string | null
   published: boolean
   basePriceCents: number | null
   updatedAt: string | null
+  artistOnVacation?: boolean
 }
 
 type WorkDetail = WorkSummary & {
@@ -60,6 +63,7 @@ type ArtistOption = {
   id: string
   name: string
   slug: string
+  isOnVacation?: boolean
 }
 
 type WorksResponse = {
@@ -201,6 +205,12 @@ export default function AuthorWorksPage() {
       draftCount: drafts.length,
     }
   }, [works, statusFilter])
+
+  const selectedWork = useMemo(() => works.find((work) => work.id === selectedWorkId) ?? null, [works, selectedWorkId])
+  const activeArtistId = detail?.artist?.id ?? selectedWork?.artistId ?? availableArtists[0]?.id ?? null
+  const activeArtistOnVacation = activeArtistId
+    ? Boolean(availableArtists.find((artist) => artist.id === activeArtistId)?.isOnVacation)
+    : false
 
   useEffect(() => {
     let active = true
@@ -549,20 +559,29 @@ export default function AuthorWorksPage() {
       setDetail(updatedWork)
       setForm(buildForm(updatedWork))
       setWorks((prev) =>
-        prev.map((work) =>
-          work.id === selectedWorkId
-            ? {
-                ...work,
-                title: updatedWork.title,
-                image: updatedWork.image || null,
-                mockup: updatedWork.mockup || null,
-                published: updatedWork.published,
-                basePriceCents: updatedWork.basePriceCents ?? null,
-                updatedAt: updatedWork.updatedAt ?? new Date().toISOString(),
-              }
-            : work,
-        ),
-      )
+                prev.map((work) =>
+                  work.id === selectedWorkId
+                    ? {
+                        ...work,
+                        title: updatedWork.title,
+                        image: updatedWork.image || null,
+                        mockup: updatedWork.mockup || null,
+                        published: updatedWork.published,
+                        basePriceCents: updatedWork.basePriceCents ?? null,
+                        updatedAt: updatedWork.updatedAt ?? new Date().toISOString(),
+                        artist: updatedWork.artist
+                          ? {
+                              id: updatedWork.artist.id,
+                              name: updatedWork.artist.name,
+                              slug: updatedWork.artist.slug,
+                              isOnVacation: updatedWork.artist.isOnVacation,
+                            }
+                          : work.artist,
+                        artistOnVacation: updatedWork.artist?.isOnVacation ?? work.artistOnVacation ?? false,
+                      }
+                    : work,
+                ),
+              )
     } catch (err: any) {
       const raw = err?.message || 'Échec de la sauvegarde'
       if (raw === 'invalid_variants') {
@@ -607,6 +626,18 @@ export default function AuthorWorksPage() {
           { type: 'link', href: '/dashboard', label: '← Retour au tableau de bord' },
         ]}
       />
+
+      {activeArtistOnVacation ? (
+        <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 shadow-sm">
+          <MoonIcon className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
+          <div>
+            <div className="font-semibold">Mode vacances activé</div>
+            <p className="mt-1 text-amber-700/90">
+              Tes œuvres restent visibles mais les commandes sont désactivées jusqu’à ton retour.
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       {flash ? (
         <div className="mb-6 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
@@ -689,7 +720,23 @@ export default function AuthorWorksPage() {
       ) : null}
 
       {loadingList ? (
-        <div className="rounded-lg border p-4 text-sm text-neutral-500">Chargement des œuvres…</div>
+        <div className="grid gap-6">
+          <div className="rounded-2xl border border-neutral-200 bg-white/80 p-5 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div className="h-4 w-32 animate-pulse rounded bg-neutral-200" />
+              <div className="h-8 w-24 animate-pulse rounded-full bg-neutral-200" />
+            </div>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={`work-skeleton-${i}`} className="h-44 animate-pulse rounded-xl border border-neutral-200 bg-neutral-100" />
+              ))}
+            </div>
+          </div>
+          <div className="rounded-2xl border border-neutral-200 bg-white/80 p-6 shadow-sm">
+            <div className="h-4 w-40 animate-pulse rounded bg-neutral-200" />
+            <div className="mt-6 h-64 animate-pulse rounded-xl bg-neutral-100" />
+          </div>
+        </div>
       ) : listError ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{listError}</div>
       ) : works.length === 0 ? (
@@ -788,8 +835,9 @@ export default function AuthorWorksPage() {
                 </div>
               ) : viewMode === 'gallery' ? (
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {filteredWorks.map((work) => {
+              {filteredWorks.map((work) => {
                     const isSelected = work.id === selectedWorkId
+                    const onVacation = Boolean(work.artist?.isOnVacation ?? work.artistOnVacation)
                     return (
                       <button
                         key={work.id}
@@ -822,6 +870,12 @@ export default function AuthorWorksPage() {
                           >
                             {work.published ? 'Publié' : 'Brouillon'}
                           </span>
+                          {onVacation ? (
+                            <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-amber-100/95 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+                              <MoonIcon className="h-3 w-3" />
+                              Vacances
+                            </span>
+                          ) : null}
                         </div>
                         <div className="flex flex-1 flex-col gap-2 px-3 pb-3 pt-4">
                           <div className="text-sm font-semibold text-neutral-900">{work.title}</div>
@@ -830,6 +884,12 @@ export default function AuthorWorksPage() {
                             <span className="font-medium text-neutral-900">{formatPrice(work.basePriceCents)}</span>
                             <span>{formatUpdatedAt(work.updatedAt)}</span>
                           </div>
+                          {onVacation ? (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+                              <MoonIcon className="h-3 w-3" />
+                              En vacances
+                            </span>
+                          ) : null}
                         </div>
                       </button>
                     )
@@ -857,6 +917,7 @@ export default function AuthorWorksPage() {
                     <tbody className="divide-y divide-neutral-100 bg-white">
                       {filteredWorks.map((work) => {
                         const isSelected = work.id === selectedWorkId
+                        const onVacation = Boolean(work.artist?.isOnVacation ?? work.artistOnVacation)
                         return (
                           <tr
                             key={work.id}
@@ -892,14 +953,22 @@ export default function AuthorWorksPage() {
                               </div>
                             </td>
                             <td className="px-4 py-3">
-                              <span
-                                className={[
-                                  'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
-                                  work.published ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700',
-                                ].join(' ')}
-                              >
-                                {work.published ? 'Publié' : 'Brouillon'}
-                              </span>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span
+                                  className={[
+                                    'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide',
+                                    work.published ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700',
+                                  ].join(' ')}
+                                >
+                                  {work.published ? 'Publié' : 'Brouillon'}
+                                </span>
+                                {onVacation ? (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+                                    <MoonIcon className="h-3 w-3" />
+                                    Vacances
+                                  </span>
+                                ) : null}
+                              </div>
                             </td>
                             <td className="px-4 py-3 font-medium text-neutral-900">{formatPrice(work.basePriceCents)}</td>
                             <td className="px-4 py-3 text-neutral-500">{formatUpdatedAt(work.updatedAt)}</td>

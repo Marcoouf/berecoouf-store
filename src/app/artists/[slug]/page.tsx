@@ -5,6 +5,7 @@ import type { Metadata } from 'next'
 import Breadcrumb from '@/components/Breadcrumb'
 import { euro } from '@/lib/format'
 import { getCatalog } from '@/lib/getCatalog'
+import { MoonIcon } from '@/components/icons'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,6 +41,7 @@ export default async function ArtistPage({ params }: Props) {
       contactEmail: true,
       socials: true,
       handle: true,
+      isOnVacation: true,
     },
   })
   if (!artist) {
@@ -79,6 +81,7 @@ export default async function ArtistPage({ params }: Props) {
   const socials: string[] = Array.isArray((artist as any)?.socials)
     ? ((artist as any).socials as string[]).filter(Boolean)
     : []
+  const isOnVacation = Boolean((artist as any)?.isOnVacation)
 
   const labelFromUrl = (s: string) => {
     try {
@@ -101,6 +104,7 @@ export default async function ArtistPage({ params }: Props) {
     url: canonicalUrl,
     image: heroSrc || undefined,
     sameAs: (artist as any)?.socials?.filter(Boolean) ?? [],
+    availability: isOnVacation ? 'https://schema.org/PreOrder' : undefined,
   }
 
   return (
@@ -155,6 +159,12 @@ export default async function ArtistPage({ params }: Props) {
                 {artist.handle && (
                   <div className="text-sm text-neutral-500">{artist.handle}</div>
                 )}
+                {isOnVacation ? (
+                  <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                    <MoonIcon className="h-4 w-4" />
+                    En vacances — commandes suspendues
+                  </div>
+                ) : null}
                 {artist.bio && (
                   <p className="mt-2 max-w-prose text-neutral-700">{artist.bio}</p>
                 )}
@@ -191,42 +201,66 @@ export default async function ArtistPage({ params }: Props) {
           <div className="text-xs text-neutral-500" aria-live="polite">{works.length} œuvre{works.length > 1 ? 's' : ''}</div>
         </div>
 
+        {isOnVacation ? (
+          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+            <MoonIcon className="mt-0.5 h-4 w-4 flex-none" />
+            <div>
+              <div className="font-semibold">L’artiste est en vacances</div>
+              <p className="mt-1 text-amber-700/90">
+                Ses œuvres restent visibles mais les commandes seront possibles à son retour.
+              </p>
+            </div>
+          </div>
+        ) : null}
+
         {works.length === 0 && (
           <div className="mb-6 text-sm text-neutral-500">Aucune œuvre trouvée pour cet artiste.</div>
         )}
 
         <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
-          {works.map((w: any) => (
-            <div key={w.id} className="group">
-              <div className="aspect-square relative overflow-hidden rounded-xl border">
-                <Link href={`/artworks/${w.slug}`} scroll className="absolute inset-0" aria-label={`Voir l'œuvre ${w.title}`}>
-                  {typeof (w as any).image === 'string' && (w as any).image ? (
-                    <SmartImage
-                      src={(w as any).image as string}
-                      alt={w.title}
-                      fill
-                      sizes="(min-width: 1024px) 30vw, (min-width: 640px) 30vw, 100vw"
-                      wrapperClass="absolute inset-0"
-                      imgClassName="object-cover transition-transform duration-500 group-hover:scale-[1.02] pointer-events-none select-none"
-                    />
-                  ) : (
-                    <div className="absolute inset-0 bg-neutral-100" />
-                  )}
-                </Link>
-              </div>
-              <div className="mt-3 flex items-start justify-between gap-4">
-                <div>
-                  <div className="text-sm font-medium">
-                    <Link href={`/artworks/${w.slug}`} scroll>{w.title}</Link>
+          {works.map((w: any) => {
+            const workOnVacation = Boolean((w as any).artistOnVacation ?? (w as any).artist?.isOnVacation ?? isOnVacation)
+            return (
+              <div key={w.id} className="group">
+                <div className="aspect-square relative overflow-hidden rounded-xl border">
+                  <Link href={`/artworks/${w.slug}`} scroll className="absolute inset-0" aria-label={`Voir l'œuvre ${w.title}`}>
+                    {typeof (w as any).image === 'string' && (w as any).image ? (
+                      <SmartImage
+                        src={(w as any).image as string}
+                        alt={w.title}
+                        fill
+                        sizes="(min-width: 1024px) 30vw, (min-width: 640px) 30vw, 100vw"
+                        wrapperClass="absolute inset-0"
+                        imgClassName="object-cover transition-transform duration-500 group-hover:scale-[1.02] pointer-events-none select-none"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 bg-neutral-100" />
+                    )}
+                  </Link>
+                  {workOnVacation ? (
+                    <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+                      <MoonIcon className="h-3.5 w-3.5" />
+                      Vacances
+                    </span>
+                  ) : null}
+                </div>
+                <div className="mt-3 flex items-start justify-between gap-4">
+                  <div>
+                    <div className="text-sm font-medium">
+                      <Link href={`/artworks/${w.slug}`} scroll>{w.title}</Link>
+                    </div>
+                    <div className="text-xs text-neutral-500">
+                      {artist.name}
+                      {workOnVacation ? <span className="ml-1 text-amber-600">(indisponible)</span> : null}
+                    </div>
                   </div>
-                  <div className="text-xs text-neutral-500">{artist.name}</div>
-                </div>
-                <div className="ml-auto text-sm tabular-nums">
-                  {(w as any).priceMinFormatted ?? euro((w as any).priceMin ?? 0)}
+                  <div className="ml-auto text-sm tabular-nums">
+                    {(w as any).priceMinFormatted ?? euro((w as any).priceMin ?? 0)}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
 
         <div className="mt-10">

@@ -30,6 +30,7 @@ export async function GET() {
       portrait: true,
       contactEmail: true,
       handle: true,
+      isOnVacation: true,
     },
   })
 
@@ -37,6 +38,7 @@ export async function GET() {
     artists.map((artist) => ({
       ...artist,
       socials: Array.isArray(artist.socials) ? artist.socials : [],
+      isOnVacation: Boolean(artist.isOnVacation),
     })),
   )
 }

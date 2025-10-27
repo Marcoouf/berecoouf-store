@@ -8,6 +8,7 @@ import Breadcrumb from '@/components/Breadcrumb'
 import ArtworkPurchase from '@/components/ArtworkPurchase'
 import { getCatalog } from '@/lib/getCatalog'
 import ArtworkImageCarousel from '@/components/ArtworkImageCarousel'
+import { MoonIcon } from '@/components/icons'
 // important : ne pas figer au build
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -175,6 +176,18 @@ export default async function Page({ params }: { params: { slug: string } }) {
             </div>
           )}
 
+          {artist?.isOnVacation ? (
+            <div className="mt-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+              <MoonIcon className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
+              <div>
+                <div className="font-semibold">L’artiste est en vacances</div>
+                <p className="mt-1 text-amber-700/90">
+                  Les commandes pour cette œuvre seront disponibles à son retour.
+                </p>
+              </div>
+            </div>
+          ) : null}
+
           <ArtworkPurchase
             artwork={{
               id: String(artwork.id),
@@ -183,6 +196,7 @@ export default async function Page({ params }: { params: { slug: string } }) {
               price: Number(priceMin) || 0,
               artistId: String(artwork.artistId),
               formats: variants.map((v) => ({ id: v.id, label: v.label, price: v.price })),
+              artistOnVacation: Boolean((artwork as any).artistOnVacation ?? artist?.isOnVacation ?? false),
             }}
           />
 

@@ -13,6 +13,7 @@ export type ArtworkLite = {
   image?: string | null
   mockup?: string | null
   artistId?: string
+  artistOnVacation?: boolean
   // les prix sont TOUJOURS en centimes
   price?: number | null
   basePrice?: number | null
@@ -71,7 +72,8 @@ export default function ArtworkPurchase({ artwork }: { artwork: ArtworkLite }) {
 
   // Affichage formaté (la fonction `euro` attend des centimes)
   const displayPrice = euro(unitPriceCents)
-  const canBuy = unitPriceCents > 0
+  const artistOnVacation = Boolean((artwork as any).artistOnVacation || (artwork as any).artist?.isOnVacation)
+  const canBuy = unitPriceCents > 0 && !artistOnVacation
 
   // Feedback visuel sur le bouton « Ajouter au panier »
   const [bump, setBump] = useState(false)
@@ -127,6 +129,11 @@ export default function ArtworkPurchase({ artwork }: { artwork: ArtworkLite }) {
 
       {/* Prix */}
       <div className="text-lg tabular-nums">{displayPrice}</div>
+      {artistOnVacation ? (
+        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+          L’artiste est en vacances : les commandes sont momentanément suspendues.
+        </div>
+      ) : null}
 
       {/* CTA */}
       <div className="mt-4">

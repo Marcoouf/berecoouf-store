@@ -27,7 +27,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   const work = await prisma.work.findUnique({
     where: { id: params.id },
     include: {
-      artist: { select: { id: true, name: true, slug: true } },
+      artist: { select: { id: true, name: true, slug: true, isOnVacation: true } },
       variants: {
         orderBy: { order: 'asc' },
         select: { id: true, label: true, price: true, order: true },
@@ -193,7 +193,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       const fresh = await tx.work.findUnique({
         where: { id: params.id },
         include: {
-          artist: { select: { id: true, name: true, slug: true } },
+          artist: { select: { id: true, name: true, slug: true, isOnVacation: true } },
           variants: {
             orderBy: { order: 'asc' },
             select: { id: true, label: true, price: true, order: true },

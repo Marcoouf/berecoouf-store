@@ -17,6 +17,7 @@ type DbArtist = {
   socials?: string[] | null
   handle?: string | null
   isArchived?: boolean
+  isOnVacation?: boolean
 }
 
 type DbVariant = {
@@ -51,6 +52,7 @@ export type Artist = {
   portrait?: string
   image?: string
   contactEmail?: string
+  isOnVacation?: boolean
 }
 
 export type Variant = {
@@ -71,7 +73,7 @@ export type Artwork = {
   mockup?: string
   cover?: string | { url: string }
   artistId: string
-  artist?: Pick<Artist, 'id' | 'slug' | 'name'>
+  artist?: Pick<Artist, 'id' | 'slug' | 'name' | 'isOnVacation'>
   price?: number // centimes
   description?: string
   year?: number
@@ -83,6 +85,7 @@ export type Artwork = {
   variants?: Variant[]
   priceMin?: number
   priceMinFormatted?: string
+  artistOnVacation?: boolean
 }
 
 // --- Helpers ---
@@ -139,10 +142,11 @@ function normalizeArtwork(raw: Artwork, artistIndex: Map<string, Artist>): Artwo
     ...raw,
     images: normalizedImages.length > 0 ? normalizedImages.map((u) => ({ url: u })) : undefined,
     cover: coverUrl ? { url: coverUrl } : undefined,
-    artist: artist ? { id: artist.id, slug: artist.slug, name: artist.name } : raw.artist,
+    artist: artist ? { id: artist.id, slug: artist.slug, name: artist.name, isOnVacation: artist.isOnVacation } : raw.artist,
     variants,
     priceMin,
     priceMinFormatted,
+    artistOnVacation: artist?.isOnVacation ?? false,
   }
 }
 
@@ -181,6 +185,7 @@ export async function getCatalog(): Promise<{ artists: Artist[]; artworks: Artwo
       socials: true,
       handle: true,
       isArchived: true,
+      isOnVacation: true,
     },
   }),
   prisma.work.findMany({
@@ -222,6 +227,7 @@ export async function getCatalog(): Promise<{ artists: Artist[]; artworks: Artwo
           portrait,
           image: cover,
           contactEmail: email || undefined,
+          isOnVacation: Boolean(a.isOnVacation),
         }
       })
 

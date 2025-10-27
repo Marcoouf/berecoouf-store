@@ -80,6 +80,13 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     hasUpdates = true
   }
 
+  if (Object.prototype.hasOwnProperty.call(body, 'isOnVacation')) {
+    if (typeof body.isOnVacation === 'boolean') {
+      data.isOnVacation = body.isOnVacation
+      hasUpdates = true
+    }
+  }
+
   if (!hasUpdates) {
     return NextResponse.json({ ok: true, updated: false })
   }
@@ -97,6 +104,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       portrait: true,
       contactEmail: true,
       handle: true,
+      isOnVacation: true,
     },
   })
 
@@ -107,6 +115,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     artist: {
       ...updated,
       socials: Array.isArray(updated.socials) ? updated.socials : [],
+      isOnVacation: Boolean(updated.isOnVacation),
     },
   })
 }

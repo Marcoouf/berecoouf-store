@@ -215,6 +215,7 @@ export default async function ArtworksPage({ searchParams }: { searchParams: Sea
             const image =
               (art as any).cover?.url ?? (art as any).image ?? (art as any).mockup ??
               (Array.isArray((art as any).images) ? (art as any).images[0]?.url : undefined)
+            const onVacation = Boolean((art as any).artist?.isOnVacation || (art as any).artistOnVacation)
 
             return (
               <div key={art.id} className="flex flex-col">
@@ -223,6 +224,11 @@ export default async function ArtworksPage({ searchParams }: { searchParams: Sea
                   className="group block focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                 >
                   <div className="relative aspect-square overflow-hidden rounded-xl border bg-white">
+                    {onVacation ? (
+                      <span className="absolute left-3 top-3 z-10 inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+                        En vacances
+                      </span>
+                    ) : null}
                     {image ? (
                       <SmartImage
                         src={image}
@@ -245,7 +251,10 @@ export default async function ArtworksPage({ searchParams }: { searchParams: Sea
                   </div>
                 </Link>
                 {art.artist?.name ? (
-                  <div className="text-xs text-neutral-500">{art.artist.name}</div>
+                  <div className="text-xs text-neutral-500">
+                    {art.artist.name}
+                    {onVacation ? <span className="ml-2 text-amber-600">(indisponible)</span> : null}
+                  </div>
                 ) : null}
               </div>
             )
