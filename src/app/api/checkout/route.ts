@@ -163,6 +163,8 @@ type VariantWithWork = {
         email: email ?? null,
         status: 'pending',
         total: orderTotal, // centimes
+        shippingStatus: 'pending',
+        trackingUrl: null,
         items: {
           create: items.map((it) => {
             const v = vMap.get(it.variantId)!

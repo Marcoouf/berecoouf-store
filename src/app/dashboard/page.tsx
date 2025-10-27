@@ -204,12 +204,28 @@ export default async function DashboardPage() {
                 <span>📝 Mettre à jour ma bio</span>
                 <span aria-hidden>→</span>
               </Link>
+              <Link
+                href="/dashboard/orders"
+                className="flex items-center justify-between rounded-2xl border border-neutral-200 px-4 py-3 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50"
+              >
+                <span>📦 Suivre mes commandes</span>
+                <span aria-hidden>→</span>
+              </Link>
               {isAdmin ? (
                 <Link
                   href="/admin"
                   className="flex items-center justify-between rounded-2xl border border-neutral-200 px-4 py-3 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50"
                 >
                   <span>⚙️ Accéder à l’admin complète</span>
+                  <span aria-hidden>→</span>
+                </Link>
+              ) : null}
+              {isAdmin ? (
+                <Link
+                  href="/admin/orders"
+                  className="flex items-center justify-between rounded-2xl border border-neutral-200 px-4 py-3 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50"
+                >
+                  <span>📦 Gestion des commandes</span>
                   <span aria-hidden>→</span>
                 </Link>
               ) : null}

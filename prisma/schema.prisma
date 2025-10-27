@@ -82,6 +82,8 @@ model Order {
   total           Int // en centimes (subtotal produits ; les frais de port viennent de Stripe)
   status          OrderStatus @default(pending)
   stripeSessionId String?
+  shippingStatus  ShippingStatus @default(pending)
+  trackingUrl     String?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
@@ -89,6 +91,13 @@ model Order {
 
   @@index([status])
   @@index([stripeSessionId])
+}
+
+enum ShippingStatus {
+  pending
+  packing
+  shipped
+  delivered
 }
 
 model OrderItem {

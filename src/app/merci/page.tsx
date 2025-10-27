@@ -1,5 +1,6 @@
 // src/app/merci/page.tsx
 import { stripe } from '@/lib/stripe'
+import { prisma } from '@/lib/prisma'
 import CheckoutSuccessClient from '@/components/CheckoutSuccessClient'
 import Link from 'next/link'
 
@@ -7,10 +8,25 @@ import Link from 'next/link'
 // décoratif ne capture les clics. On rend CheckoutSuccessClient sous le contenu
 // et avec pointer-events: none.
 
-type Props = { searchParams?: { session_id?: string } }
+type Props = { searchParams?: { session_id?: string; orderId?: string } }
+
+const SHIPPING_LABELS: Record<string, string> = {
+  pending: 'En attente',
+  packing: 'En préparation',
+  shipped: 'Expédiée',
+  delivered: 'Livrée',
+}
 
 export default async function MerciPage({ searchParams }: Props) {
   const sessionId = searchParams?.session_id
+  const orderId = searchParams?.orderId
+
+  const orderRecord = orderId
+    ? await prisma.order.findUnique({
+        where: { id: orderId },
+        select: { id: true, shippingStatus: true, trackingUrl: true, updatedAt: true },
+      })
+    : null
 
   if (!sessionId) {
     return (
@@ -39,6 +55,9 @@ export default async function MerciPage({ searchParams }: Props) {
         : li.description)
     return { name, qty, unit, total: unit * qty }
   })
+
+  const shippingStatus = orderRecord?.shippingStatus ?? null
+  const trackingUrl = orderRecord?.trackingUrl ?? null
 
   return (
     <div className="relative">
@@ -77,6 +96,36 @@ export default async function MerciPage({ searchParams }: Props) {
           )}
         </section>
 
+        {orderRecord ? (
+          <section className="mt-6 rounded-xl border border-neutral-200 bg-white/70 p-4">
+            <h2 className="font-medium mb-2">Suivi d’expédition</h2>
+            <p className="text-sm text-neutral-600">
+              Statut :{' '}
+              <span className="font-semibold text-neutral-900">
+                {shippingStatus ? SHIPPING_LABELS[shippingStatus] ?? shippingStatus : 'En attente'}
+              </span>
+            </p>
+            {trackingUrl ? (
+              <p className="mt-2 text-sm">
+                <a
+                  href={trackingUrl}
+                  target="_blank"
+                  rel="noopener"
+                  className="inline-flex items-center gap-2 rounded-lg border border-neutral-300 px-3 py-2 text-sm font-medium text-ink transition hover:bg-neutral-100"
+                >
+                  <span aria-hidden>🔍</span>
+                  Consulter le suivi La Poste
+                </a>
+              </p>
+            ) : (
+              <p className="mt-2 text-sm text-neutral-500">
+                Nous te préviendrons par email dès que le numéro de suivi sera disponible. Les œuvres partent en lettre
+                suivie via La Poste.
+              </p>
+            )}
+          </section>
+        ) : null}
+
         <section className="mt-6 grid gap-3 md:grid-cols-2">
           <a
             href={`mailto:contact@point-bleu.fr?subject=Reçu%20commande%20${encodeURIComponent(session.id)}`}
@@ -98,7 +147,7 @@ export default async function MerciPage({ searchParams }: Props) {
 
         <p className="mt-4 flex items-center gap-2 rounded-lg bg-neutral-50 px-3 py-2 text-sm text-neutral-600">
           <span aria-hidden className="text-lg">✅</span>
-          Les tirages sont préparés sous 3 à 5 jours ouvrés. Tu recevras un email dès que le colis partira.
+          Les tirages sont préparés sous 3 à 5 jours ouvrés. Nous envoyons un email avec le suivi dès l’expédition.
         </p>
 
         <div className="mt-6">

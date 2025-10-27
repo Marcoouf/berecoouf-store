@@ -1,28 +1,13 @@
 // src/app/api/stripe/webhook/route.ts
 import { NextResponse } from 'next/server'
 import * as React from 'react'
-import { EmailLayout } from '@/emails/layout'
 import { stripe } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
+import { renderEmail, getResendClient } from '@/lib/emailer'
 import type Stripe from 'stripe'
-
-// Resend (optionnel)
-let resend: any = null
-try {
-  const { Resend } = require('resend')
-  const key = process.env.RESEND_API_KEY
-  if (key) resend = new Resend(key)
-} catch {
-  // paquet non installé → on continue sans email
-}
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-
-async function renderEmail(props: React.ComponentProps<typeof EmailLayout>) {
-  const { renderToStaticMarkup } = await import('react-dom/server')
-  return '<!DOCTYPE html>' + renderToStaticMarkup(<EmailLayout {...props} />)
-}
 
 function ok(body: any = { received: true }, init: number | ResponseInit = 200) {
   return NextResponse.json(body, typeof init === 'number' ? { status: init } : init)
@@ -304,6 +289,7 @@ export async function POST(req: Request) {
   const artistSendFailures: Array<{ to: string; artist: string; reason: string }> = []
 
   const disableArtistEmails = process.env.RESEND_DISABLE_ARTIST_EMAILS === '1'
+  const resend = getResendClient()
 
   console.log('webhook resend status', {
     resendConfigured: Boolean(resend),
