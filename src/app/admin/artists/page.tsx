@@ -8,6 +8,7 @@ type ArtistRow = {
   name: string;
   slug: string;
   isArchived: boolean;
+  isHidden: boolean;
 };
 
 type ArtistFull = {
@@ -19,6 +20,7 @@ type ArtistFull = {
   portrait?: string | null;  // avatar
   contactEmail?: string | null;
   socials?: string[];
+  isHidden?: boolean;
 };
 
 // --- Small helpers ---
@@ -75,6 +77,7 @@ async function apiGet(id: string): Promise<ArtistFull> {
     portrait: artist.portrait ?? null,
     contactEmail: artist.contactEmail ?? null,
     socials: artist.socials ?? [],
+    isHidden: artist.isHidden ?? false,
   };
 }
 async function apiArchive(id: string) {
@@ -154,7 +157,7 @@ export default function AdminArtistsPage() {
   useEffect(() => { refresh(); }, []);
 
   function startCreate() {
-    setEditing({ name: "", slug: "", bio: "", image: "", portrait: "", contactEmail: "", socials: [] });
+    setEditing({ name: "", slug: "", bio: "", image: "", portrait: "", contactEmail: "", socials: [], isHidden: false });
     setCoverPreview(null);
     setPortraitPreview(null);
     setFormLoading(false);
@@ -163,7 +166,7 @@ export default function AdminArtistsPage() {
     const r = rows.find((x) => x.id === id);
     if (!r) return;
     setFormLoading(true);
-    setEditing({ id: r.id, name: r.name, slug: r.slug, bio: "", image: "", portrait: "", contactEmail: "", socials: [] });
+    setEditing({ id: r.id, name: r.name, slug: r.slug, bio: "", image: "", portrait: "", contactEmail: "", socials: [], isHidden: r.isHidden });
     setCoverPreview(null);
     setPortraitPreview(null);
     try {
@@ -189,6 +192,7 @@ export default function AdminArtistsPage() {
       portrait: editing.portrait?.trim() || null,
       contactEmail: editing.contactEmail?.trim() || null,
       socials: editing.socials ?? [],
+      isHidden: editing.isHidden ?? false,
     };
     try {
       if (isEditing && editing.id) await apiUpdate(editing.id, payload);
@@ -205,6 +209,10 @@ export default function AdminArtistsPage() {
   }
   async function onRestore(id: string) {
     try { await apiRestore(id); refresh(); } catch (e: any) { alert(e?.message); }
+  }
+  async function onToggleHidden(id: string, hide: boolean) {
+    try { await apiUpdate(id, { isHidden: hide }); await refresh(); }
+    catch (e: any) { alert(e?.message || "Action refusée"); }
   }
   async function onDelete(id: string) {
     if (!confirm("Supprimer l’artiste ? (refus si des œuvres existent)")) return;
@@ -257,10 +265,20 @@ export default function AdminArtistsPage() {
               <div key={a.id} className="flex items-center justify-between gap-3 px-3 py-2">
                 <div>
                   <div className="font-medium">{a.name}</div>
-                  <div className="text-xs text-neutral-500">{a.slug} {a.isArchived ? "· archivé" : ""}</div>
+                  <div className="text-xs text-neutral-500">
+                    {a.slug}
+                    {a.isArchived ? " · archivé" : ""}
+                    {a.isHidden ? " · masqué" : ""}
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   <button className="rounded border px-2 py-1 text-sm" onClick={() => startEditById(a.id)}>Éditer</button>
+                  <button
+                    className="rounded border px-2 py-1 text-sm"
+                    onClick={() => onToggleHidden(a.id, !a.isHidden)}
+                  >
+                    {a.isHidden ? "Afficher" : "Masquer"}
+                  </button>
                   {!a.isArchived ? (
                     <button className="rounded border px-2 py-1 text-sm" onClick={() => onArchive(a.id)}>Archiver</button>
                   ) : (
@@ -313,6 +331,22 @@ export default function AdminArtistsPage() {
                   onChange={(e) => setEditing((s) => ({ ...(s as ArtistFull), contactEmail: e.target.value || null }))}
                 />
                 <span className="text-[11px] text-neutral-500">Utilisé pour avertir l’artiste lors d’une commande réussie.</span>
+              </label>
+
+              <label className="flex items-start gap-2 rounded-md border border-neutral-200 bg-neutral-50/80 px-3 py-2 text-sm text-neutral-700">
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={Boolean(editing.isHidden)}
+                  disabled={formDisabled}
+                  onChange={(e) => setEditing((s) => ({ ...(s as ArtistFull), isHidden: e.target.checked }))}
+                />
+                <span>
+                  Masquer cet artiste du site public
+                  <span className="block text-xs text-neutral-500">
+                    Les œuvres restent visibles dans l’admin et pour l’auteur, mais ne s’affichent plus sur le site.
+                  </span>
+                </span>
               </label>
 
               <label className="grid gap-1">

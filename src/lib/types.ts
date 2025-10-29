@@ -49,6 +49,7 @@ export type Artist = {
   socials?: string[]
   isArchived?: boolean
   isOnVacation?: boolean
+  isHidden?: boolean
 }
 
 export type CartItem = {

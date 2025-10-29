@@ -20,7 +20,7 @@ export const dynamic = 'force-dynamic'
 export default async function ArtistsPage() {
   // Récupère les artistes directement via Prisma
   const artists = await prisma.artist.findMany({
-    where: { deletedAt: null, isArchived: false },
+    where: { deletedAt: null, isArchived: false, isHidden: false },
     orderBy: { name: 'asc' },
     select: {
       id: true,

@@ -31,6 +31,7 @@ export async function GET() {
       contactEmail: true,
       handle: true,
       isOnVacation: true,
+      isHidden: true,
     },
   })
 
@@ -39,6 +40,7 @@ export async function GET() {
       ...artist,
       socials: Array.isArray(artist.socials) ? artist.socials : [],
       isOnVacation: Boolean(artist.isOnVacation),
+      isHidden: Boolean(artist.isHidden),
     })),
   )
 }

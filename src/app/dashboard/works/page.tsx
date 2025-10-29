@@ -63,6 +63,7 @@ type ArtistOption = {
   name: string
   slug: string
   isOnVacation?: boolean
+  isHidden?: boolean
 }
 
 type WorksResponse = {
@@ -208,6 +209,9 @@ export default function AuthorWorksPage() {
   const activeArtistId = detail?.artist?.id ?? selectedWork?.artistId ?? availableArtists[0]?.id ?? null
   const activeArtistOnVacation = activeArtistId
     ? Boolean(availableArtists.find((artist) => artist.id === activeArtistId)?.isOnVacation)
+    : false
+  const activeArtistHidden = activeArtistId
+    ? Boolean(availableArtists.find((artist) => artist.id === activeArtistId)?.isHidden)
     : false
 
   useEffect(() => {
@@ -639,6 +643,16 @@ export default function AuthorWorksPage() {
               Tes œuvres restent visibles mais les commandes sont désactivées jusqu’à ton retour.
             </p>
           </div>
+        </div>
+      ) : null}
+
+      {activeArtistHidden ? (
+        <div className="mb-6 rounded-2xl border border-neutral-300 bg-neutral-50 px-4 py-3 text-sm text-neutral-700 shadow-sm">
+          <div className="font-semibold">Profil masqué par l’équipe</div>
+          <p className="mt-1 text-neutral-600">
+            Cet artiste est actuellement masqué sur le site public. Contacte l’administrateur pour le rendre visible à
+            nouveau.
+          </p>
         </div>
       ) : null}
 

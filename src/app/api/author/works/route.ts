@@ -22,7 +22,7 @@ export async function GET() {
   const [artists, works] = await Promise.all([
     prisma.artist.findMany({
       where: { id: { in: artistIds } },
-      select: { id: true, name: true, slug: true, isOnVacation: true },
+      select: { id: true, name: true, slug: true, isOnVacation: true, isHidden: true },
       orderBy: { name: 'asc' },
     }),
     prisma.work.findMany({
@@ -45,7 +45,11 @@ export async function GET() {
 
   return NextResponse.json({
     works: works.map(mapWorkSummary),
-    artists: artists.map((artist) => ({ ...artist, isOnVacation: Boolean(artist.isOnVacation) })),
+    artists: artists.map((artist) => ({
+      ...artist,
+      isOnVacation: Boolean(artist.isOnVacation),
+      isHidden: Boolean(artist.isHidden),
+    })),
   })
 }
 

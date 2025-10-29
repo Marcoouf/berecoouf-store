@@ -12,7 +12,7 @@ export async function GET() {
   const artists = await prisma.artist.findMany({
     where: { deletedAt: null },
     orderBy: { name: "asc" },
-    select: { id: true, name: true, slug: true, isArchived: true },
+    select: { id: true, name: true, slug: true, isArchived: true, isHidden: true },
   });
   return NextResponse.json(artists);
 }
@@ -41,6 +41,7 @@ export async function POST(req: Request) {
         image: input.image ?? null,
         portrait: input.portrait ?? null,
         contactEmail,
+        isHidden: input.isHidden ?? false,
       },
       update: {
         name: input.name,
@@ -51,6 +52,7 @@ export async function POST(req: Request) {
         contactEmail,
         deletedAt: null,
         isArchived: false,
+        isHidden: input.isHidden ?? false,
       },
       select: { id: true, slug: true, name: true },
     });

@@ -18,6 +18,7 @@ type DbArtist = {
   handle?: string | null
   isArchived?: boolean
   isOnVacation?: boolean
+  isHidden?: boolean
 }
 
 type DbVariant = {
@@ -53,6 +54,7 @@ export type Artist = {
   image?: string
   contactEmail?: string
   isOnVacation?: boolean
+  isHidden?: boolean
 }
 
 export type Variant = {
@@ -185,10 +187,12 @@ export async function getCatalog(): Promise<{ artists: Artist[]; artworks: Artwo
       socials: true,
       handle: true,
       isArchived: true,
+      isHidden: true,
       isOnVacation: true,
     },
   }),
   prisma.work.findMany({
+    where: { artist: { isArchived: false, isHidden: false, deletedAt: null } },
     orderBy: [{ year: 'desc' }, { title: 'asc' }],
     select: {
       id: true,
@@ -213,7 +217,7 @@ export async function getCatalog(): Promise<{ artists: Artist[]; artworks: Artwo
 
     // Artistes actifs uniquement
     const artists: Artist[] = (dbArtists as unknown as DbArtist[])
-      .filter((a) => !a.isArchived)
+      .filter((a) => !a.isArchived && !a.isHidden)
       .map((a) => {
         const portrait = toUrlString(a.portrait) ?? toUrlString(a.image) ?? undefined
         const cover = toUrlString(a.image) ?? toUrlString(a.portrait) ?? undefined
@@ -228,6 +232,7 @@ export async function getCatalog(): Promise<{ artists: Artist[]; artworks: Artwo
           image: cover,
           contactEmail: email || undefined,
           isOnVacation: Boolean(a.isOnVacation),
+          isHidden: Boolean(a.isHidden),
         }
       })
 
@@ -254,7 +259,10 @@ export async function getCatalog(): Promise<{ artists: Artist[]; artworks: Artwo
     }))
 
     const artistIndex = new Map<string, Artist>(artists.map((a) => [a.id, a]))
-    const artworksNormalized = artworksRaw.map((w) => normalizeArtwork(w, artistIndex)).filter(isArtwork)
+    const artworksNormalized = artworksRaw
+      .filter((w) => artistIndex.has(w.artistId))
+      .map((w) => normalizeArtwork(w, artistIndex))
+      .filter(isArtwork)
 
     const artworksFiltered = artworksNormalized.filter((a) => {
       const url = primaryImageUrl(a)

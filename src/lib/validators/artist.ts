@@ -10,8 +10,11 @@ export const artistBaseSchema = z.object({
   contactEmail: z.string().email("Email invalide").optional().nullable(),
 });
 
-export const artistCreateSchema = artistBaseSchema;
+export const artistCreateSchema = artistBaseSchema.extend({
+  isHidden: z.boolean().optional(),
+});
 
 export const artistUpdateSchema = artistBaseSchema.partial().extend({
   id: z.string().min(1),
+  isHidden: z.boolean().optional(),
 });

@@ -23,6 +23,7 @@ export async function GET(_req: Request, { params }: Params) {
         contactEmail: true,
         socials: true,
         isArchived: true,
+        isHidden: true,
         deletedAt: true,
       },
     });
@@ -71,6 +72,7 @@ export async function PATCH(
       const email = typeof payload.contactEmail === "string" ? payload.contactEmail.trim() : payload.contactEmail
       data.contactEmail = email ? email : null
     }
+    if (typeof payload.isHidden === "boolean") data.isHidden = payload.isHidden;
 
     const updated = await prisma.artist.update({
       where: { id },

@@ -12,8 +12,8 @@ export const dynamic = 'force-dynamic'
 type Props = { params: { slug: string } }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const artist = await prisma.artist.findUnique({
-    where: { slug: params.slug },
+  const artist = await prisma.artist.findFirst({
+    where: { slug: params.slug, deletedAt: null, isArchived: false, isHidden: false },
     select: { name: true, bio: true },
   })
   return {
@@ -29,8 +29,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 export default async function ArtistPage({ params }: Props) {
-  const artist = await prisma.artist.findUnique({
-    where: { slug: params.slug },
+  const artist = await prisma.artist.findFirst({
+    where: { slug: params.slug, deletedAt: null, isArchived: false, isHidden: false },
     select: {
       id: true,
       name: true,
