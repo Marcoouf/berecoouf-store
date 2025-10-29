@@ -10,12 +10,14 @@ const INTERACTIVE_SEL =
 /**
  * Split in two components so we never break the Rules of Hooks.
  * The outer component decides whether to render the cursor at all
- * (admin pages or mobile/tablet -> no cursor). The inner component
+ * (admin/auteur/backoffice pages or mobile/tablet -> no cursor). The inner component
  * attaches mouse listeners and renders the dot.
  */
 export default function CustomCursor() {
   const pathname = usePathname()
   const isAdmin = (pathname ?? "").startsWith("/admin")
+  const isAuthor = (pathname ?? "").startsWith("/dashboard")
+  const isBackoffice = isAdmin || isAuthor
 
   // Detect mobile/tablet (coarse pointer OR small viewport)
   const [isMobile, setIsMobile] = useState(false)
@@ -42,7 +44,7 @@ export default function CustomCursor() {
   useEffect(() => {
     const body = document?.body
     if (!body) return
-    if (isAdmin || isMobile) {
+    if (isBackoffice || isMobile) {
       body.classList.remove('cursor-hidden')
     } else {
       body.classList.add('cursor-hidden')
@@ -51,10 +53,10 @@ export default function CustomCursor() {
       // on unmount, always ensure native cursor comes back
       body.classList.remove('cursor-hidden')
     }
-  }, [isAdmin, isMobile])
+  }, [isBackoffice, isMobile])
 
-  // Do not render the custom cursor on admin routes or mobile/tablet
-  if (isAdmin || isMobile) return null
+  // Do not render the custom cursor on admin/author routes or mobile/tablet
+  if (isBackoffice || isMobile) return null
 
   return <CursorInner />
 }
