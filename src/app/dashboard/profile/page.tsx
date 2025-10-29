@@ -254,7 +254,10 @@ function ImageUploadField({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="text-sm font-semibold text-neutral-700">{label}</div>
+      <div>
+        <div className="text-sm font-semibold text-neutral-700">{label}</div>
+        <div className="text-xs text-neutral-500">Poids max 2,5&nbsp;Mo.</div>
+      </div>
       <div
         role="button"
         tabIndex={0}

@@ -46,7 +46,6 @@ type FormState = {
   year: string
   technique: string
   paper: string
-  dimensions: string
   edition: string
   image: string
   mockup: string
@@ -105,7 +104,6 @@ function buildForm(detail: WorkDetail): FormState {
     year: detail.year ? String(detail.year) : '',
     technique: detail.technique ?? '',
     paper: detail.paper ?? '',
-    dimensions: detail.dimensions ?? '',
     edition: detail.edition ?? '',
     image: detail.image ?? '',
     mockup: detail.mockup ?? '',
@@ -486,6 +484,12 @@ export default function AuthorWorksPage() {
     setError(null)
     setMessage(null)
 
+    if (!form.image.trim()) {
+      setError('Ajoute une image principale avant de sauvegarder.')
+      setSaving(false)
+      return
+    }
+
     const variantErrors: string[] = []
     const variantsPayload: Array<{ id?: string; label: string; price: number; order: number }> = []
 
@@ -533,9 +537,8 @@ export default function AuthorWorksPage() {
       year: form.year.trim() ? Number(form.year) : null,
       technique: form.technique.trim() || null,
       paper: form.paper.trim() || null,
-      dimensions: form.dimensions.trim() || null,
       edition: form.edition.trim() || null,
-      image: form.image.trim() || null,
+      image: form.image.trim(),
       mockup: form.mockup.trim() || null,
       basePrice: form.basePrice.trim() ? Number(form.basePrice.replace(',', '.')) : null,
       published: form.published,
@@ -663,7 +666,9 @@ export default function AuthorWorksPage() {
           ) : (
             <form className="mt-4 space-y-4" onSubmit={handleCreateWork}>
               <div>
-                <label className="block text-sm font-medium text-neutral-700">Artiste</label>
+                <label className="block text-sm font-medium text-neutral-700">
+                  Artiste <span className="ml-1 text-red-600">*</span>
+                </label>
                 <select
                   value={createForm.artistId}
                   onChange={(e) => handleCreateField('artistId', e.target.value)}
@@ -678,7 +683,9 @@ export default function AuthorWorksPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-neutral-700">Titre</label>
+                <label className="block text-sm font-medium text-neutral-700">
+                  Titre <span className="ml-1 text-red-600">*</span>
+                </label>
                 <input
                   type="text"
                   value={createForm.title}
@@ -996,7 +1003,9 @@ export default function AuthorWorksPage() {
                 ) : null}
 
                 <div>
-                  <label className="block text-sm font-medium text-neutral-700">Titre</label>
+                  <label className="block text-sm font-medium text-neutral-700">
+                    Titre <span className="ml-1 text-red-600">*</span>
+                  </label>
                   <input
                     type="text"
                     value={form.title}
@@ -1051,25 +1060,14 @@ export default function AuthorWorksPage() {
                   </div>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700">Dimensions</label>
-                    <input
-                      type="text"
-                      value={form.dimensions}
-                      onChange={(e) => handleField('dimensions', e.target.value)}
-                      className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-2 focus:ring-ink/10"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700">Édition</label>
-                    <input
-                      type="text"
-                      value={form.edition}
-                      onChange={(e) => handleField('edition', e.target.value)}
-                      className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-2 focus:ring-ink/10"
-                    />
-                  </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700">Édition</label>
+                  <input
+                    type="text"
+                    value={form.edition}
+                    onChange={(e) => handleField('edition', e.target.value)}
+                    className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-2 focus:ring-ink/10"
+                  />
                 </div>
 
                 <div>
@@ -1101,7 +1099,9 @@ export default function AuthorWorksPage() {
                         className="grid gap-3 rounded-md border border-neutral-200 p-3 md:grid-cols-[1fr_140px_auto]"
                       >
                         <div>
-                          <label className="block text-xs font-medium uppercase text-neutral-500">Intitulé</label>
+                          <label className="block text-xs font-medium uppercase text-neutral-500">
+                            Intitulé <span className="text-red-600">*</span>
+                          </label>
                           <input
                             type="text"
                             value={variant.label}
@@ -1111,11 +1111,13 @@ export default function AuthorWorksPage() {
                           />
                         </div>
                         <div>
-                          <label className="block text-xs font-medium uppercase text-neutral-500">Prix (€)</label>
+                          <label className="block text-xs font-medium uppercase text-neutral-500">
+                            Prix (€) <span className="text-red-600">*</span>
+                          </label>
                           <input
-                            type="number"
-                            min="0"
-                            step="0.01"
+                            type="text"
+                            inputMode="decimal"
+                            pattern="^[0-9]+(?:[.,][0-9]{0,2})?$"
                             value={variant.price}
                             onChange={(e) => handleVariantChange(idx, 'price', e.target.value)}
                             placeholder="0"
@@ -1142,6 +1144,7 @@ export default function AuthorWorksPage() {
 
                 <div className="rounded-lg border border-neutral-200 p-4">
                   <h3 className="text-sm font-semibold text-neutral-700">Image principale</h3>
+                  <p className="mt-1 text-xs text-neutral-500">Poids max 2,5&nbsp;Mo.</p>
                   {form.image ? (
                     <div className="relative mt-3 h-40 w-full overflow-hidden rounded-lg">
                       <Image
@@ -1180,6 +1183,7 @@ export default function AuthorWorksPage() {
 
                 <div className="rounded-lg border border-neutral-200 p-4">
                   <h3 className="text-sm font-semibold text-neutral-700">Mockup (optionnel)</h3>
+                  <p className="mt-1 text-xs text-neutral-500">Poids max 2,5&nbsp;Mo.</p>
                   {form.mockup ? (
                     <div className="relative mt-3 h-40 w-full overflow-hidden rounded-lg">
                       <Image

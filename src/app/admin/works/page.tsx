@@ -19,7 +19,6 @@ type ArtworkDraft = {
   year?: number
   technique?: string
   paper?: string
-  size?: string
   edition?: string
   formats?: FormatRow[]
 }
@@ -58,7 +57,6 @@ function AdminPageInner() {
     year: undefined,
     technique: '',
     paper: '',
-    size: '',
     edition: '',
     formats: [
       { id: uid('f'), label: 'A3 — 297×420mm', price: 120 },
@@ -288,7 +286,6 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
       year: value.year ?? null,
       technique: value.technique || null,
       paper: value.paper || null,
-      size: value.size || null,
       edition: value.edition || null,
       published: true,
       formats: (value.formats ?? [])
@@ -338,7 +335,6 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
           year: undefined,
           technique: '',
           paper: '',
-          size: '',
           edition: '',
           formats: [
             { id: uid('f'), label: 'A3 — 297×420mm', price: 120 },
@@ -393,7 +389,6 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
                     year: undefined,
                     technique: '',
                     paper: '',
-                    size: '',
                     edition: '',
                     formats: [
                       { id: uid('f'), label: 'A3 — 297×420mm', price: 120 },
@@ -491,7 +486,6 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
                   year: undefined,
                   technique: '',
                   paper: '',
-                  size: '',
                   edition: '',
                   formats: [
                     { id: uid('f'), label: 'A3 — 297×420mm', price: 120 },
@@ -514,7 +508,10 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
         {/* Upload + aperçu */}
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-8">
           <div className="flex-1 space-y-3">
-            <label className="block text-sm font-medium">Fichier image</label>
+            <label className="block text-sm font-medium">
+              Fichier image <span className="ml-1 text-red-600">*</span>
+              <span className="ml-2 text-xs font-normal text-neutral-500">(max 2,5 Mo)</span>
+            </label>
             <div className="flex items-center gap-3">
               <button
                 type="button"
@@ -602,7 +599,10 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
             )}
 
             <div className="mt-6">
-              <label className="block text-sm font-medium">Fichier mockup (optionnel)</label>
+              <label className="block text-sm font-medium">
+                Fichier mockup (optionnel)
+                <span className="ml-2 text-xs font-normal text-neutral-500">(max 2,5 Mo)</span>
+              </label>
               <div className="mt-2 flex items-center gap-3">
                 <button
                   type="button"
@@ -754,17 +754,18 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
         {/* Infos principales */}
         <div className="grid gap-4 md:grid-cols-2">
           <Field
-            label="Titre *"
+            label="Titre"
             value={value.title}
             onChange={v => setField('title', v)}
             placeholder="ex : Mono Field 02"
             required
           />
           <Select
-            label="Artiste *"
+            label="Artiste"
             value={value.artistId}
             onChange={v => setField('artistId', v)}
             options={artistsForSelect}
+            required
           />
           <Field
             label="Slug"
@@ -788,7 +789,6 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
             <Field label="Année" type="number" value={String(value.year ?? '')} onChange={v => setField('year', v ? Number(v) : undefined)} />
             <Field label="Technique" value={value.technique ?? ''} onChange={v => setField('technique', v)} />
             <Field label="Papier" value={value.paper ?? ''} onChange={v => setField('paper', v)} />
-            <Field label="Dimensions (texte)" value={value.size ?? ''} onChange={v => setField('size', v)} />
             <Field label="Édition" className="md:col-span-2" value={value.edition ?? ''} onChange={v => setField('edition', v)} />
           </div>
         </div>
@@ -830,14 +830,16 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
                     value={f.label}
                     onChange={v => setFormat(idx, { label: v })}
                     placeholder="ex : A2 — 420×594mm"
+                    required
                   />
                 </div>
                 <div className="grid gap-2 sm:col-span-1">
                   <SmallField
                     label="Prix (€)"
-                    type="number"
                     value={String(f.price ?? 0)}
                     onChange={v => setFormat(idx, { price: Number(v || 0) })}
+                    required
+                    inputMode="decimal"
                   />
                 </div>
                 <div className="col-span-2 flex justify-end">
@@ -914,20 +916,23 @@ function Field({
   required,
   className = '',
   desc,
+  inputMode,
 }: {
   label: string
   value: string
   onChange: (v: string) => void
-  type?: 'text' | 'number'
+  type?: React.HTMLInputTypeAttribute
   placeholder?: string
   required?: boolean
   className?: string
   desc?: string
+  inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode']
 }) {
   return (
     <div className={className}>
       <label className="mb-1 block text-sm font-medium">
-        {label} {required && <span className="text-red-600">*</span>}
+        {label}
+        {required && <span className="ml-1 text-red-600">*</span>}
       </label>
       <input
         className="w-full rounded-md border px-3 py-2 text-sm"
@@ -935,6 +940,8 @@ function Field({
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
+        required={required}
+        inputMode={inputMode}
       />
       {desc && <p className="mt-1 text-xs text-neutral-500">{desc}</p>}
     </div>
@@ -950,19 +957,25 @@ function Select({
   value,
   onChange,
   options,
+  required,
 }: {
   label: string
   value: string
   onChange: (v: string) => void
   options: { value: string; label: string }[]
+  required?: boolean
 }) {
   return (
     <div>
-      <label className="mb-1 block text-sm font-medium">{label}</label>
+      <label className="mb-1 block text-sm font-medium">
+        {label}
+        {required && <span className="ml-1 text-red-600">*</span>}
+      </label>
       <select
         className="w-full rounded-md border px-3 py-2 text-sm"
         value={value}
         onChange={e => onChange(e.target.value)}
+        required={required}
       >
         {options.map(opt => (
           <option key={opt.value} value={opt.value}>

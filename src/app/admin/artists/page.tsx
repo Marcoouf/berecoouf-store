@@ -326,7 +326,10 @@ export default function AdminArtistsPage() {
               {/* Upload & URLs : Couverture */}
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <label className="grid gap-1">
-                  <span className="text-xs text-neutral-600">Image de couverture (upload ou URL)</span>
+                  <span className="text-xs text-neutral-600">
+                    Image de couverture (upload ou URL)
+                    <span className="ml-1 text-[11px] text-neutral-500">(max 2,5 Mo)</span>
+                  </span>
                   <input type="file" accept="image/*" onChange={handleCoverFileChange}
                          disabled={formDisabled}
                          className="block w-full text-sm" />
@@ -344,7 +347,10 @@ export default function AdminArtistsPage() {
 
                 {/* Upload & URLs : Portrait */}
                 <label className="grid gap-1">
-                  <span className="text-xs text-neutral-600">Portrait (upload ou URL)</span>
+                  <span className="text-xs text-neutral-600">
+                    Portrait (upload ou URL)
+                    <span className="ml-1 text-[11px] text-neutral-500">(max 2,5 Mo)</span>
+                  </span>
                   <input type="file" accept="image/*" onChange={handlePortraitFileChange}
                          disabled={formDisabled}
                          className="block w-full text-sm" />
