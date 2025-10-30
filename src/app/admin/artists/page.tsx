@@ -139,7 +139,9 @@ export default function AdminArtistsPage() {
   const [uploadingCover, setUploadingCover] = useState(false);
   const [uploadingPortrait, setUploadingPortrait] = useState(false);
   const [formLoading, setFormLoading] = useState(false);
-  const formDisabled = formLoading && isEditing;
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
+  const formDisabled = formLoading || saving;
 
   async function refresh() {
     setLoading(true);
@@ -156,11 +158,22 @@ export default function AdminArtistsPage() {
 
   useEffect(() => { refresh(); }, []);
 
+  useEffect(() => {
+    if (!toast) return;
+    const id = window.setTimeout(() => setToast(null), 3500);
+    return () => window.clearTimeout(id);
+  }, [toast]);
+
+  const showToast = (message: string, kind: 'success' | 'error' = 'success') => {
+    setToast({ kind, message });
+  };
+
   function startCreate() {
     setEditing({ name: "", slug: "", bio: "", image: "", portrait: "", contactEmail: "", socials: [], isHidden: false });
     setCoverPreview(null);
     setPortraitPreview(null);
     setFormLoading(false);
+    setSaving(false);
   }
   async function startEditById(id: string) {
     const r = rows.find((x) => x.id === id);
@@ -175,15 +188,17 @@ export default function AdminArtistsPage() {
       setCoverPreview(full.image ?? null);
       setPortraitPreview(full.portrait ?? null);
     } catch (e: any) {
-      alert(e?.message || "Impossible de charger l’artiste");
+      showToast(e?.message || "Impossible de charger l’artiste", 'error');
     } finally {
       setFormLoading(false);
+      setSaving(false);
     }
   }
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!editing) return;
+    setSaving(true);
     const payload: ArtistFull = {
       name: editing.name.trim(),
       slug: editing.slug.trim(),
@@ -199,24 +214,44 @@ export default function AdminArtistsPage() {
       else await apiCreate(payload);
       setEditing(null);
       await refresh();
+      showToast(isEditing ? "Artiste mis à jour ✅" : "Artiste créé ✅", 'success');
     } catch (e: any) {
-      alert(e?.message || "Échec de l’enregistrement");
+      showToast(e?.message || "Échec de l’enregistrement", 'error');
+    } finally {
+      setSaving(false);
     }
   }
 
   async function onArchive(id: string) {
-    try { await apiArchive(id); refresh(); } catch (e: any) { alert(e?.message); }
+    try {
+      await apiArchive(id); refresh(); showToast('Artiste archivé ✅', 'success');
+    } catch (e: any) {
+      showToast(e?.message || 'Action impossible', 'error');
+    }
   }
   async function onRestore(id: string) {
-    try { await apiRestore(id); refresh(); } catch (e: any) { alert(e?.message); }
+    try {
+      await apiRestore(id); refresh(); showToast('Artiste restauré ✅', 'success');
+    } catch (e: any) {
+      showToast(e?.message || 'Action impossible', 'error');
+    }
   }
   async function onToggleHidden(id: string, hide: boolean) {
-    try { await apiUpdate(id, { isHidden: hide }); await refresh(); }
-    catch (e: any) { alert(e?.message || "Action refusée"); }
+    try {
+      await apiUpdate(id, { isHidden: hide });
+      await refresh();
+      showToast(hide ? 'Artiste masqué ✅' : 'Artiste visible ✅', 'success');
+    } catch (e: any) {
+      showToast(e?.message || 'Action refusée', 'error');
+    }
   }
   async function onDelete(id: string) {
     if (!confirm("Supprimer l’artiste ? (refus si des œuvres existent)")) return;
-    try { await apiDelete(id); refresh(); } catch (e: any) { alert(e?.message); }
+    try {
+      await apiDelete(id); refresh(); showToast('Artiste supprimé ✅', 'success');
+    } catch (e: any) {
+      showToast(e?.message || 'Suppression impossible', 'error');
+    }
   }
 
   const sorted = useMemo(() => rows.slice().sort((a,b) => a.name.localeCompare(b.name, "fr")), [rows]);
@@ -244,49 +279,91 @@ export default function AdminArtistsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl p-6">
-      <div className="flex items-center justify-between gap-4">
+    <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-medium">Admin · Artistes</h1>
-        <button onClick={startCreate} className="rounded border px-3 py-1.5 text-sm hover:bg-neutral-50">+ Ajouter</button>
+        <button
+          onClick={startCreate}
+          className="w-full rounded border px-3 py-2 text-sm font-medium hover:bg-neutral-50 sm:w-auto"
+        >
+          + Ajouter
+        </button>
       </div>
+
+      {toast && (
+        <div
+          className={clsx(
+            'mt-4 rounded-md border px-3 py-2 text-sm shadow-sm',
+            toast.kind === 'success' ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-700'
+          )}
+        >
+          {toast.message}
+        </div>
+      )}
 
       {error && <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
 
       <div className="mt-4">
         {loading ? (
           <div className="text-sm text-neutral-500">Chargement…</div>
+        ) : sorted.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-neutral-300 bg-white/80 p-6 text-sm text-neutral-500">
+            Aucun artiste. Clique sur « Ajouter » pour en créer un.
+          </div>
         ) : (
-          <div className="divide-y rounded-lg border">
-            {sorted.length === 0 && (
-              <div className="p-4 text-sm text-neutral-500">Aucun artiste. Cliquez « Ajouter » pour en créer un.</div>
-            )}
-
-            {sorted.map((a) => (
-              <div key={a.id} className="flex items-center justify-between gap-3 px-3 py-2">
-                <div>
-                  <div className="font-medium">{a.name}</div>
-                  <div className="text-xs text-neutral-500">
-                    {a.slug}
-                    {a.isArchived ? " · archivé" : ""}
-                    {a.isHidden ? " · masqué" : ""}
+          <div className="grid gap-3">
+            {sorted.map((artist) => (
+              <article key={artist.id} className="rounded-xl border border-neutral-200 bg-white/90 p-4 shadow-sm">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="text-sm font-semibold text-neutral-900">{artist.name}</div>
+                    <div className="mt-1 flex items-center gap-2 text-xs text-neutral-500">
+                      <code className="rounded bg-neutral-100 px-2 py-0.5 text-xs">/{artist.slug}</code>
+                      {artist.isHidden && (
+                        <span className="rounded-full bg-neutral-200 px-2 py-0.5 text-xs text-neutral-700">Masqué</span>
+                      )}
+                      {artist.isArchived && (
+                        <span className="rounded-full bg-amber-200 px-2 py-0.5 text-xs text-amber-800">Archivé</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 transition hover:bg-neutral-50"
+                      onClick={() => startEditById(artist.id)}
+                    >
+                      Éditer
+                    </button>
+                    <button
+                      className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 transition hover:bg-neutral-50"
+                      onClick={() => onToggleHidden(artist.id, !artist.isHidden)}
+                    >
+                      {artist.isHidden ? 'Afficher' : 'Masquer'}
+                    </button>
+                    {!artist.isArchived ? (
+                      <button
+                        className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 transition hover:bg-neutral-50"
+                        onClick={() => onArchive(artist.id)}
+                      >
+                        Archiver
+                      </button>
+                    ) : (
+                      <button
+                        className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium text-neutral-700 transition hover:bg-neutral-50"
+                        onClick={() => onRestore(artist.id)}
+                      >
+                        Restaurer
+                      </button>
+                    )}
+                    <button
+                      className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50"
+                      onClick={() => onDelete(artist.id)}
+                    >
+                      Supprimer
+                    </button>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <button className="rounded border px-2 py-1 text-sm" onClick={() => startEditById(a.id)}>Éditer</button>
-                  <button
-                    className="rounded border px-2 py-1 text-sm"
-                    onClick={() => onToggleHidden(a.id, !a.isHidden)}
-                  >
-                    {a.isHidden ? "Afficher" : "Masquer"}
-                  </button>
-                  {!a.isArchived ? (
-                    <button className="rounded border px-2 py-1 text-sm" onClick={() => onArchive(a.id)}>Archiver</button>
-                  ) : (
-                    <button className="rounded border px-2 py-1 text-sm" onClick={() => onRestore(a.id)}>Restaurer</button>
-                  )}
-                  <button className="rounded border px-2 py-1 text-sm" onClick={() => onDelete(a.id)}>Supprimer</button>
-                </div>
-              </div>
+              </article>
             ))}
           </div>
         )}
@@ -294,125 +371,158 @@ export default function AdminArtistsPage() {
 
       {/* Drawer/Form */}
       {editing && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onClick={() => setEditing(null)}>
-          <div className="w-full max-w-2xl rounded-xl border bg-white p-4" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <div className="text-base font-medium">{isEditing ? "Éditer l’artiste" : "Nouvel artiste"}</div>
-              <button className="rounded border px-2 py-1 text-sm" onClick={() => setEditing(null)}>Fermer</button>
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-6"
+          onClick={() => setEditing(null)}
+        >
+          <div
+            className="w-full max-w-3xl rounded-2xl border border-neutral-200 bg-white shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-col gap-3 border-b border-neutral-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+              <div className="text-base font-semibold text-neutral-900">{isEditing ? "Éditer l’artiste" : "Nouvel artiste"}</div>
+              <button type="button" className="rounded-md border border-neutral-300 px-3 py-1 text-xs font-medium text-neutral-600 transition hover:bg-neutral-50" onClick={() => setEditing(null)}>Fermer</button>
             </div>
 
-            <form onSubmit={submit} className="mt-3 grid gap-3">
-              {formLoading && <div className="text-xs text-neutral-500">Chargement des informations…</div>}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <label className="grid gap-1">
-                  <span className="text-xs text-neutral-600">Nom *</span>
-                  <input className="rounded border px-2 py-1" value={editing.name}
-                         disabled={formDisabled}
-                         onChange={(e) => setEditing((s) => ({ ...(s as ArtistFull), name: e.target.value }))}
-                         required />
-                </label>
-                <label className="grid gap-1">
-                  <span className="text-xs text-neutral-600">Slug *</span>
-                  <input className="rounded border px-2 py-1" value={editing.slug}
-                         disabled={formDisabled}
-                         onChange={(e) => setEditing((s) => ({ ...(s as ArtistFull), slug: e.target.value }))}
-                         pattern="[a-z0-9-]+" required />
-                </label>
-              </div>
+            <div className="max-h-[85vh] overflow-y-auto px-5 py-4 sm:px-6">
+              {formLoading && (
+                <div className="mb-3 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-xs text-neutral-600">
+                  Chargement des informations…
+                </div>
+              )}
 
-              <label className="grid gap-1">
-                <span className="text-xs text-neutral-600">Email de contact (notification commandes)</span>
-                <input
-                  className="rounded border px-2 py-1"
-                  type="email"
-                  placeholder="artiste@example.com"
-                  value={editing.contactEmail ?? ""}
-                  disabled={formDisabled}
-                  onChange={(e) => setEditing((s) => ({ ...(s as ArtistFull), contactEmail: e.target.value || null }))}
-                />
-                <span className="text-[11px] text-neutral-500">Utilisé pour avertir l’artiste lors d’une commande réussie.</span>
-              </label>
+              <form onSubmit={submit} className="space-y-6">
+                <section className="space-y-3">
+                  <h3 className="text-sm font-semibold text-neutral-800">Informations générales</h3>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="grid gap-1">
+                      <span className="text-xs font-medium text-neutral-600">Nom *</span>
+                      <input
+                        className="rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-black focus:outline-none focus:ring-2 focus:ring-black/10"
+                        value={editing.name}
+                        disabled={formDisabled}
+                        onChange={(e) => setEditing((s) => ({ ...(s as ArtistFull), name: e.target.value }))}
+                        required
+                      />
+                    </label>
+                    <label className="grid gap-1">
+                      <span className="text-xs font-medium text-neutral-600">Slug *</span>
+                      <input
+                        className="rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-black focus:outline-none focus:ring-2 focus:ring-black/10"
+                        value={editing.slug}
+                        disabled={formDisabled}
+                        onChange={(e) => setEditing((s) => ({ ...(s as ArtistFull), slug: e.target.value }))}
+                        pattern="[a-z0-9-]+"
+                        required
+                      />
+                    </label>
+                  </div>
+                  <label className="grid gap-1">
+                    <span className="text-xs font-medium text-neutral-600">Email de contact (notification commandes)</span>
+                    <input
+                      className="rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-black focus:outline-none focus:ring-2 focus:ring-black/10"
+                      type="email"
+                      placeholder="artiste@example.com"
+                      value={editing.contactEmail ?? ""}
+                      disabled={formDisabled}
+                      onChange={(e) => setEditing((s) => ({ ...(s as ArtistFull), contactEmail: e.target.value || null }))}
+                    />
+                    <span className="text-[11px] text-neutral-500">Utilisé pour avertir l’artiste lors d’une commande réussie.</span>
+                  </label>
+                  <label className="flex items-start gap-2 rounded-md border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-700">
+                    <input
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={Boolean(editing.isHidden)}
+                      disabled={formDisabled}
+                      onChange={(e) => setEditing((s) => ({ ...(s as ArtistFull), isHidden: e.target.checked }))}
+                    />
+                    <span>
+                      Masquer cet artiste du site public
+                      <span className="block text-xs text-neutral-500">
+                        Les œuvres restent visibles dans l’admin et pour l’auteur, mais ne s’affichent plus sur le site.
+                      </span>
+                    </span>
+                  </label>
+                  <label className="grid gap-1">
+                    <span className="text-xs font-medium text-neutral-600">Biographie</span>
+                    <textarea
+                      className="min-h-[120px] rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-black focus:outline-none focus:ring-2 focus:ring-black/10"
+                      disabled={formDisabled}
+                      value={editing.bio ?? ""}
+                      onChange={(e) => setEditing((s) => ({ ...(s as ArtistFull), bio: e.target.value }))}
+                    />
+                  </label>
+                </section>
 
-              <label className="flex items-start gap-2 rounded-md border border-neutral-200 bg-neutral-50/80 px-3 py-2 text-sm text-neutral-700">
-                <input
-                  type="checkbox"
-                  className="mt-0.5"
-                  checked={Boolean(editing.isHidden)}
-                  disabled={formDisabled}
-                  onChange={(e) => setEditing((s) => ({ ...(s as ArtistFull), isHidden: e.target.checked }))}
-                />
-                <span>
-                  Masquer cet artiste du site public
-                  <span className="block text-xs text-neutral-500">
-                    Les œuvres restent visibles dans l’admin et pour l’auteur, mais ne s’affichent plus sur le site.
-                  </span>
-                </span>
-              </label>
+                <section className="space-y-3">
+                  <h3 className="text-sm font-semibold text-neutral-800">Visuels</h3>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2 rounded-lg border border-neutral-200 p-3">
+                      <div className="text-xs font-medium text-neutral-600">Image de couverture (16:9)</div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleCoverFileChange}
+                        disabled={formDisabled}
+                        className="block w-full text-xs"
+                      />
+                      {coverPreview && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={coverPreview} alt="Prévisualisation couverture" className="mt-2 h-24 w-full rounded-md border object-cover" />
+                      )}
+                      <input
+                        className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-black focus:outline-none focus:ring-2 focus:ring-black/10"
+                        placeholder="https://…"
+                        value={editing.image ?? ""}
+                        disabled={formDisabled}
+                        onChange={(e) => setEditing((s) => ({ ...(s as ArtistFull), image: e.target.value || null }))}
+                      />
+                      {uploadingCover && <div className="text-[11px] text-neutral-500">Upload couverture en cours…</div>}
+                    </div>
+                    <div className="space-y-2 rounded-lg border border-neutral-200 p-3">
+                      <div className="text-xs font-medium text-neutral-600">Portrait (carré)</div>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handlePortraitFileChange}
+                        disabled={formDisabled}
+                        className="block w-full text-xs"
+                      />
+                      {portraitPreview && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={portraitPreview} alt="Prévisualisation portrait" className="mt-2 h-24 w-24 rounded-full border object-cover" />
+                      )}
+                      <input
+                        className="w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-black focus:outline-none focus:ring-2 focus:ring-black/10"
+                        placeholder="https://…"
+                        value={editing.portrait ?? ""}
+                        disabled={formDisabled}
+                        onChange={(e) => setEditing((s) => ({ ...(s as ArtistFull), portrait: e.target.value || null }))}
+                      />
+                      {uploadingPortrait && <div className="text-[11px] text-neutral-500">Upload portrait en cours…</div>}
+                    </div>
+                  </div>
+                </section>
 
-              <label className="grid gap-1">
-                <span className="text-xs text-neutral-600">Bio</span>
-                <textarea className="rounded border px-2 py-1" rows={4}
-                          disabled={formDisabled}
-                          value={editing.bio ?? ""}
-                          onChange={(e) => setEditing((s) => ({ ...(s as ArtistFull), bio: e.target.value }))} />
-              </label>
+                <section className="space-y-3">
+                  <h3 className="text-sm font-semibold text-neutral-800">Réseaux sociaux</h3>
+                  <textarea
+                    className="min-h-[100px] rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-black focus:outline-none focus:ring-2 focus:ring-black/10"
+                    rows={3}
+                    disabled={formDisabled}
+                    value={socialsToTextarea(editing.socials)}
+                    onChange={(e) => setEditing((s) => ({ ...(s as ArtistFull), socials: parseSocials(e.target.value) }))}
+                  />
+                  <p className="text-[11px] text-neutral-500">Ajoute une adresse par ligne (Instagram, site, e-mail…)</p>
+                </section>
 
-              {/* Upload & URLs : Couverture */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <label className="grid gap-1">
-                  <span className="text-xs text-neutral-600">
-                    Image de couverture (upload ou URL)
-                    <span className="ml-1 text-[11px] text-neutral-500">(max 2,5 Mo)</span>
-                  </span>
-                  <input type="file" accept="image/*" onChange={handleCoverFileChange}
-                         disabled={formDisabled}
-                         className="block w-full text-sm" />
-                  {coverPreview && (
-                    // aperçus locaux (blob:) → next/image incompatible
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={coverPreview} alt="Prévisualisation couverture" className="mt-2 h-24 w-24 rounded border object-cover" />
-                  )}
-                  <input className="mt-2 rounded border px-2 py-1" placeholder="https://…"
-                         value={editing.image ?? ""}
-                         disabled={formDisabled}
-                         onChange={(e) => setEditing((s) => ({ ...(s as ArtistFull), image: e.target.value || null }))} />
-                  {uploadingCover && <div className="text-xs text-neutral-500 mt-1">Upload couverture en cours…</div>}
-                </label>
-
-                {/* Upload & URLs : Portrait */}
-                <label className="grid gap-1">
-                  <span className="text-xs text-neutral-600">
-                    Portrait (upload ou URL)
-                    <span className="ml-1 text-[11px] text-neutral-500">(max 2,5 Mo)</span>
-                  </span>
-                  <input type="file" accept="image/*" onChange={handlePortraitFileChange}
-                         disabled={formDisabled}
-                         className="block w-full text-sm" />
-                  {portraitPreview && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={portraitPreview} alt="Prévisualisation portrait" className="mt-2 h-24 w-24 rounded-full border object-cover" />
-                  )}
-                  <input className="mt-2 rounded border px-2 py-1" placeholder="https://…"
-                         value={editing.portrait ?? ""}
-                         disabled={formDisabled}
-                         onChange={(e) => setEditing((s) => ({ ...(s as ArtistFull), portrait: e.target.value || null }))} />
-                  {uploadingPortrait && <div className="text-xs text-neutral-500 mt-1">Upload portrait en cours…</div>}
-                </label>
-              </div>
-
-              <label className="grid gap-1">
-                <span className="text-xs text-neutral-600">Réseaux (1 par ligne ou séparés par virgule)</span>
-                <textarea className="rounded border px-2 py-1" rows={3}
-                          disabled={formDisabled}
-                          value={socialsToTextarea(editing.socials)}
-                          onChange={(e) => setEditing((s) => ({ ...(s as ArtistFull), socials: parseSocials(e.target.value) }))} />
-              </label>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button type="button" className="rounded border px-3 py-1.5 text-sm" onClick={() => setEditing(null)}>Annuler</button>
-                <button type="submit" disabled={formDisabled} className={clsx("rounded px-3 py-1.5 text-sm text-white", "bg-black hover:bg-neutral-800 disabled:opacity-60 disabled:cursor-not-allowed")}>{isEditing ? "Enregistrer" : "Créer"}</button>
-              </div>
-            </form>
+                <div className="flex justify-end gap-2 border-t border-neutral-200 pt-3">
+                  <button type="button" className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-600 transition hover:bg-neutral-50" onClick={() => setEditing(null)}>Annuler</button>
+                  <button type="submit" disabled={formDisabled} className={clsx("rounded-md px-4 py-2 text-sm font-medium text-white transition", formDisabled ? "bg-neutral-400" : "bg-black hover:bg-neutral-800")}>{saving ? 'Enregistrement…' : isEditing ? "Enregistrer" : "Créer"}</button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}

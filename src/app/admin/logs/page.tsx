@@ -114,7 +114,7 @@ export default async function AdminLogsPage({ searchParams }: { searchParams?: S
   }
 
   return (
-    <div className="mx-auto w-full max-w-5xl px-6 py-10">
+    <div className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6">
       <AdminPageHeader
         title="Historique des connexions"
         subtitle="Liste des 200 dernières connexions auteurs et administrateurs, avec IP et agent."
@@ -189,9 +189,9 @@ export default async function AdminLogsPage({ searchParams }: { searchParams?: S
           Aucun événement enregistré pour le moment. Les connexions apparaîtront ici dès la prochaine authentification.
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white/90 shadow-sm">
+        <div className="rounded-2xl border border-neutral-200 bg-white/90 shadow-sm">
           <div className="max-h-[600px] overflow-auto">
-            <table className="min-w-full divide-y divide-neutral-200 text-sm">
+            <table className="min-w-[720px] divide-y divide-neutral-200 text-sm">
               <thead className="sticky top-0 z-10 bg-white/95 backdrop-blur">
                 <tr className="text-left text-xs uppercase tracking-wide text-neutral-500">
                   <th className="px-4 py-3 font-medium">Date</th>

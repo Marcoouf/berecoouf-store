@@ -116,10 +116,14 @@ export default function AdminAuthorsPage() {
 
   const isEditing = Boolean(editing?.id)
 
-  const selectedArtists = useMemo(() => {
+  const selectedArtists = useMemo<Array<{ id: string; name: string }>>(() => {
+    if (!editing) return []
     const map = new Map(artists.map((a) => [a.id, a]))
-    return editing?.artistIds.map((id) => map.get(id)?.name || id) ?? []
-  }, [editing?.artistIds, artists])
+    return editing.artistIds.map((id) => ({
+      id,
+      name: map.get(id)?.name || id,
+    }))
+  }, [editing, artists])
 
   const openCreate = () => {
     setEditing(emptyForm())
@@ -210,10 +214,13 @@ export default function AdminAuthorsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl p-6">
-      <div className="flex items-center justify-between gap-4">
+    <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-medium">Admin · Comptes auteurs</h1>
-        <button onClick={openCreate} className="rounded border px-3 py-1.5 text-sm hover:bg-neutral-50">
+        <button
+          onClick={openCreate}
+          className="w-full rounded border px-3 py-2 text-sm font-medium hover:bg-neutral-50 sm:w-auto"
+        >
           + Ajouter un auteur
         </button>
       </div>
@@ -226,8 +233,8 @@ export default function AdminAuthorsPage() {
         ) : authors.length === 0 ? (
           <div className="rounded-lg border p-4 text-sm text-neutral-600">Aucun auteur pour le moment.</div>
         ) : (
-          <div className="overflow-hidden rounded-xl border">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white shadow-sm">
+            <table className="min-w-[640px] w-full text-sm">
               <thead className="bg-neutral-100 text-left text-xs uppercase tracking-wide text-neutral-500">
                 <tr>
                   <th className="px-3 py-2">Email</th>
@@ -273,11 +280,22 @@ export default function AdminAuthorsPage() {
       </div>
 
       {editing && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4" onClick={() => !saving && setEditing(null)}>
-          <div className="w-full max-w-xl rounded-xl border bg-white p-5" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-6"
+          onClick={() => !saving && setEditing(null)}
+        >
+          <div
+            className="w-full max-w-xl rounded-xl border border-neutral-200 bg-white p-5 shadow-xl sm:p-6 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <h2 className="text-base font-semibold">{isEditing ? 'Modifier un auteur' : 'Nouvel auteur'}</h2>
-              <button className="rounded border px-2 py-1 text-xs" onClick={() => setEditing(null)} disabled={saving}>
+              <button
+                type="button"
+                className="self-start rounded border px-2 py-1 text-xs font-medium sm:self-auto"
+                onClick={() => setEditing(null)}
+                disabled={saving}
+              >
                 Fermer
               </button>
             </div>
@@ -362,8 +380,12 @@ export default function AdminAuthorsPage() {
               </div>
 
               {selectedArtists.length > 0 && (
-                <div className="text-xs text-neutral-500">
-                  Artistes sélectionnés : {selectedArtists.join(', ')}
+                <div className="flex flex-wrap gap-1 text-xs text-neutral-500">
+                  {selectedArtists.map(({ id, name }) => (
+                    <span key={id} className="rounded-full border border-neutral-300 px-2 py-0.5">
+                      {name}
+                    </span>
+                  ))}
                 </div>
               )}
 
