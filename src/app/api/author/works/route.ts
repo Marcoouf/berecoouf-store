@@ -26,7 +26,7 @@ export async function GET() {
       orderBy: { name: 'asc' },
     }),
     prisma.work.findMany({
-      where: { artistId: { in: artistIds } },
+      where: { artistId: { in: artistIds }, deletedAt: null },
       orderBy: [{ updatedAt: 'desc' }],
       select: {
         id: true,
@@ -35,6 +35,7 @@ export async function GET() {
         title: true,
         artistId: true,
         published: true,
+        deletedAt: true,
         basePrice: true,
         imageUrl: true,
         mockupUrl: true,

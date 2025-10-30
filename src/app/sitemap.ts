@@ -20,7 +20,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     })
 
     works = await prisma.work.findMany({
-      where: { artist: { isArchived: false, deletedAt: null, isHidden: false } },
+      where: { published: true, deletedAt: null, artist: { isArchived: false, deletedAt: null, isHidden: false } },
       select: { slug: true, updatedAt: true },
       orderBy: { slug: 'asc' },
     })

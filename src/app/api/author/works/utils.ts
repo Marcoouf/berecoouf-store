@@ -84,6 +84,7 @@ export type WorkDetailRecord = {
   mockupUrl: string | null
   basePrice: number | null
   published: boolean
+  deletedAt: Date | null
   artist: { id: string; name: string; slug: string; isOnVacation: boolean } | null
   variants: Array<{ id: string; label: string; price: number; order: number }>
   updatedAt: Date
@@ -131,6 +132,7 @@ export type WorkSummaryRecord = {
   title: string
   artistId: string
   published: boolean
+  deletedAt: Date | null
   basePrice: number | null
   imageUrl: string | null
   mockupUrl: string | null

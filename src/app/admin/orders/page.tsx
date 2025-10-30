@@ -53,6 +53,7 @@ export default function AdminOrdersPage() {
   const [error, setError] = useState<string | null>(null)
   const [drafts, setDrafts] = useState<Record<string, { shippingStatus: string; trackingUrl: string }>>({})
   const [saving, setSaving] = useState<Record<string, boolean>>({})
+  const [deleting, setDeleting] = useState<Record<string, boolean>>({})
   const [toasts, setToasts] = useState<Toast[]>([])
   const [sort, setSort] = useState<string>('created_desc')
   const [shippingFilter, setShippingFilter] = useState<string>('')
@@ -152,6 +153,36 @@ export default function AdminOrdersPage() {
       addToast('error', err?.message || 'Impossible de mettre à jour')
     } finally {
       setSaving((prev) => ({ ...prev, [orderId]: false }))
+    }
+  }
+
+  async function handleDelete(orderId: string) {
+    const confirmDelete = window.confirm('Supprimer définitivement cette commande ?')
+    if (!confirmDelete) return
+    setDeleting((prev) => ({ ...prev, [orderId]: true }))
+    try {
+      const res = await fetch(`/api/admin/orders/${orderId}`, {
+        method: 'DELETE',
+        headers: adminHeaders(),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || data?.ok === false) {
+        throw new Error(data?.error || 'Suppression impossible')
+      }
+      setOrders((prev) => prev.filter((order) => order.id !== orderId))
+      setDrafts((prev) => {
+        const { [orderId]: _removed, ...rest } = prev
+        return rest
+      })
+      setSaving((prev) => {
+        const { [orderId]: _s, ...rest } = prev
+        return rest
+      })
+      addToast('success', 'Commande supprimée ✅')
+    } catch (err: any) {
+      addToast('error', err?.message || 'Suppression impossible')
+    } finally {
+      setDeleting((prev) => ({ ...prev, [orderId]: false }))
     }
   }
 
@@ -295,13 +326,21 @@ export default function AdminOrdersPage() {
                       <div className="mt-1 text-xs text-neutral-500">Client : {order.email}</div>
                     ) : null}
                   </div>
-                  <div className="flex flex-col gap-2 text-right text-sm">
+                  <div className="flex flex-col items-end gap-2 text-right text-sm">
                     <div>
                       Paiement : <span className="font-medium text-neutral-900">{order.status}</span>
                     </div>
                     <div>
                       Total : <span className="font-medium text-neutral-900">{formatCurrency(order.total)}</span>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(order.id)}
+                      disabled={deleting[order.id]}
+                      className="rounded-md border border-red-200 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {deleting[order.id] ? 'Suppression…' : 'Supprimer'}
+                    </button>
                   </div>
                 </header>
 

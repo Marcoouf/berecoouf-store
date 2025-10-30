@@ -160,3 +160,16 @@ export const PATCH = withAdmin(async (req: NextRequest, { params }: Params) => {
 
   return NextResponse.json({ ok: true, order: serializeOrder(updatedRecord as any) })
 })
+
+export const DELETE = withAdmin(async (_req: NextRequest, { params }: Params) => {
+  const orderId = params.id
+
+  const order = await prisma.order.findUnique({ where: { id: orderId }, select: { id: true } })
+  if (!order) {
+    return NextResponse.json({ ok: false, error: 'order_not_found' }, { status: 404 })
+  }
+
+  await prisma.order.delete({ where: { id: orderId } })
+
+  return NextResponse.json({ ok: true })
+})

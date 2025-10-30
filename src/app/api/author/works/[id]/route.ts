@@ -35,7 +35,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
     },
   })
 
-  if (!work || !artistIds.includes(work.artistId)) {
+  if (!work || work.deletedAt || !artistIds.includes(work.artistId)) {
     return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
   }
 
@@ -57,10 +57,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
   const work = await prisma.work.findUnique({
     where: { id: params.id },
-    select: { id: true, artistId: true },
+    select: { id: true, artistId: true, deletedAt: true },
   })
 
-  if (!work || !artistIds.includes(work.artistId)) {
+  if (!work || work.deletedAt || !artistIds.includes(work.artistId)) {
     return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
   }
 
@@ -238,7 +238,17 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
 
   const linkedOrders = await prisma.orderItem.count({ where: { workId: params.id } })
   if (linkedOrders > 0) {
-    return NextResponse.json({ ok: false, error: 'work_has_orders' }, { status: 409 })
+    const archivedSlug = `${work.slug}-archive-${Date.now()}`.slice(0, 60)
+    await prisma.work.update({
+      where: { id: params.id },
+      data: {
+        published: false,
+        slug: archivedSlug,
+        deletedAt: new Date(),
+      },
+    })
+    revalidateWorkPaths(work.slug)
+    return NextResponse.json({ ok: true, softDeleted: true })
   }
 
   await prisma.$transaction(async (tx) => {

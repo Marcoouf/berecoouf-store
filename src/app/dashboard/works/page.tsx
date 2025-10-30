@@ -461,7 +461,7 @@ export default function AuthorWorksPage() {
         return
       }
 
-      setFlash('Œuvre supprimée ✅')
+      setFlash(data?.softDeleted ? 'Œuvre archivée (commandes existantes) ✅' : 'Œuvre supprimée ✅')
       setWorks((prev) => {
         const next = prev.filter((work) => work.id !== detail.id)
         if (next.length === 0) {
@@ -1172,14 +1172,7 @@ export default function AuthorWorksPage() {
                   ) : (
                     <p className="mt-2 text-xs text-neutral-500">Aucune image définie pour le moment.</p>
                   )}
-                  <div className="mt-3 flex flex-wrap items-center gap-3">
-                    <input
-                      type="url"
-                      placeholder="https://…"
-                      value={form.image}
-                      onChange={(e) => handleField('image', e.target.value)}
-                      className="w-full flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-2 focus:ring-ink/10"
-                    />
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
                     <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium hover:bg-neutral-50">
                       <input
                         type="file"
@@ -1190,8 +1183,27 @@ export default function AuthorWorksPage() {
                           if (file) handleUpload('image', file)
                         }}
                       />
-                      {uploadingCover ? 'Upload…' : 'Téléverser'}
+                      {uploadingCover ? 'Upload…' : 'Upload'}
                     </label>
+                    {form.image ? (
+                      <>
+                        <a
+                          href={form.image}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50"
+                        >
+                          Voir l’image
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => handleField('image', '')}
+                          className="inline-flex items-center rounded-md border border-neutral-300 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                        >
+                          Retirer
+                        </button>
+                      </>
+                    ) : null}
                   </div>
                 </div>
 
@@ -1211,14 +1223,7 @@ export default function AuthorWorksPage() {
                   ) : (
                     <p className="mt-2 text-xs text-neutral-500">Aucun mockup défini.</p>
                   )}
-                  <div className="mt-3 flex flex-wrap items-center gap-3">
-                    <input
-                      type="url"
-                      placeholder="https://…"
-                      value={form.mockup}
-                      onChange={(e) => handleField('mockup', e.target.value)}
-                      className="w-full flex-1 rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-2 focus:ring-ink/10"
-                    />
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
                     <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-neutral-300 px-3 py-2 text-sm font-medium hover:bg-neutral-50">
                       <input
                         type="file"
@@ -1229,8 +1234,27 @@ export default function AuthorWorksPage() {
                           if (file) handleUpload('mockup', file)
                         }}
                       />
-                      {uploadingMockup ? 'Upload…' : 'Téléverser'}
+                      {uploadingMockup ? 'Upload…' : 'Upload'}
                     </label>
+                    {form.mockup ? (
+                      <>
+                        <a
+                          href={form.mockup}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50"
+                        >
+                          Voir le mockup
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => handleField('mockup', '')}
+                          className="inline-flex items-center rounded-md border border-neutral-300 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                        >
+                          Retirer
+                        </button>
+                      </>
+                    ) : null}
                   </div>
                 </div>
 

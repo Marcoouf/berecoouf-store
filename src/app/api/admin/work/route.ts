@@ -262,6 +262,21 @@ export const DELETE = withAdmin(async (req: NextRequest) => {
   const id = url.searchParams.get('id') || ''
   if (!id) return NextResponse.json({ ok: false, error: 'missing_id' }, { status: 400 })
 
+  const work = await prisma.work.findUnique({ where: { id }, select: { slug: true, published: true, deletedAt: true } })
+  if (!work || work.deletedAt) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
+
+  const linkedOrders = await prisma.orderItem.count({ where: { workId: id } })
+  if (linkedOrders > 0) {
+    const archivedSlug = `${work.slug}-archive-${Date.now()}`.slice(0, 60)
+    await prisma.work.update({
+      where: { id },
+      data: { published: false, slug: archivedSlug, deletedAt: new Date() },
+    })
+    revalidatePath('/artworks')
+    revalidatePath(`/artworks/${work.slug}`)
+    return NextResponse.json({ ok: true, softDeleted: true })
+  }
+
   const deleted = await prisma.$transaction(async (tx: any) => {
     await tx.variant.deleteMany({ where: { workId: id } })
     return tx.work.delete({ where: { id }, select: { slug: true } })

@@ -192,7 +192,7 @@ export async function getCatalog(): Promise<{ artists: Artist[]; artworks: Artwo
     },
   }),
   prisma.work.findMany({
-    where: { artist: { isArchived: false, isHidden: false, deletedAt: null } },
+    where: { published: true, deletedAt: null, artist: { isArchived: false, isHidden: false, deletedAt: null } },
     orderBy: [{ year: 'desc' }, { title: 'asc' }],
     select: {
       id: true,

@@ -48,6 +48,7 @@ model Work {
   createdById String?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
+  deletedAt   DateTime?
   variants    Variant[]
   orderItems  OrderItem[]
   artist      Artist      @relation(fields: [artistId], references: [id])
