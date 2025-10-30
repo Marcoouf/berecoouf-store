@@ -52,7 +52,7 @@ type UploadMeta = {
   sizeLabel: string
 }
 
-type SectionKey = 'identite' | 'biographie' | 'visuels' | 'reseaux'
+type SectionKey = 'identite' | 'biographie' | 'visuels' | 'reseaux' | 'securite'
 
 function createSectionsState(): Record<SectionKey, boolean> {
   return {
@@ -60,6 +60,7 @@ function createSectionsState(): Record<SectionKey, boolean> {
     biographie: false,
     visuels: true,
     reseaux: false,
+    securite: false,
   }
 }
 
@@ -498,6 +499,8 @@ export default function AuthorProfilePage() {
   const [uploadingCover, setUploadingCover] = useState(false)
   const [uploadMeta, setUploadMeta] = useState<{ portrait?: UploadMeta; image?: UploadMeta }>({})
   const [sectionsOpen, setSectionsOpen] = useState<Record<SectionKey, boolean>>(createSectionsState)
+  const [passwordForm, setPasswordForm] = useState({ current: '', next: '', confirm: '' })
+  const [savingPassword, setSavingPassword] = useState(false)
   const [toasts, setToasts] = useState<Toast[]>([])
   const toastTimeouts = useRef<number[]>([])
   const previousArtistId = useRef<string | null>(null)
@@ -594,6 +597,10 @@ export default function AuthorProfilePage() {
     })
   }, [])
 
+  const handlePasswordField = useCallback((key: 'current' | 'next' | 'confirm', value: string) => {
+    setPasswordForm((prev) => ({ ...prev, [key]: value }))
+  }, [])
+
   const toggleSection = useCallback((key: SectionKey) => {
     setSectionsOpen((prev) => ({ ...prev, [key]: !prev[key] }))
   }, [])
@@ -621,6 +628,62 @@ export default function AuthorProfilePage() {
     } finally {
       if (kind === 'portrait') setUploadingPortrait(false)
       else setUploadingCover(false)
+    }
+  }
+
+  async function handleChangePassword(e?: FormEvent<HTMLFormElement>) {
+    if (e) e.preventDefault()
+    if (savingPassword) return
+    const current = passwordForm.current.trim()
+    const next = passwordForm.next.trim()
+    const confirm = passwordForm.confirm.trim()
+
+    if (next.length < 8) {
+      pushToast('Le nouveau mot de passe doit contenir au moins 8 caractères.', 'error')
+      return
+    }
+    if (next !== confirm) {
+      pushToast('Le nouveau mot de passe et la confirmation ne correspondent pas.', 'error')
+      return
+    }
+    if (current === next) {
+      pushToast('Le nouveau mot de passe doit être différent de l’actuel.', 'error')
+      return
+    }
+
+    setSavingPassword(true)
+    try {
+      const res = await fetch('/api/account/password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword: current, newPassword: next }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || data?.ok === false) {
+        const code = data?.error
+        if (code === 'invalid_current_password') {
+          throw new Error('Le mot de passe actuel est invalide.')
+        }
+        if (code === 'password_unchanged') {
+          throw new Error('Le nouveau mot de passe doit être différent de l’actuel.')
+        }
+        if (code === 'password_not_set') {
+          throw new Error('Ton compte n’a pas de mot de passe défini.')
+        }
+        if (code === 'current_password_required') {
+          throw new Error('Renseigne ton mot de passe actuel.')
+        }
+        if (code === 'new_password_too_short') {
+          throw new Error('Le nouveau mot de passe doit contenir au moins 8 caractères.')
+        }
+        throw new Error(data?.error || 'Impossible de mettre à jour le mot de passe.')
+      }
+      setPasswordForm({ current: '', next: '', confirm: '' })
+      pushToast('Mot de passe mis à jour ✅', 'success')
+    } catch (err: any) {
+      pushToast(err?.message || 'Impossible de mettre à jour le mot de passe.', 'error')
+    } finally {
+      setSavingPassword(false)
     }
   }
 
@@ -955,6 +1018,65 @@ export default function AuthorProfilePage() {
                       >
                         + Ajouter un lien
                       </button>
+                    </AccordionSection>
+
+                    <AccordionSection
+                      title="Sécurité"
+                      description="Change ton mot de passe pour sécuriser ton compte."
+                      open={sectionsOpen.securite}
+                      onToggle={() => toggleSection('securite')}
+                    >
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-sm font-medium text-neutral-700">Mot de passe actuel</label>
+                          <input
+                            type="password"
+                            value={passwordForm.current}
+                            onChange={(e) => handlePasswordField('current', e.target.value)}
+                            autoComplete="current-password"
+                            className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-700 transition focus:border-ink focus:outline-none focus:ring-2 focus:ring-ink/10"
+                            placeholder="••••••••"
+                          />
+                        </div>
+                        <div className="grid gap-3 md:grid-cols-2">
+                          <div>
+                            <label className="block text-sm font-medium text-neutral-700">Nouveau mot de passe</label>
+                            <input
+                              type="password"
+                              value={passwordForm.next}
+                              onChange={(e) => handlePasswordField('next', e.target.value)}
+                              autoComplete="new-password"
+                              className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-700 transition focus:border-ink focus:outline-none focus:ring-2 focus:ring-ink/10"
+                              placeholder="Au moins 8 caractères"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-neutral-700">Confirmer</label>
+                            <input
+                              type="password"
+                              value={passwordForm.confirm}
+                              onChange={(e) => handlePasswordField('confirm', e.target.value)}
+                              autoComplete="new-password"
+                              className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-700 transition focus:border-ink focus:outline-none focus:ring-2 focus:ring-ink/10"
+                              placeholder="Répète le mot de passe"
+                            />
+                          </div>
+                        </div>
+                        <p className="text-xs text-neutral-500">
+                          Utilise un mot de passe unique et d’au moins 8 caractères. Les changements prennent effet
+                          immédiatement.
+                        </p>
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => handleChangePassword()}
+                            disabled={savingPassword}
+                            className="rounded-md bg-ink px-4 py-2 text-sm font-medium text-white transition hover:bg-ink/90 disabled:cursor-not-allowed disabled:bg-neutral-300"
+                          >
+                            {savingPassword ? 'Mise à jour…' : 'Enregistrer le nouveau mot de passe'}
+                          </button>
+                        </div>
+                      </div>
                     </AccordionSection>
 
                     <div className="sticky bottom-0 left-0 right-0 -mx-6 -mb-6 mt-2 border-t border-neutral-200 bg-white/95 px-6 py-4 shadow-[0_-10px_30px_rgba(10,10,10,0.08)] backdrop-blur">
