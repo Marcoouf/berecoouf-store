@@ -1,4 +1,5 @@
 import SmartImage from '@/components/SmartImage'
+import ConditionalPaddingImage from '@/components/ConditionalPaddingImage'
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import type { Metadata } from 'next'
@@ -126,13 +127,12 @@ export default async function ArtistPage({ params }: Props) {
           {/* Bandeau image de l'artiste */}
           <div className="aspect-[21/9] relative overflow-hidden rounded-2xl border" aria-label={`Visuel de ${artist.name}`}>
             {hasHero ? (
-              <SmartImage
+              <ConditionalPaddingImage
                 src={heroSrc as string}
                 alt={artist.name}
-                fill
                 sizes="(min-width:1024px) 1024px, 100vw"
-                wrapperClass="absolute inset-0"
-                imgClassName="object-cover"
+                imageClassName="!object-cover"
+                padding={0}
               />
             ) : (
               <div className="absolute inset-0 bg-neutral-100" />
@@ -225,13 +225,12 @@ export default async function ArtistPage({ params }: Props) {
                 <div className="aspect-square relative overflow-hidden rounded-xl border">
                   <Link href={`/artworks/${w.slug}`} scroll className="absolute inset-0" aria-label={`Voir l'œuvre ${w.title}`}>
                     {typeof (w as any).image === 'string' && (w as any).image ? (
-                      <SmartImage
+                      <ConditionalPaddingImage
                         src={(w as any).image as string}
                         alt={w.title}
-                        fill
                         sizes="(min-width: 1024px) 30vw, (min-width: 640px) 30vw, 100vw"
-                        wrapperClass="absolute inset-0"
-                        imgClassName="object-cover transition-transform duration-500 group-hover:scale-[1.02] pointer-events-none select-none"
+                        imageClassName="transition-transform duration-500 group-hover:scale-[1.02] pointer-events-none select-none !object-contain"
+                        padding={28}
                       />
                     ) : (
                       <div className="absolute inset-0 bg-neutral-100" />

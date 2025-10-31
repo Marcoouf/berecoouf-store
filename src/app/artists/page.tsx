@@ -1,6 +1,6 @@
 // src/app/artists/page.tsx
 import Link from 'next/link'
-import SmartImage from '@/components/SmartImage'
+import ConditionalPaddingImage from '@/components/ConditionalPaddingImage'
 import Breadcrumb from '@/components/Breadcrumb'
 import { prisma } from '@/lib/prisma'
 
@@ -72,13 +72,13 @@ export default async function ArtistsPage() {
                 aria-label={`Voir la page de ${a.name}`}
               >
                 <div className="relative overflow-hidden rounded-lg border aspect-[4/3]">
-                  <SmartImage
+                  <ConditionalPaddingImage
                     src={cover}
                     alt={a.name}
-                    fill
                     sizes="(min-width:1024px) 30vw, (min-width:640px) 45vw, 100vw"
-                    className="object-cover transition-transform duration-500 group-hover:scale-[1.05]"
+                    imageClassName="transition-transform duration-500 group-hover:scale-[1.02] !object-cover"
                     priority={idx < 3}
+                    padding={0}
                   />
                 </div>
                 <div className="mt-2 text-center text-sm sm:text-base font-medium group-hover:text-accent transition-colors">

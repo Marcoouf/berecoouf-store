@@ -1,6 +1,6 @@
 
 import Breadcrumb from '@/components/Breadcrumb'
-import SmartImage from '@/components/SmartImage'
+import ConditionalPaddingImage from '@/components/ConditionalPaddingImage'
 import { getCatalog } from '@/lib/getCatalog'
 import { euro } from '@/lib/format'
 import type { Metadata } from 'next'
@@ -230,14 +230,11 @@ export default async function ArtworksPage({ searchParams }: { searchParams: Sea
                       </span>
                     ) : null}
                     {image ? (
-                      <SmartImage
+                      <ConditionalPaddingImage
                         src={image}
                         alt={`Visuel de l’œuvre ${art.title}`}
-                        fill
-                        wrapperClass="absolute inset-0 flex items-center justify-center p-4"
-                        className="!object-contain"
                         sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw"
-                        draggable={false}
+                        imageClassName="transition duration-500 group-hover:scale-[1.02] !object-contain"
                       />
                     ) : (
                       <div className="absolute inset-0 flex items-center justify-center text-sm text-neutral-400">

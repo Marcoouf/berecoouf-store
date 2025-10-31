@@ -2,6 +2,7 @@
 
 import React from 'react'
 import Image from '@/components/SmartImage'
+import ConditionalPaddingImage from '@/components/ConditionalPaddingImage'
 import Link from 'next/link'
 import type { Artwork, Artist, CartItem } from '@/lib/types'
 import { useCart } from '@/components/CartContext'
@@ -94,14 +95,11 @@ function Hero({ highlight }: { highlight?: HeroHighlight | null }) {
                 aria-busy={false}
               >
                 {highlight?.image ? (
-                  <Image
+                  <ConditionalPaddingImage
                     src={highlight.image}
                     alt={altText}
-                    fill
-                    priority
                     sizes="(min-width: 1024px) 40vw, (min-width: 768px) 50vw, 100vw"
-                    className="absolute inset-0 h-full w-full object-contain"
-                    wrapperClassName="absolute inset-0"
+                    priority
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-neutral-400">
@@ -273,12 +271,11 @@ function ArtworkCard({ art, onAdd, artistsById }: { art: Artwork; onAdd: (a: Art
         aria-label={`Voir l’œuvre ${art.title}`}
       >
         {art.image ? (
-          <Image
+          <ConditionalPaddingImage
             src={art.image}
             alt={`Visuel de l’œuvre ${art.title}`}
-            fill
-            className="object-contain bg-white transition-transform duration-500 group-hover:scale-105"
             sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw"
+            imageClassName="transition-transform duration-500 group-hover:scale-105 !object-contain"
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center bg-accent text-ink">

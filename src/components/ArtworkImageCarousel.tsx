@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useRef, useState, useEffect, useCallback } from 'react'
-import SmartImage from '@/components/SmartImage'
+import ConditionalPaddingImage from '@/components/ConditionalPaddingImage'
 
 type Props = {
   title: string
@@ -132,15 +132,13 @@ export default function ArtworkImageCarousel({
               const isPriority = eagerAll || (priority && i === 0)
               return (
                 <div key={`${src}-${i}`} className="relative h-full w-full flex-shrink-0">
-                  <SmartImage
+                  <ConditionalPaddingImage
                     src={src}
                     alt={title}
-                    fill
                     priority={isPriority}
                     loading={isPriority ? 'eager' : undefined}
                     sizes="(min-width:1024px) 40vw, (min-width:768px) 50vw, 100vw"
-                    className="h-full w-full object-contain"
-                    wrapperClassName="absolute inset-0"
+                    padding={32}
                   />
                 </div>
               )

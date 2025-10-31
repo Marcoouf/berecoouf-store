@@ -1,7 +1,6 @@
 // src/app/artworks/[slug]/page.tsx
 import Link from 'next/link'
-import Image from 'next/image'
-import SmartImage from '@/components/SmartImage'
+import ConditionalPaddingImage from '@/components/ConditionalPaddingImage'
 import { euro } from '@/lib/format'
 import { notFound } from 'next/navigation'
 import Breadcrumb from '@/components/Breadcrumb'
@@ -219,13 +218,12 @@ export default async function Page({ params }: { params: { slug: string } }) {
                 className="group block"
               >
                 <div className="aspect-square w-full overflow-hidden rounded-2xl border bg-white relative">
-                  <SmartImage
+                  <ConditionalPaddingImage
                     src={String((art as any).image ?? '')}
                     alt={String(art.title)}
-                    // carré comme sur la home
-                    fill
-                    className="object-cover transition-transform duration-300 group-hover:scale-[1.02]"
                     sizes="(min-width: 1024px) 320px, (min-width: 640px) 33vw, 100vw"
+                    imageClassName="transition-transform duration-300 group-hover:scale-[1.02] !object-contain"
+                    padding={28}
                   />
                 </div>
 
