@@ -10,6 +10,7 @@ import ClientLayout from '@/components/ClientLayout'
 import { Suspense } from 'react'
 import Footer from '@/components/Footer'
 import ImageProtection from '@/components/ImageProtection'
+import { Analytics } from "@vercel/analytics/next"
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
 const garamond = EB_Garamond({ subsets: ['latin'], variable: '--font-serif' })
