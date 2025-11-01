@@ -28,6 +28,8 @@ export default async function ArtistsPage() {
       slug: true,
       image: true,
       portrait: true,
+      bio: true,
+      socials: true,
     },
   });
 
@@ -35,9 +37,14 @@ export default async function ArtistsPage() {
   const safe = artists.filter(a => a && a.slug && a.name)
 
   return (
-    <div className="mx-auto max-w-6xl px-4 sm:px-6 py-8 sm:py-10 md:py-12">
+    <div className="mx-auto max-w-5xl px-4 sm:px-6 py-10">
       <Breadcrumb items={[{ label: 'Accueil', href: '/' }, { label: 'Artistes' }]} />
-      <h1 className="text-2xl sm:text-3xl font-medium mt-4 mb-6">Tous les artistes</h1>
+      <header className="mt-6 mb-8">
+        <h1 className="mt-3 text-3xl sm:text-[2.4rem] font-semibold tracking-tight text-accent-300">Nos Artistes</h1>
+        <p className="mt-2 max-w-2xl text-sm text-neutral-500">
+          Rencontres, inspirations et profils mis à jour en continu. Chaque artiste bénéficie d’un espace dédié pour raconter son univers et présenter ses œuvres disponibles.
+        </p>
+      </header>
 
       {/* État vide clair */}
       {safe.length === 0 && (
@@ -58,36 +65,39 @@ export default async function ArtistsPage() {
       )}
 
       {safe.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-6">
-          {safe.map((a, idx) => {
-            // Fallback image léger pour éviter un rendu vide si cover manquant
-            const cover = a.image || a.portrait || PLACEHOLDER_DATA_URL
+        <ul className="space-y-6">
+          {safe.map((a) => {
+            const portrait = a.portrait || a.image || PLACEHOLDER_DATA_URL
+            const bio = (a as any).bio ? String((a as any).bio) : 'Biographie à venir.'
             return (
-              <Link
-                key={a.id}
-                href={`/artists/${a.slug}`}
-                prefetch={false}
-                scroll
-                className="group block"
-                aria-label={`Voir la page de ${a.name}`}
-              >
-                <div className="relative overflow-hidden rounded-lg border aspect-[4/3]">
-                  <ConditionalPaddingImage
-                    src={cover}
-                    alt={a.name}
-                    sizes="(min-width:1024px) 30vw, (min-width:640px) 45vw, 100vw"
-                    imageClassName="transition-transform duration-500 group-hover:scale-[1.02] !object-cover"
-                    priority={idx < 3}
-                    padding={0}
-                  />
-                </div>
-                <div className="mt-2 text-center text-sm sm:text-base font-medium group-hover:text-accent transition-colors">
-                  {a.name}
-                </div>
-              </Link>
+              <li key={a.id}>
+                <Link
+                  href={`/artists/${a.slug}`}
+                  className="group block rounded-3xl border border-neutral-200/80 bg-gradient-to-br from-[#f9fbff] via-white to-[#edf3ff] shadow-[0_18px_28px_rgba(15,23,42,0.10)] transition-transform hover:-translate-y-[2px] hover:shadow-[0_26px_40px_rgba(15,23,42,0.16)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+                  aria-label={`Voir la page de ${a.name}`}
+                >
+                  <div className="flex min-h-[176px] flex-col gap-6 p-6 sm:flex-row sm:items-center sm:gap-8 sm:p-8">
+                    <div className="relative flex-none">
+                      <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-[18px] border border-accent/40 bg-white/80 shadow-inner">
+                        <ConditionalPaddingImage src={portrait} alt={`Portrait de ${a.name}`} padding={4} imageClassName="!object-cover" />
+                      </div>
+                    </div>
+                    <div className="min-w-0 flex-1 text-neutral-600">
+                      <h2 className="text-lg font-semibold text-neutral-900 transition-colors group-hover:text-accent">{a.name}</h2>
+                      <p className="mt-2 text-sm leading-relaxed text-neutral-600 line-clamp-3">
+                        {bio}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-3 text-right sm:min-w-[180px]">
+                      <span className="text-[11px] uppercase tracking-[0.28em] text-accent-900">Découvrir</span>
+                      <span className="inline-flex items-center gap-2 rounded-full border border-accent/60 bg-white/80 px-3 py-1 text-sm font-semibold text-accent shadow-sm transition group-hover:bg-accent group-hover:text-neutral-900">Voir le profil<span aria-hidden>→</span></span>
+                    </div>
+                  </div>
+                </Link>
+              </li>
             )
           })}
-        </div>
+        </ul>
       )}
     </div>
   )
