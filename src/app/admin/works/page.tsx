@@ -2,6 +2,7 @@
 export const dynamic = 'force-dynamic'
 
 import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import ConditionalPaddingImage from '@/components/ConditionalPaddingImage'
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader'
 
 type Toast = { id: string; kind: 'success' | 'error' | 'info'; msg: string }
@@ -256,11 +257,14 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
     })
   }
 
+  const imageUrl = typeof value.image === 'string' ? value.image.trim() : ''
+  const mockupUrl = typeof value.mockup === 'string' ? value.mockup.trim() : ''
+  const imageMissing = imageUrl.length === 0
   const canSubmit =
     value.title.trim().length > 0 &&
     (value.slug.trim().length > 0 || derivedSlug.length > 0) &&
     value.artistId &&
-    value.image &&
+    imageUrl.length > 0 &&
     ((value.price ?? 0) > 0 || (value.formats ?? []).some(f => (f.price ?? 0) > 0))
 
   async function onSubmit(e: React.FormEvent) {
@@ -278,8 +282,8 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
       title: value.title,
       slug: derivedSlug,
       artistId: value.artistId,
-      image: value.image || '',
-      mockup: value.mockup || null,
+      image: imageUrl,
+      mockup: mockupUrl || null,
       // prix de base en euros si aucun format, sinon on le laisse vide (le serveur prendra min(formats))
       price: (value.price && value.price > 0 ? Number(value.price) : undefined),
       description: value.description || null,
@@ -290,6 +294,7 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
       published: true,
       formats: (value.formats ?? [])
         .filter(f => f.label.trim())
+        .sort((a, b) => Number(a.price || 0) - Number(b.price || 0))
         .map(f => ({
           id: String(f.id || '').startsWith('f-') ? undefined : f.id,
           label: f.label,
@@ -408,10 +413,14 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
                             { id: uid('f'), label: 'A2 — 420×594mm', price: 180 },
                             { id: uid('f'), label: 'A1 — 594×841mm', price: 220 },
                           ]
+                    const normalizedFormats = [...formats].map(f => ({
+                      ...f,
+                      price: Number(f.price ?? 0),
+                    })).sort((a, b) => a.price - b.price)
                     set({
                       ...found,
                       id: String(found.id),
-                      formats,
+                      formats: normalizedFormats,
                       image: String((found as any).image || (found as any).imageUrl || ''),
                       mockup: (found as any).mockup || (found as any).mockupUrl || '',
                     } as any)
@@ -507,8 +516,13 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
       <form onSubmit={onSubmit} className="space-y-8">
         {/* Upload + aperçu */}
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-8">
-          <div className="flex-1 space-y-3">
-            <label className="block text-sm font-medium">
+          <div
+            className={[
+              'flex-1 space-y-3 transition-shadow',
+              imageMissing ? 'rounded-xl outline outline-2 outline-red-300/80 outline-offset-4' : '',
+            ].join(' ').trim()}
+          >
+            <label id="admin-work-image-label" className="block text-sm font-medium">
               Fichier image <span className="ml-1 text-red-600">*</span>
               <span className="ml-2 text-xs font-normal text-neutral-500">(max 2,5 Mo)</span>
             </label>
@@ -563,6 +577,11 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
                 </button>
               )}
             </div>
+            {imageMissing && (
+              <p className="text-xs font-medium text-red-600">
+                Ajoute une image principale avant d’enregistrer.
+              </p>
+            )}
             {imgProgress > 0 && (
   <div className="mt-2 h-2 w-full rounded bg-neutral-100">
     <div
@@ -694,12 +713,17 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
           </div>
 
           <div className="w-44 shrink-0 space-y-3">
-            <div className="rounded-xl border">
+            <div className="rounded-xl border bg-white/70">
               <div className="relative aspect-[4/5] overflow-hidden rounded-xl">
                 {value.image ? (
                   <>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={value.image} alt="Aperçu image" className="absolute inset-0 h-full w-full object-cover" />
+                    <ConditionalPaddingImage
+                      src={value.image}
+                      alt="Aperçu image"
+                      padding={28}
+                      className="bg-white"
+                      imageClassName="!object-contain"
+                    />
                     <div className="absolute left-1/2 top-1 -translate-x-1/2 rounded-full bg-white/80 px-2 py-0.5 shadow backdrop-blur supports-[backdrop-filter]:bg-white/60">
                       <button
                         type="button"
@@ -721,12 +745,17 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
                 )}
               </div>
             </div>
-            <div className="rounded-xl border">
+            <div className="rounded-xl border bg-white/70">
               <div className="relative aspect-[4/5] overflow-hidden rounded-xl">
                 {value.mockup ? (
                   <>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={value.mockup} alt="Aperçu mockup" className="absolute inset-0 h-full w-full object-cover" />
+                    <ConditionalPaddingImage
+                      src={value.mockup}
+                      alt="Aperçu mockup"
+                      padding={28}
+                      className="bg-white"
+                      imageClassName="!object-contain"
+                    />
                     <div className="absolute left-1/2 top-1 -translate-x-1/2 rounded-full bg-white/80 px-2 py-0.5 shadow backdrop-blur supports-[backdrop-filter]:bg-white/60">
                       <button
                         type="button"
@@ -884,12 +913,12 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
         </div>
       </form>
       {/* Toasts */}
-<div className="fixed bottom-4 right-4 z-50 space-y-2">
+<div className="fixed inset-x-0 top-4 z-50 flex flex-col items-center space-y-2 px-4">
   {toasts.map(t => (
     <div
       key={t.id}
       className={[
-        'rounded-md px-3 py-2 text-sm shadow',
+        'max-w-sm rounded-md px-3 py-2 text-sm shadow',
         t.kind === 'success' ? 'bg-green-600 text-white' : '',
         t.kind === 'error' ? 'bg-red-600 text-white' : '',
         t.kind === 'info' ? 'bg-neutral-800 text-white' : '',

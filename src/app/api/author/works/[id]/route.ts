@@ -10,6 +10,8 @@ import {
   type VariantInput,
 } from '../utils'
 import { revalidateWorkPaths } from '@/lib/revalidate'
+import { deleteBlobIfNeeded } from '@/lib/blob'
+import { uniqueSlug } from '@/lib/uniqueSlug'
 
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const session = await getAuthSession()
@@ -57,7 +59,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
 
   const work = await prisma.work.findUnique({
     where: { id: params.id },
-    select: { id: true, artistId: true, deletedAt: true },
+    select: { id: true, artistId: true, deletedAt: true, slug: true },
   })
 
   if (!work || work.deletedAt || !artistIds.includes(work.artistId)) {
@@ -122,6 +124,26 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (Object.prototype.hasOwnProperty.call(body, 'mockup')) {
     updates.mockupUrl = sanitizeUrl(body.mockup)
     hasUpdates = true
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, 'slug')) {
+    const rawSlug = typeof body.slug === 'string' ? body.slug.trim() : ''
+    const slugSource =
+      rawSlug ||
+      (typeof body.title === 'string' && body.title.trim().length > 0 ? body.title.trim() : null)
+    if (slugSource) {
+      const existing = await prisma.work.findMany({
+        where: { id: { not: params.id } },
+        select: { slug: true },
+      })
+      const nextSlug = uniqueSlug(slugSource, new Set(existing.map((entry) => entry.slug)), {
+        addToSet: false,
+      })
+      if (nextSlug && nextSlug !== work.slug) {
+        updates.slug = nextSlug
+        hasUpdates = true
+      }
+    }
   }
 
   if (Object.prototype.hasOwnProperty.call(body, 'variants')) {
@@ -229,7 +251,7 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
 
   const work = await prisma.work.findUnique({
     where: { id: params.id },
-    select: { id: true, artistId: true, slug: true },
+    select: { id: true, artistId: true, slug: true, imageUrl: true, mockupUrl: true },
   })
 
   if (!work || !artistIds.includes(work.artistId)) {
@@ -237,6 +259,8 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
   }
 
   const linkedOrders = await prisma.orderItem.count({ where: { workId: params.id } })
+  const imageUrl = work.imageUrl ?? null
+  const mockupUrl = work.mockupUrl ?? null
   if (linkedOrders > 0) {
     const archivedSlug = `${work.slug}-archive-${Date.now()}`.slice(0, 60)
     await prisma.work.update({
@@ -247,6 +271,7 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
         deletedAt: new Date(),
       },
     })
+    await Promise.all([deleteBlobIfNeeded(imageUrl), deleteBlobIfNeeded(mockupUrl)])
     revalidateWorkPaths(work.slug)
     return NextResponse.json({ ok: true, softDeleted: true })
   }
@@ -255,6 +280,8 @@ export async function DELETE(_req: Request, { params }: { params: { id: string }
     await tx.variant.deleteMany({ where: { workId: params.id } })
     await tx.work.delete({ where: { id: params.id } })
   })
+
+  await Promise.all([deleteBlobIfNeeded(imageUrl), deleteBlobIfNeeded(mockupUrl)])
 
   revalidateWorkPaths(work.slug)
 

@@ -67,7 +67,15 @@ export function normalizeVariants(raw: unknown): { variants: VariantInput[]; err
     })
   })
 
-  return { variants, errors }
+  const sorted = variants
+    .slice()
+    .sort((a, b) => (a.price || 0) - (b.price || 0))
+    .map((variant, index) => ({
+      ...variant,
+      order: index,
+    }))
+
+  return { variants: sorted, errors }
 }
 
 export type WorkDetailRecord = {

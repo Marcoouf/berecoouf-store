@@ -68,7 +68,8 @@ export default async function ArtistsPage() {
         <ul className="space-y-6">
           {safe.map((a) => {
             const portrait = a.portrait || a.image || PLACEHOLDER_DATA_URL
-            const bio = (a as any).bio ? String((a as any).bio) : 'Biographie à venir.'
+            const rawBio = typeof (a as any).bio === 'string' ? (a as any).bio.trim() : ''
+            const bio = rawBio.length > 0 ? rawBio : 'Biographie à venir.'
             return (
               <li key={a.id}>
                 <Link
@@ -84,7 +85,7 @@ export default async function ArtistsPage() {
                     </div>
                     <div className="min-w-0 flex-1 text-neutral-600">
                       <h2 className="text-lg font-semibold text-neutral-900 transition-colors group-hover:text-accent">{a.name}</h2>
-                      <p className="mt-2 text-sm leading-relaxed text-neutral-600 line-clamp-3">
+                      <p className="mt-2 text-xs sm:text-sm leading-relaxed text-neutral-600 line-clamp-3">
                         {bio}
                       </p>
                     </div>

@@ -17,12 +17,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     where: { slug: params.slug, deletedAt: null, isArchived: false, isHidden: false },
     select: { name: true, bio: true },
   })
+  const bio = artist?.bio ? artist.bio.trim() : ''
   return {
     title: artist ? `${artist.name} — Vague` : 'Artiste — Vague',
-    description: artist?.bio ?? undefined,
+    description: bio || undefined,
     openGraph: {
       title: artist ? `${artist.name} — Vague` : 'Artiste — Vague',
-      description: artist?.bio ?? undefined,
+      description: bio || undefined,
       type: 'profile',
     },
     alternates: { canonical: `/artists/${params.slug}` },
@@ -101,7 +102,7 @@ export default async function ArtistPage({ params }: Props) {
     '@context': 'https://schema.org',
     '@type': 'Person',
     name: artist.name,
-    description: artist.bio || undefined,
+    description: artist.bio ? artist.bio.trim() || undefined : undefined,
     url: canonicalUrl,
     image: heroSrc || undefined,
     sameAs: (artist as any)?.socials?.filter(Boolean) ?? [],
@@ -165,8 +166,10 @@ export default async function ArtistPage({ params }: Props) {
                     En vacances — commandes suspendues
                   </div>
                 ) : null}
-                {artist.bio && (
-                  <p className="mt-2 max-w-prose text-neutral-700">{artist.bio}</p>
+                {artist.bio && artist.bio.trim().length > 0 && (
+                  <p className="mt-2 max-w-prose text-sm text-neutral-600 whitespace-pre-line">
+                    {artist.bio.trim()}
+                  </p>
                 )}
                 {socials.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-2">

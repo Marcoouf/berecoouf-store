@@ -1,10 +1,13 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader'
 import { MoonIcon } from '@/components/icons'
+import ConditionalPaddingImage from '@/components/ConditionalPaddingImage'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { slugify } from '@/lib/slug'
 
 type WorkSummary = {
   id: string
@@ -42,6 +45,7 @@ type WorkDetail = WorkSummary & {
 
 type FormState = {
   title: string
+  slug: string
   description: string
   year: string
   technique: string
@@ -87,13 +91,16 @@ function toEuros(cents: number | null | undefined) {
 
 function buildForm(detail: WorkDetail): FormState {
   const variants: FormState['variants'] =
-    (detail.variants ?? []).map(
-      (variant): FormState['variants'][number] => ({
-        id: variant.id || undefined,
-        label: variant.label,
-        price: variant.price ? (variant.price / 100).toString() : '',
-      }),
-    ) || []
+    (detail.variants ?? [])
+      .slice()
+      .sort((a, b) => (a.price || 0) - (b.price || 0))
+      .map(
+        (variant): FormState['variants'][number] => ({
+          id: variant.id || undefined,
+          label: variant.label,
+          price: variant.price ? (variant.price / 100).toString() : '',
+        }),
+      ) || []
 
   if (variants.length === 0) {
     variants.push({ label: '', price: '' })
@@ -101,6 +108,7 @@ function buildForm(detail: WorkDetail): FormState {
 
   return {
     title: detail.title ?? '',
+    slug: detail.slug ?? '',
     description: detail.description ?? '',
     year: detail.year ? String(detail.year) : '',
     technique: detail.technique ?? '',
@@ -164,11 +172,14 @@ async function uploadImage(file: File, hint: string) {
 }
 
 export default function AuthorWorksPage() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
   const [works, setWorks] = useState<WorkSummary[]>([])
   const [loadingList, setLoadingList] = useState(true)
   const [listError, setListError] = useState<string | null>(null)
   const [availableArtists, setAvailableArtists] = useState<ArtistOption[]>([])
-  const [showCreate, setShowCreate] = useState(false)
+  const [showCreate, setShowCreate] = useState(() => searchParams?.get('view') === 'create')
   const [createForm, setCreateForm] = useState<CreateFormState>({ title: '', artistId: '', image: '' })
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
@@ -186,6 +197,26 @@ export default function AuthorWorksPage() {
   const [uploadingCover, setUploadingCover] = useState(false)
   const [uploadingMockup, setUploadingMockup] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [invalidFields, setInvalidFields] = useState<{ image?: boolean; variants?: number[] }>({})
+  const coverBlockRef = useRef<HTMLDivElement>(null)
+  const updateViewParam = useCallback(
+    (open: boolean) => {
+      if (!pathname) return
+      if (!searchParams) return
+      const params = new URLSearchParams(searchParams.toString())
+      if (open) {
+        if (params.get('view') !== 'create') {
+          params.set('view', 'create')
+          router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+        }
+      } else if (params.has('view')) {
+        params.delete('view')
+        const query = params.toString()
+        router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+      }
+    },
+    [pathname, router, searchParams],
+  )
 
   const { filteredWorks, publishedCount, draftCount } = useMemo(() => {
     const published = works.filter((work) => work.published)
@@ -213,6 +244,12 @@ export default function AuthorWorksPage() {
   const activeArtistHidden = activeArtistId
     ? Boolean(availableArtists.find((artist) => artist.id === activeArtistId)?.isHidden)
     : false
+
+  useEffect(() => {
+    if (!searchParams) return
+    const shouldOpen = searchParams.get('view') === 'create'
+    setShowCreate((prev) => (prev === shouldOpen ? prev : shouldOpen))
+  }, [searchParams])
 
   useEffect(() => {
     let active = true
@@ -282,7 +319,8 @@ export default function AuthorWorksPage() {
     if (!selectedWorkId) {
       setDetail(null)
       setForm(null)
-       setLoadingDetail(false)
+      setInvalidFields({})
+      setLoadingDetail(false)
       return
     }
 
@@ -296,6 +334,7 @@ export default function AuthorWorksPage() {
         if (!active) return
         setDetail(data)
         setForm(buildForm(data))
+        setInvalidFields({})
       })
       .catch((err: any) => {
         if (!active) return
@@ -313,12 +352,38 @@ export default function AuthorWorksPage() {
   const handleField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setMessage(null)
     setError(null)
-    setForm((prev) => (prev ? { ...prev, [key]: value } : prev))
+    if (key === 'image' && invalidFields.image) {
+      setInvalidFields((prev) => ({ ...prev, image: false }))
+    }
+    setForm((prev) => {
+      if (!prev) return prev
+      if (key === 'title') {
+        const nextTitle = value as string
+        const currentSlug = prev.slug?.trim() ?? ''
+        const autoSlugFromPrevTitle = slugify(prev.title || '')
+        const shouldAutoUpdate = !currentSlug || currentSlug === autoSlugFromPrevTitle
+        return {
+          ...prev,
+          title: nextTitle,
+          slug: shouldAutoUpdate ? slugify(nextTitle || '') : prev.slug,
+        }
+      }
+      if (key === 'slug') {
+        return { ...prev, slug: value as string }
+      }
+      return { ...prev, [key]: value }
+    })
   }
 
   const handleVariantChange = (index: number, key: 'label' | 'price', value: string) => {
     setMessage(null)
     setError(null)
+    if (invalidFields.variants?.includes(index)) {
+      setInvalidFields((prev) => {
+        const remaining = (prev.variants ?? []).filter((i) => i !== index)
+        return { ...prev, variants: remaining.length > 0 ? remaining : undefined }
+      })
+    }
     setForm((prev) => {
       if (!prev) return prev
       const variants = [...prev.variants]
@@ -349,14 +414,24 @@ export default function AuthorWorksPage() {
       if (next.length === 0) next.push({ id: undefined, label: '', price: '' })
       return { ...prev, variants: next }
     })
+    if (invalidFields.variants?.length) {
+      setInvalidFields((prev) => {
+        const remaining = (prev.variants ?? [])
+          .filter((i) => i !== index)
+          .map((i) => (i > index ? i - 1 : i))
+        return { ...prev, variants: remaining.length > 0 ? remaining : undefined }
+      })
+    }
   }
 
   const toggleCreatePanel = () => {
     if (showCreate) {
+      updateViewParam(false)
       setShowCreate(false)
       setCreateError(null)
       setCreateForm((form) => ({ ...form, title: '', image: '' }))
     } else {
+      updateViewParam(true)
       setShowCreate(true)
     }
   }
@@ -419,11 +494,13 @@ export default function AuthorWorksPage() {
       const newWork = data.work as WorkSummary
       setWorks((prev) => [newWork, ...prev.filter((work) => work.id !== newWork.id)])
       setFlash('Nouvelle œuvre créée ✅')
+      updateViewParam(false)
       setShowCreate(false)
       setCreateForm({ title: '', artistId, image: '' })
       setCreateError(null)
       setDetail(null)
       setForm(null)
+      setInvalidFields({})
       setSelectedWorkId(newWork.id)
     } catch (err: any) {
       setCreateError(err?.message || 'Création impossible.')
@@ -473,6 +550,7 @@ export default function AuthorWorksPage() {
       })
       setDetail(null)
       setForm(null)
+      setInvalidFields({})
       setLoadingDetail(false)
     } catch (err: any) {
       setError(err?.message || 'Suppression impossible.')
@@ -488,14 +566,21 @@ export default function AuthorWorksPage() {
     setError(null)
     setMessage(null)
 
-    if (!form.image.trim()) {
+    const trimmedImage = form.image.trim()
+    if (!trimmedImage) {
       setError('Ajoute une image principale avant de sauvegarder.')
+      setInvalidFields((prev) => ({ ...prev, image: true }))
       setSaving(false)
+      requestAnimationFrame(() => {
+        coverBlockRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        coverBlockRef.current?.focus({ preventScroll: true })
+      })
       return
     }
 
     const variantErrors: string[] = []
     const variantsPayload: Array<{ id?: string; label: string; price: number; order: number }> = []
+    const invalidVariantIndexes: number[] = []
 
     form.variants.forEach((variant, idx) => {
       const label = variant.label.trim()
@@ -506,12 +591,14 @@ export default function AuthorWorksPage() {
       }
       if (!label) {
         variantErrors.push(`Le format ${idx + 1} doit avoir un nom.`)
+        invalidVariantIndexes.push(idx)
         return
       }
 
       const priceValue = priceStr ? Number(priceStr.replace(',', '.')) : NaN
       if (!Number.isFinite(priceValue) || priceValue <= 0) {
         variantErrors.push(`Prix invalide pour "${label}".`)
+        invalidVariantIndexes.push(idx)
         return
       }
 
@@ -525,28 +612,48 @@ export default function AuthorWorksPage() {
 
     if (variantErrors.length > 0) {
       setError(variantErrors[0])
+      setInvalidFields((prev) => ({
+        ...prev,
+        variants: Array.from(new Set([...(prev.variants ?? []), ...invalidVariantIndexes])),
+      }))
       setSaving(false)
       return
     }
 
     if (variantsPayload.length === 0) {
       setError('Ajoute au moins un format avec un prix supérieur à 0 €.')
+      setInvalidFields((prev) => ({
+        ...prev,
+        variants: form.variants.map((_, idx) => idx),
+      }))
       setSaving(false)
       return
     }
 
+    const sortedVariants = variantsPayload
+      .slice()
+      .sort((a, b) => a.price - b.price)
+      .map((variant, order) => ({ ...variant, order }))
+
+    const normalizedSlug = (() => {
+      const manual = form.slug.trim()
+      if (manual) return slugify(manual)
+      return slugify(form.title)
+    })()
+
     const payload = {
       title: form.title.trim(),
+      slug: normalizedSlug,
       description: form.description.trim() || null,
       year: form.year.trim() ? Number(form.year) : null,
       technique: form.technique.trim() || null,
       paper: form.paper.trim() || null,
       edition: form.edition.trim() || null,
-      image: form.image.trim(),
+      image: trimmedImage,
       mockup: form.mockup.trim() || null,
       basePrice: form.basePrice.trim() ? Number(form.basePrice.replace(',', '.')) : null,
       published: form.published,
-      variants: variantsPayload,
+      variants: sortedVariants,
     }
 
     try {
@@ -561,6 +668,7 @@ export default function AuthorWorksPage() {
       }
 
       const updatedWork = data.work
+      setInvalidFields({})
 
       setMessage('Œuvre mise à jour ✅')
       setDetail(updatedWork)
@@ -571,6 +679,7 @@ export default function AuthorWorksPage() {
                     ? {
                         ...work,
                         title: updatedWork.title,
+                        slug: updatedWork.slug,
                         image: updatedWork.image || null,
                         mockup: updatedWork.mockup || null,
                         published: updatedWork.published,
@@ -593,10 +702,22 @@ export default function AuthorWorksPage() {
       const raw = err?.message || 'Échec de la sauvegarde'
       if (raw === 'invalid_variants') {
         setError('Vérifie chaque format : intitulé et prix doivent être renseignés.')
+        setInvalidFields((prev) => ({
+          ...prev,
+          variants: form.variants.map((_, idx) => idx),
+        }))
       } else if (raw === 'variants_required') {
         setError('Ajoute au moins un format avec un prix supérieur à 0 €.')
+        setInvalidFields((prev) => ({
+          ...prev,
+          variants: form.variants.map((_, idx) => idx),
+        }))
       } else if (raw === 'invalid_variant_id') {
         setError('Format inconnu. Recharge la page pour repartir sur les valeurs à jour.')
+        setInvalidFields((prev) => ({
+          ...prev,
+          variants: form.variants.map((_, idx) => idx),
+        }))
       } else {
         setError(raw)
       }
@@ -614,6 +735,9 @@ export default function AuthorWorksPage() {
       else setUploadingMockup(true)
       const url = await uploadImage(file, hint)
       handleField(kind === 'image' ? 'image' : 'mockup', url)
+      if (kind === 'image') {
+        setInvalidFields((prev) => ({ ...prev, image: false }))
+      }
       setMessage(kind === 'image' ? 'Image mise à jour ✅' : 'Mockup mis à jour ✅')
     } catch (err: any) {
       setError(err?.message || 'Upload impossible')
@@ -766,6 +890,7 @@ export default function AuthorWorksPage() {
           <button
             type="button"
             onClick={() => {
+              updateViewParam(true)
               setShowCreate(true)
               window.scrollTo({ top: 0, behavior: 'smooth' })
             }}
@@ -1028,6 +1153,26 @@ export default function AuthorWorksPage() {
                     required
                   />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700">Slug</label>
+                  <input
+                    type="text"
+                    value={form.slug}
+                    onChange={(e) => handleField('slug', slugify(e.target.value))}
+                    onBlur={() => {
+                      const next = form.slug.trim()
+                      handleField('slug', next ? slugify(next) : slugify(form.title))
+                    }}
+                    placeholder="nom-de-l-oeuvre"
+                    className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm lowercase focus:border-ink focus:outline-none focus:ring-2 focus:ring-ink/10"
+                    inputMode="text"
+                    autoComplete="off"
+                  />
+                  <p className="mt-1 text-xs text-neutral-500">
+                    URL lisible : elle apparaît après `/artworks/…`. Laisse vide pour le générer automatiquement depuis
+                    le titre.
+                  </p>
+                </div>
 
                 <div className="grid gap-4 md:grid-cols-2">
                   <div>
@@ -1107,48 +1252,66 @@ export default function AuthorWorksPage() {
                   </div>
 
                   <div className="space-y-3">
-                    {form.variants.map((variant, idx) => (
-                      <div
-                        key={variant.id ?? `new-${idx}`}
-                        className="grid gap-3 rounded-md border border-neutral-200 p-3 md:grid-cols-[1fr_140px_auto]"
-                      >
-                        <div>
-                          <label className="block text-xs font-medium uppercase text-neutral-500">
-                            Intitulé <span className="text-red-600">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            value={variant.label}
-                            onChange={(e) => handleVariantChange(idx, 'label', e.target.value)}
-                            placeholder="Ex. A3 — 297×420 mm"
-                            className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-2 focus:ring-ink/10"
-                          />
+                    {form.variants.map((variant, idx) => {
+                      const variantInvalid = Boolean(invalidFields.variants?.includes(idx))
+                      return (
+                        <div
+                          key={variant.id ?? `new-${idx}`}
+                          className={[
+                            'grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_140px_auto]',
+                            variantInvalid ? 'border-red-300 bg-red-50/60' : 'border-neutral-200',
+                          ].join(' ')}
+                        >
+                          <div>
+                            <label className="block text-xs font-medium uppercase text-neutral-500">
+                              Intitulé <span className="text-red-600">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={variant.label}
+                              onChange={(e) => handleVariantChange(idx, 'label', e.target.value)}
+                              placeholder="Ex. A3 — 297×420 mm"
+                              aria-invalid={variantInvalid ? 'true' : undefined}
+                              className={[
+                                'mt-1 w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2',
+                                variantInvalid
+                                  ? 'border-red-400 focus:border-red-500 focus:ring-red-200'
+                                  : 'border-neutral-300 focus:border-ink focus:ring-ink/10',
+                              ].join(' ')}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium uppercase text-neutral-500">
+                              Prix (€) <span className="text-red-600">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              inputMode="decimal"
+                              pattern="^[0-9]+(?:[.,][0-9]{0,2})?$"
+                              value={variant.price}
+                              onChange={(e) => handleVariantChange(idx, 'price', e.target.value)}
+                              placeholder="0"
+                              aria-invalid={variantInvalid ? 'true' : undefined}
+                              className={[
+                                'mt-1 w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2',
+                                variantInvalid
+                                  ? 'border-red-400 focus:border-red-500 focus:ring-red-200'
+                                  : 'border-neutral-300 focus:border-ink focus:ring-ink/10',
+                              ].join(' ')}
+                            />
+                          </div>
+                          <div className="flex items-end justify-end">
+                            <button
+                              type="button"
+                              onClick={() => removeVariant(idx)}
+                              className="rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50"
+                            >
+                              Retirer
+                            </button>
+                          </div>
                         </div>
-                        <div>
-                          <label className="block text-xs font-medium uppercase text-neutral-500">
-                            Prix (€) <span className="text-red-600">*</span>
-                          </label>
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            pattern="^[0-9]+(?:[.,][0-9]{0,2})?$"
-                            value={variant.price}
-                            onChange={(e) => handleVariantChange(idx, 'price', e.target.value)}
-                            placeholder="0"
-                            className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-2 focus:ring-ink/10"
-                          />
-                        </div>
-                        <div className="flex items-end justify-end">
-                          <button
-                            type="button"
-                            onClick={() => removeVariant(idx)}
-                            className="rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-50"
-                          >
-                            Retirer
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
 
                   <p className="mt-3 text-xs text-neutral-500">
@@ -1156,17 +1319,29 @@ export default function AuthorWorksPage() {
                   </p>
                 </div>
 
-                <div className="rounded-lg border border-neutral-200 p-4">
-                  <h3 className="text-sm font-semibold text-neutral-700">Image principale</h3>
+                <div
+                  ref={coverBlockRef}
+                  tabIndex={-1}
+                  className={[
+                    'rounded-lg border p-4 focus:outline-none',
+                    invalidFields.image
+                      ? 'border-red-300 bg-red-50/60 ring-2 ring-red-200/80'
+                      : 'border-neutral-200',
+                  ].join(' ')}
+                >
+                  <h3 id="author-work-cover-label" className="text-sm font-semibold text-neutral-700">
+                    Image principale <span className="text-red-600">*</span>
+                  </h3>
                   <p className="mt-1 text-xs text-neutral-500">Poids max 2,5&nbsp;Mo.</p>
                   {form.image ? (
-                    <div className="relative mt-3 h-40 w-full overflow-hidden rounded-lg">
-                      <Image
+                    <div className="relative mt-3 h-40 w-full overflow-hidden rounded-lg bg-white">
+                      <ConditionalPaddingImage
                         src={form.image}
                         alt={`Image principale ${form.title || ''}`.trim()}
-                        fill
                         sizes="(min-width: 1024px) 420px, 100vw"
-                        className="object-cover"
+                        padding={28}
+                        className="bg-white"
+                        imageClassName="!object-contain"
                       />
                     </div>
                   ) : (
@@ -1178,6 +1353,7 @@ export default function AuthorWorksPage() {
                         type="file"
                         accept="image/*"
                         className="hidden"
+                        aria-invalid={invalidFields.image ? 'true' : undefined}
                         onChange={(e) => {
                           const file = e.target.files?.[0]
                           if (file) handleUpload('image', file)
@@ -1205,6 +1381,11 @@ export default function AuthorWorksPage() {
                       </>
                     ) : null}
                   </div>
+                  {invalidFields.image && (
+                    <p className="mt-3 text-xs font-semibold text-red-600">
+                      Ajoute une image avant de publier ou d’enregistrer.
+                    </p>
+                  )}
                 </div>
 
                 <div className="rounded-lg border border-neutral-200 p-4">
@@ -1262,7 +1443,19 @@ export default function AuthorWorksPage() {
                   <input
                     type="checkbox"
                     checked={form.published}
-                    onChange={(e) => handleField('published', e.target.checked)}
+                    onChange={(e) => {
+                      const next = e.target.checked
+                      if (next && !form.image.trim()) {
+                        setInvalidFields((prev) => ({ ...prev, image: true }))
+                        setError('Ajoute une image principale avant de publier.')
+                        requestAnimationFrame(() => {
+                          coverBlockRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                          coverBlockRef.current?.focus({ preventScroll: true })
+                        })
+                        return
+                      }
+                      handleField('published', next)
+                    }}
                   />
                   Œuvre publiée et visible sur le site
                 </label>
@@ -1304,6 +1497,7 @@ export default function AuthorWorksPage() {
         type="button"
         onClick={() => {
           if (!showCreate) {
+            updateViewParam(true)
             setShowCreate(true)
             window.scrollTo({ top: 0, behavior: 'smooth' })
           }

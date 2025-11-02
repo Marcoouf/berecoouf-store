@@ -1,10 +1,11 @@
 import { NextResponse, NextRequest } from 'next/server'
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
+import { deleteBlobIfNeeded } from '@/lib/blob'
 import { withAdmin } from '../_lib/withAdmin'
 
 // ----------------- Types d'entrée normalisés -----------------
-export type VariantIn = { id?: string; label: string; price: number; sku?: string | null; stock?: number | null }
+export type VariantIn = { id?: string; label: string; price: number; order?: number; sku?: string | null; stock?: number | null }
 export type WorkIn = {
   id?: string
   slug: string
@@ -92,6 +93,14 @@ function normalize(body: any): WorkIn {
   }
 }
 
+const sortVariantsAscending = (variants?: VariantIn[]): VariantIn[] => {
+  if (!Array.isArray(variants)) return []
+  return variants
+    .slice()
+    .sort((a, b) => (a.price || 0) - (b.price || 0))
+    .map((variant, index) => ({ ...variant, order: index }))
+}
+
 // ----------------- Validation stricte (print only) -----------------
 function ensureOnlyPrint(data: WorkIn, raw: any) {
   const errs: string[] = []
@@ -150,6 +159,7 @@ export const POST = withAdmin(async (req: NextRequest) => {
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: e?.code || 'validation_failed', detail: e?.detail || [e?.message] }, { status: 400 })
   }
+  const sortedVariants = sortVariantsAscending(data.variants)
 
   const artistResolvedId = await resolveArtistId(data.artistId)
   if (!artistResolvedId) return NextResponse.json({ ok: false, error: 'unknown_artist' }, { status: 400 })
@@ -169,10 +179,10 @@ export const POST = withAdmin(async (req: NextRequest) => {
         basePrice: data.basePrice, // **CENTIMES**
         published: data.published ?? true,
         artist: { connect: { id: artistResolvedId } },
-        ...(data.variants && data.variants.length
+        ...(sortedVariants.length
           ? {
               variants: {
-                create: data.variants.map((v) => ({ label: v.label, price: v.price })),
+                create: sortedVariants.map((v) => ({ label: v.label, price: v.price, order: v.order ?? 0 })),
               },
             }
           : {}),
@@ -207,6 +217,7 @@ export const PUT = withAdmin(async (req: NextRequest) => {
 
   const artistResolvedId = await resolveArtistId(data.artistId)
   if (!artistResolvedId) return NextResponse.json({ ok: false, error: 'unknown_artist' }, { status: 400 })
+  const sortedVariants = sortVariantsAscending(data.variants)
 
   const work = await prisma.$transaction(async (tx: any) => {
     await tx.work.update({
@@ -228,7 +239,7 @@ export const PUT = withAdmin(async (req: NextRequest) => {
     })
 
     // Sync variants
-    const incoming = data.variants ?? []
+    const incoming = sortedVariants
     const keepIds = incoming
       .filter((v) => typeof v.id === 'string' && v.id.trim().length > 0)
       .map((v) => v.id as string)
@@ -239,9 +250,14 @@ export const PUT = withAdmin(async (req: NextRequest) => {
     // Mettre à jour / Créer
     for (const v of incoming) {
       if (v.id && v.id.trim()) {
-        await tx.variant.update({ where: { id: v.id }, data: { label: v.label, price: v.price } })
+        await tx.variant.update({
+          where: { id: v.id },
+          data: { label: v.label, price: v.price, order: v.order ?? 0 },
+        })
       } else {
-        await tx.variant.create({ data: { workId: id, label: v.label, price: v.price } })
+        await tx.variant.create({
+          data: { workId: id, label: v.label, price: v.price, order: v.order ?? 0 },
+        })
       }
     }
 
@@ -262,16 +278,27 @@ export const DELETE = withAdmin(async (req: NextRequest) => {
   const id = url.searchParams.get('id') || ''
   if (!id) return NextResponse.json({ ok: false, error: 'missing_id' }, { status: 400 })
 
-  const work = await prisma.work.findUnique({ where: { id }, select: { slug: true, published: true, deletedAt: true } })
+  const work = await prisma.work.findUnique({
+    where: { id },
+    select: { slug: true, published: true, deletedAt: true, imageUrl: true, mockupUrl: true },
+  })
   if (!work || work.deletedAt) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
 
   const linkedOrders = await prisma.orderItem.count({ where: { workId: id } })
+  const imageUrl = work.imageUrl ?? null
+  const mockupUrl = work.mockupUrl ?? null
+
   if (linkedOrders > 0) {
     const archivedSlug = `${work.slug}-archive-${Date.now()}`.slice(0, 60)
     await prisma.work.update({
       where: { id },
-      data: { published: false, slug: archivedSlug, deletedAt: new Date() },
+      data: {
+        published: false,
+        slug: archivedSlug,
+        deletedAt: new Date(),
+      },
     })
+    await Promise.all([deleteBlobIfNeeded(imageUrl), deleteBlobIfNeeded(mockupUrl)])
     revalidatePath('/artworks')
     revalidatePath(`/artworks/${work.slug}`)
     return NextResponse.json({ ok: true, softDeleted: true })
@@ -281,6 +308,7 @@ export const DELETE = withAdmin(async (req: NextRequest) => {
     await tx.variant.deleteMany({ where: { workId: id } })
     return tx.work.delete({ where: { id }, select: { slug: true } })
   })
+  await Promise.all([deleteBlobIfNeeded(imageUrl), deleteBlobIfNeeded(mockupUrl)])
 
   // Revalidate public pages
   revalidatePath('/artworks')

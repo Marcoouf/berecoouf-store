@@ -40,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </Suspense>
         </Providers>
         <Footer />
+        <Analytics />
       </body>
     </html>
   )
