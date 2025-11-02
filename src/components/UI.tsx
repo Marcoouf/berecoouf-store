@@ -4,10 +4,11 @@ import React from 'react'
 import Image from '@/components/SmartImage'
 import ConditionalPaddingImage from '@/components/ConditionalPaddingImage'
 import Link from 'next/link'
-import type { Artwork, Artist, CartItem } from '@/lib/types'
+import type { Artwork, Artist } from '@/lib/types'
 import { useCart } from '@/components/CartContext'
 import { FadeIn, Stagger } from '@/components/Motion'
 import { euro } from '@/lib/format'
+import ArtworkHoverCard from '@/components/ArtworkHoverCard'
 
 type HeroHighlight = {
   image?: string | null
@@ -117,33 +118,6 @@ function Hero({ highlight }: { highlight?: HeroHighlight | null }) {
 
 
 function CollectionsTeaser({ artworks, artistsById }: { artworks: Artwork[]; artistsById: Record<string, string> }) {
-  const { add } = useCart()
-
-  const handleAdd = React.useCallback(
-    (art: Artwork, selected: any) => {
-      const unit =
-        (selected?.price as number | undefined) ??
-        ((art as any).basePrice as number | undefined) ??
-        ((art as any).priceMin as number | undefined) ??
-        0
-
-      const item: CartItem = {
-        key: `${art.id}-${selected?.id ?? 'std'}`,
-        qty: 1,
-        artwork: {
-          id: art.id,
-          title: art.title,
-          image: (art as any).image ?? (art as any).mockup ?? null,
-        },
-        format: selected ? { id: selected.id, label: selected.label, price: selected.price } : undefined,
-        unitPriceCents: unit,
-      }
-
-      add(item as any)
-    },
-    [add],
-  )
-
   if (!artworks.length) return null
 
   return (
@@ -161,7 +135,11 @@ function CollectionsTeaser({ artworks, artistsById }: { artworks: Artwork[]; art
         <div className="grid items-stretch gap-5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
           <Stagger>
             {artworks.map((a) => (
-              <ArtworkCard key={a.id} art={a} onAdd={handleAdd} artistsById={artistsById} />
+              <ArtworkHoverCard
+                key={a.id}
+                artwork={a}
+                artistName={artistsById[a.artistId] ?? null}
+              />
             ))}
           </Stagger>
         </div>
@@ -223,154 +201,7 @@ function Artists({ artists }: { artists: Artist[] }) {
   )
 }
 
-function ArtworkCard({ art, onAdd, artistsById }: { art: Artwork; onAdd: (a: Artwork, f: any) => void; artistsById: Record<string, string> }) {
-  const formatsList = React.useMemo(() => {
-    const base = art as any
-    if (Array.isArray(art.formats)) return art.formats as any[]
-    if (Array.isArray(base?.variants)) return base.variants as any[]
-    return [] as any[]
-  }, [art])
-
-  const [formatId, setFormatId] = React.useState(() => formatsList[0]?.id ?? null)
-
-  React.useEffect(() => {
-    if (!formatsList.some((f) => f.id === formatId)) {
-      setFormatId(formatsList[0]?.id ?? null)
-    }
-  }, [formatsList, formatId])
-
-  const selected = React.useMemo(() => {
-    return formatsList.find((f) => f.id === formatId) ?? null
-  }, [formatsList, formatId])
-
-  const priceCents = React.useMemo(() => {
-    const fallback =
-      (selected?.price as number | undefined) ??
-      ((art as any).priceMin as number | undefined) ??
-      ((art as any).price as number | undefined) ??
-      0
-    return Number.isFinite(fallback) ? Number(fallback) : 0
-  }, [selected, art])
-
-  const priceLabel = React.useMemo(() => {
-    return selected?.price
-      ? euro(selected.price)
-      : art.priceMinFormatted ?? euro(priceCents)
-  }, [selected, art.priceMinFormatted, priceCents])
-
-  const slug = art.slug ?? art.id
-
-  const formats = formatsList
-
-  return (
-    <div className="group flex h-full flex-col">
-      <Link
-        href={`/artworks/${slug}`}
-        scroll
-        className="relative block aspect-square overflow-hidden rounded-2xl border transition-all duration-300 group-hover:shadow-[0_12px_30px_rgba(0,0,0,0.08)] focus:outline-none focus:ring-2 focus:ring-accent-300"
-        aria-label={`Voir l’œuvre ${art.title}`}
-      >
-        {art.image ? (
-          <ConditionalPaddingImage
-            src={art.image}
-            alt={`Visuel de l’œuvre ${art.title}`}
-            sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw"
-            imageClassName="transition-transform duration-500 group-hover:scale-105 !object-contain"
-          />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center bg-accent text-ink">
-            <span className="px-3 text-sm font-medium text-center">{art.title}</span>
-          </div>
-        )}
-      </Link>
-
-      <div className="mt-3 flex items-start justify-between gap-4">
-        <div>
-          <Link
-            href={`/artworks/${slug}`}
-            scroll
-            className="text-sm font-medium transition group-hover:text-accent-700 hover:underline underline-offset-4 focus:outline-none focus:ring-2 focus:ring-accent-300 rounded"
-          >
-            {art.title}
-          </Link>
-          <div className="text-xs text-neutral-500">{artistsById[art.artistId] ?? 'Artiste'}</div>
-        </div>
-        <div className="ml-auto text-sm tabular-nums">
-          {priceLabel}
-        </div>
-      </div>
-
-      {formats.length > 0 && (
-        <div className="mt-2 min-h-[72px] grid grid-cols-2 gap-2 xs:grid-cols-[repeat(auto-fit,minmax(140px,1fr))]">
-          {formats.map((f) => {
-            const isSel = f.id === formatId
-            return (
-              <button
-                key={f.id}
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setFormatId(f.id)
-                }}
-                className={[
-                  'inline-flex h-8 w-full items-center justify-center rounded-full px-3',
-                  'text-[12px] font-medium whitespace-nowrap',
-                  'border transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent',
-                  isSel
-                    ? 'bg-accent-300 text-ink border-accent-300'
-                    : 'bg-white text-neutral-700 border-neutral-200 hover:bg-accent-100 hover:border-accent-300 hover:text-accent-700',
-                ].join(' ')}
-              >
-                {f.label}
-              </button>
-            )
-          })}
-        </div>
-      )}
-
-      <div className="mt-auto pt-3">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation()
-            onAdd(art, selected)
-          }}
-          className="w-full rounded-lg bg-accent-300 hover:bg-accent-400 text-ink font-medium px-3 py-2 text-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-        >
-          Ajouter au panier
-        </button>
-      </div>
-    </div>
-  )
-}
-
 function Gallery({ artworks, artistsById }: { artworks: Artwork[]; artistsById: Record<string, string> }) {
-  const { add } = useCart()
-  const handleAdd = React.useCallback(
-    (art: Artwork, selected: any) => {
-      const unit =
-        (selected?.price as number | undefined) ??
-        ((art as any).basePrice as number | undefined) ??
-        ((art as any).priceMin as number | undefined) ??
-        0
-
-      const item: CartItem = {
-        key: `${art.id}-${selected?.id ?? 'std'}`,
-        qty: 1,
-        artwork: {
-          id: art.id,
-          title: art.title,
-          image: (art as any).image ?? (art as any).mockup ?? null,
-        },
-        format: selected ? { id: selected.id, label: selected.label, price: selected.price } : undefined,
-        unitPriceCents: unit,
-      }
-
-      add(item as any)
-    },
-    [add],
-  )
-
   if (!artworks.length) {
     return (
       <section id="gallery" className="border-b border-neutral-200/60">
@@ -389,7 +220,11 @@ function Gallery({ artworks, artistsById }: { artworks: Artwork[]; artistsById: 
         <div className="grid items-stretch gap-5 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
           <Stagger>
             {artworks.map((a) => (
-              <ArtworkCard key={a.id} art={a} onAdd={handleAdd} artistsById={artistsById} />
+              <ArtworkHoverCard
+                key={a.id}
+                artwork={a}
+                artistName={artistsById[a.artistId] ?? null}
+              />
             ))}
           </Stagger>
         </div>

@@ -1,6 +1,7 @@
 import SmartImage from '@/components/SmartImage'
 import ConditionalPaddingImage from '@/components/ConditionalPaddingImage'
 import Link from 'next/link'
+import ArtworkHoverCard from '@/components/ArtworkHoverCard'
 import { prisma } from '@/lib/prisma'
 import type { Metadata } from 'next'
 import Breadcrumb from '@/components/Breadcrumb'
@@ -223,44 +224,16 @@ export default async function ArtistPage({ params }: Props) {
         <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
           {works.map((w: any) => {
             const workOnVacation = Boolean((w as any).artistOnVacation ?? (w as any).artist?.isOnVacation ?? isOnVacation)
+            const badge = workOnVacation ? 'Vacances' : null
+            const priceLabel = (w as any).priceMinFormatted ?? euro((w as any).priceMin ?? 0)
             return (
-              <div key={w.id} className="group">
-                <div className="aspect-square relative overflow-hidden rounded-xl border">
-                  <Link href={`/artworks/${w.slug}`} scroll className="absolute inset-0" aria-label={`Voir l'œuvre ${w.title}`}>
-                    {typeof (w as any).image === 'string' && (w as any).image ? (
-                      <ConditionalPaddingImage
-                        src={(w as any).image as string}
-                        alt={w.title}
-                        sizes="(min-width: 1024px) 30vw, (min-width: 640px) 30vw, 100vw"
-                        imageClassName="transition-transform duration-500 group-hover:scale-[1.02] pointer-events-none select-none !object-contain"
-                        padding={28}
-                      />
-                    ) : (
-                      <div className="absolute inset-0 bg-neutral-100" />
-                    )}
-                  </Link>
-                  {workOnVacation ? (
-                    <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
-                      <MoonIcon className="h-3.5 w-3.5" />
-                      Vacances
-                    </span>
-                  ) : null}
-                </div>
-                <div className="mt-3 flex items-start justify-between gap-4">
-                  <div>
-                    <div className="text-sm font-medium">
-                      <Link href={`/artworks/${w.slug}`} scroll>{w.title}</Link>
-                    </div>
-                    <div className="text-xs text-neutral-500">
-                      {artist.name}
-                      {workOnVacation ? <span className="ml-1 text-amber-600">(indisponible)</span> : null}
-                    </div>
-                  </div>
-                  <div className="ml-auto text-sm tabular-nums">
-                    {(w as any).priceMinFormatted ?? euro((w as any).priceMin ?? 0)}
-                  </div>
-                </div>
-              </div>
+              <ArtworkHoverCard
+                key={w.id}
+                artwork={w}
+                artistName={artist.name}
+                priceLabel={priceLabel}
+                badge={badge}
+              />
             )
           })}
         </div>

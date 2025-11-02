@@ -8,6 +8,7 @@ import ArtworkPurchase from '@/components/ArtworkPurchase'
 import { getCatalog } from '@/lib/getCatalog'
 import ArtworkImageCarousel from '@/components/ArtworkImageCarousel'
 import { MoonIcon } from '@/components/icons'
+import ArtworkHoverCard from '@/components/ArtworkHoverCard'
 // important : ne pas figer au build
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -212,31 +213,12 @@ export default async function Page({ params }: { params: { slug: string } }) {
           <h2 className="mb-4 text-lg font-medium">{relatedTitle}</h2>
           <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
             {related.map((art) => (
-              <Link
+              <ArtworkHoverCard
                 key={art.id}
-                href={`/artworks/${art.slug}`}
-                className="group block"
-              >
-                <div className="aspect-square w-full overflow-hidden rounded-2xl border bg-white relative">
-                  <ConditionalPaddingImage
-                    src={String((art as any).image ?? '')}
-                    alt={String(art.title)}
-                    sizes="(min-width: 1024px) 320px, (min-width: 640px) 33vw, 100vw"
-                    imageClassName="transition-transform duration-300 group-hover:scale-[1.02] !object-contain"
-                    padding={28}
-                  />
-                </div>
-
-                <div className="mt-2 flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-medium">{art.title}</div>
-                    <div className="text-xs text-neutral-500">{artistsById[art.artistId]}</div>
-                  </div>
-                  <div className="ml-auto text-sm tabular-nums">
-                    {(art as any).priceMinFormatted ?? euro((art as any).priceMin ?? (art as any).price ?? 0)}
-                  </div>
-                </div>
-              </Link>
+                artwork={art}
+                artistName={artistsById[art.artistId] ?? null}
+                priceLabel={(art as any).priceMinFormatted ?? euro((art as any).priceMin ?? (art as any).price ?? 0)}
+              />
             ))}
           </div>
         </section>

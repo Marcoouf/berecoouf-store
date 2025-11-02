@@ -1,10 +1,10 @@
 
 import Breadcrumb from '@/components/Breadcrumb'
-import ConditionalPaddingImage from '@/components/ConditionalPaddingImage'
 import { getCatalog } from '@/lib/getCatalog'
 import { euro } from '@/lib/format'
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import ArtworkHoverCard from '@/components/ArtworkHoverCard'
 
 export const metadata: Metadata = {
   title: 'Toutes les œuvres — Vague',
@@ -111,6 +111,7 @@ export default async function ArtworksPage({ searchParams }: { searchParams: Sea
 
   const filtered = filterArtworks(artworks, searchParams)
   const count = filtered.length
+  const artistsById = Object.fromEntries(artists.map((a) => [a.id, a.name])) as Record<string, string>
 
   return (
     <div className="mx-auto max-w-6xl px-4 sm:px-6 py-8 sm:py-10">
@@ -209,51 +210,20 @@ export default async function ArtworksPage({ searchParams }: { searchParams: Sea
       ) : (
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((art) => {
-            const priceLabel: string =
+            const onVacation = Boolean((art as any).artist?.isOnVacation || (art as any).artistOnVacation)
+            const badge = onVacation ? 'En vacances' : null
+            const priceLabel =
               (art as any).priceMinFormatted ??
               (typeof (art as any).priceMin === 'number' ? euro((art as any).priceMin) : euro(unitPriceCents(art)))
-            const image =
-              (art as any).cover?.url ?? (art as any).image ?? (art as any).mockup ??
-              (Array.isArray((art as any).images) ? (art as any).images[0]?.url : undefined)
-            const onVacation = Boolean((art as any).artist?.isOnVacation || (art as any).artistOnVacation)
 
             return (
-              <div key={art.id} className="flex flex-col">
-                <Link
-                  href={`/artworks/${art.slug}`}
-                  className="group block focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                >
-                  <div className="relative aspect-square overflow-hidden rounded-xl border bg-white">
-                    {onVacation ? (
-                      <span className="absolute left-3 top-3 z-10 inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
-                        En vacances
-                      </span>
-                    ) : null}
-                    {image ? (
-                      <ConditionalPaddingImage
-                        src={image}
-                        alt={`Visuel de l’œuvre ${art.title}`}
-                        sizes="(min-width: 1024px) 30vw, (min-width: 640px) 45vw, 100vw"
-                        imageClassName="transition duration-500 group-hover:scale-[1.02] !object-contain"
-                      />
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center text-sm text-neutral-400">
-                        Visuel en préparation
-                      </div>
-                    )}
-                  </div>
-                  <div className="mt-2 flex items-center justify-between gap-3">
-                    <div className="truncate text-sm font-medium group-hover:text-accent transition">{art.title}</div>
-                    <div className="ml-auto text-sm tabular-nums">{priceLabel}</div>
-                  </div>
-                </Link>
-                {art.artist?.name ? (
-                  <div className="text-xs text-neutral-500">
-                    {art.artist.name}
-                    {onVacation ? <span className="ml-2 text-amber-600">(indisponible)</span> : null}
-                  </div>
-                ) : null}
-              </div>
+              <ArtworkHoverCard
+                key={art.id}
+                artwork={art}
+                artistName={art.artist?.name ?? artistsById[art.artistId] ?? null}
+                priceLabel={priceLabel}
+                badge={badge}
+              />
             )
           })}
         </div>
