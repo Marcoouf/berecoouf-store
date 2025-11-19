@@ -36,16 +36,6 @@ function formatCurrency(cents: number) {
   return euro.format((cents ?? 0) / 100)
 }
 
-function getAdminKey(): string | undefined {
-  const k = process.env.NEXT_PUBLIC_ADMIN_KEY
-  return k && k.trim().length > 0 ? k : undefined
-}
-
-function adminHeaders(extra: Record<string, string> = {}) {
-  const key = getAdminKey()
-  return { ...extra, ...(key ? { 'x-admin-key': key } : {}) }
-}
-
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([])
   const [shippingStatuses, setShippingStatuses] = useState<string[]>([])
@@ -71,7 +61,6 @@ export default function AdminOrdersPage() {
         if (artistFilter) params.set('artist', artistFilter)
         if (statusFilter) params.set('status', statusFilter)
         const res = await fetch(`/api/admin/orders?${params.toString()}`, {
-          headers: adminHeaders({ 'Content-Type': 'application/json' }),
           cache: 'no-store',
         })
         if (!active) return
@@ -127,7 +116,7 @@ export default function AdminOrdersPage() {
     try {
       const res = await fetch(`/api/admin/orders/${orderId}`, {
         method: 'PATCH',
-        headers: adminHeaders({ 'Content-Type': 'application/json' }),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           shippingStatus: draft.shippingStatus,
           trackingUrl: draft.trackingUrl,
@@ -163,7 +152,6 @@ export default function AdminOrdersPage() {
     try {
       const res = await fetch(`/api/admin/orders/${orderId}`, {
         method: 'DELETE',
-        headers: adminHeaders(),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok || data?.ok === false) {

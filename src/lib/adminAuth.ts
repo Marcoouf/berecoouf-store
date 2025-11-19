@@ -1,28 +1,45 @@
 import { NextResponse } from 'next/server'
+import { getAuthSession } from '@/lib/auth'
 
 function getCookie(req: Request, name: string) {
   const raw = req.headers.get('cookie') || ''
-  const m = raw.split(';').map(s => s.trim()).find(s => s.startsWith(name + '='))
+  const m = raw.split(';').map((s) => s.trim()).find((s) => s.startsWith(`${name}=`))
   return m ? decodeURIComponent(m.split('=').slice(1).join('=')) : undefined
+}
+
+async function hasAdminSession() {
+  try {
+    const session = await getAuthSession()
+    return session?.user?.role === 'admin'
+  } catch {
+    return false
+  }
+}
+
+function headerProvidesAccess(req: Request): boolean {
+  const strong = (process.env.ADMIN_KEY || '').trim()
+  if (!strong) return false
+  const fromHeader = (req.headers.get('x-admin-key') || '').trim()
+  const fromAuth = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim()
+  return Boolean((fromHeader && fromHeader === strong) || (fromAuth && fromAuth === strong))
 }
 
 /**
  * Vérifie l’accès admin :
- *  - Cookie de session: pb_admin_session=ok (défini par /api/admin/login)
- *  - Ou en-tête x-admin-key égal à ADMIN_KEY (fallback/outillage)
+ *  - Session NextAuth avec rôle admin
+ *  - Cookie pb_admin_session=ok (défini par /api/admin/login)
+ *  - Ou en-tête x-admin-key / Authorization Bearer égal à ADMIN_KEY (usage outillage backend)
  */
-export function assertAdmin(req: Request) {
-  const strong = process.env.ADMIN_KEY
-  const fromHeader = req.headers.get('x-admin-key')
+export async function assertAdmin(req: Request) {
+  const bySession = await hasAdminSession()
+  const byCookie = getCookie(req, 'pb_admin_session') === 'ok'
+  const byHeader = headerProvidesAccess(req)
 
-  const session = getCookie(req, 'pb_admin_session')
-  const byCookie = session === 'ok'
-  const byHeader = !!strong && fromHeader === strong
-
-  if (!byCookie && !byHeader) {
-    return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+  if (bySession || byCookie || byHeader) {
+    return null
   }
-  return null
+
+  return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
 }
 
 /** Refuse les méthodes non prévues. */

@@ -2,14 +2,14 @@ import { NextResponse } from "next/server";
 import { prisma } from '@/lib/prisma'
 import { artistUpdateSchema } from "@/lib/validators/artist";
 import { revalidateArtistPaths } from "@/lib/revalidate";
-
-function assertAdmin() {}
+import { assertAdmin } from '@/lib/adminAuth'
 
 type Params = { params: { id: string } };
 
-export async function GET(_req: Request, { params }: Params) {
+export async function GET(req: Request, { params }: Params) {
+  const denied = await assertAdmin(req)
+  if (denied) return denied
   try {
-    assertAdmin();
     const id = decodeURIComponent(params.id);
     const artist = await prisma.artist.findUnique({
       where: { id },
@@ -41,9 +41,9 @@ export async function PATCH(
   req: Request,
   { params }: { params: { id: string } }
 ) {
+  const denied = await assertAdmin(req)
+  if (denied) return denied
   try {
-    assertAdmin();
-
     const id = decodeURIComponent(params.id);
     const payload = await req.json();
 
@@ -89,9 +89,10 @@ export async function PATCH(
   }
 }
 
-export async function DELETE(_req: Request, { params }: Params) {
+export async function DELETE(req: Request, { params }: Params) {
+  const denied = await assertAdmin(req)
+  if (denied) return denied
   try {
-    assertAdmin();
     const id = params.id;
 
     const artist = await prisma.artist.findUnique({

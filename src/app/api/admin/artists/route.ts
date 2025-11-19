@@ -2,13 +2,11 @@ import { NextResponse } from "next/server";
 import { prisma } from '@/lib/prisma'
 import { artistCreateSchema } from "@/lib/validators/artist";
 import { revalidateArtistPaths } from "@/lib/revalidate";
+import { assertAdmin } from '@/lib/adminAuth'
 
-// TODO: remplace par ta vraie auth admin
-function assertAdmin() {
-  // if (!isAdmin) throw new Error("Unauthorized");
-}
-
-export async function GET() {
+export async function GET(req: Request) {
+  const denied = await assertAdmin(req)
+  if (denied) return denied
   const artists = await prisma.artist.findMany({
     where: { deletedAt: null },
     orderBy: { name: "asc" },
@@ -18,8 +16,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const denied = await assertAdmin(req)
+  if (denied) return denied
   try {
-    assertAdmin();
     const payload = await req.json();
     const input = artistCreateSchema.parse(payload);
 

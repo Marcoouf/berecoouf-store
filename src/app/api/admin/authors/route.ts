@@ -2,10 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
-
-function assertAdmin() {
-  // TODO: brancher ta vraie auth admin (middleware + cookies déjà en place)
-}
+import { assertAdmin } from '@/lib/adminAuth'
 
 const authorCreateSchema = z.object({
   email: z.string().email(),
@@ -33,8 +30,9 @@ function mapArtistAuthors(
     .filter((entry): entry is { id: string; name: string; slug: string } => Boolean(entry))
 }
 
-export async function GET() {
-  assertAdmin()
+export async function GET(req: Request) {
+  const denied = await assertAdmin(req)
+  if (denied) return denied
   const users = await prisma.user.findMany({
     where: { role: 'author' },
     orderBy: { email: 'asc' },
@@ -64,8 +62,9 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const denied = await assertAdmin(req)
+  if (denied) return denied
   try {
-    assertAdmin()
     const payload = await req.json()
     const parsed = authorCreateSchema.parse(payload)
 

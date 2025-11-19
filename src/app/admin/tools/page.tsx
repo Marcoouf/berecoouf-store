@@ -14,9 +14,9 @@ export default function AdminToolsPage() {
     setError(null)
     setResult(null)
     try {
-      const r = await fetch(`/api/admin/migrate-public-to-blob${dry ? '?dry=1' : ''}`, {
+      const endpoint = `/api/admin/migrate-catalog${dry ? '?dry=1' : ''}`
+      const r = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'x-admin-key': process.env.NEXT_PUBLIC_ADMIN_CALL || '' },
       })
       const j = await r.json()
       if (!r.ok) throw new Error(j?.error || 'Erreur migration')

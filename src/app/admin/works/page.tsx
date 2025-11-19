@@ -84,19 +84,6 @@ function addToast(kind: Toast['kind'], msg: string) {
   }, 4000)
 }
 
-  // Admin key helpers (client)
-  function getAdminKey() {
-    const k = process.env.NEXT_PUBLIC_ADMIN_KEY as string | undefined
-    return (k && k.trim().length > 0) ? k : undefined
-  }
-  function adminHeaders(extra: Record<string, string> = {}) {
-    const k = getAdminKey()
-    return {
-      ...extra,
-      ...(k ? { 'x-admin-key': k } : {}),
-    }
-  }
-
   useEffect(() => {
     let active = true
     fetch('/api/catalog')
@@ -144,13 +131,6 @@ function addToast(kind: Toast['kind'], msg: string) {
 
     const xhr = new XMLHttpRequest()
     xhr.open('POST', '/api/upload', true)
-    // Pass admin auth to the API (header) and mark as XHR
-    const adminKey = getAdminKey()
-    if (!adminKey) {
-      addToast('error', 'Clé admin manquante côté client (NEXT_PUBLIC_ADMIN_KEY)')
-    } else {
-      xhr.setRequestHeader('x-admin-key', adminKey)
-    }
     xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest')
     // Ask XHR to parse JSON for us when supported
     try { xhr.responseType = 'json' } catch {}
@@ -311,7 +291,7 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
       const res = await fetch(endpoint, {
         method,
         credentials: 'include',
-        headers: adminHeaders({ 'Content-Type': 'application/json' }),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payloadForApi),
       })
       const j = await res.json().catch(() => ({}))
@@ -362,12 +342,6 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
           { type: 'link', href: '/admin/authors', label: 'Comptes auteurs' },
         ]}
       />
-
-      {!getAdminKey() && (
-        <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          Attention : <code>NEXT_PUBLIC_ADMIN_KEY</code> n&apos;est pas défini côté client. Les appels d&apos;API d&apos;admin risquent d&apos;échouer (401).
-        </div>
-      )}
 
       <div className="mb-6 rounded-xl border p-4">
         <div className="text-sm font-medium mb-2">Mode</div>
@@ -473,7 +447,6 @@ async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
                 const res = await fetch(`/api/admin/work?id=${encodeURIComponent(editingId)}`, {
                   method: 'DELETE',
                   credentials: 'include',
-                  headers: adminHeaders(),
                 })
                 const j = await res.json().catch(() => ({}))
                 if (!res.ok || !j?.ok) {

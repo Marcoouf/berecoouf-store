@@ -11,7 +11,7 @@ function adminHeaderOk(req: Request) {
   const fromAuth = req.headers.get('authorization') || req.headers.get('Authorization')
   const bearer = fromAuth && /^Bearer\s+(.+)$/i.test(fromAuth) ? (fromAuth.match(/^Bearer\s+(.+)$/i) as RegExpMatchArray)[1] : null
   const candidate = (fromHeader || bearer || '').trim()
-  const valid = process.env.ADMIN_KEY || process.env.NEXT_PUBLIC_ADMIN_KEY
+  const valid = (process.env.ADMIN_KEY || '').trim()
   return !!candidate && !!valid && candidate === valid
 }
 
@@ -41,14 +41,16 @@ export async function POST(req: Request) {
 
   // Autoriser aussi le header "x-admin-key" (ou Authorization: Bearer ...)
   if (!adminHeaderOk(req)) {
-    const notAdmin = assertAdmin(req) // fallback à ta logique existante (cookie/session, etc.)
+    const notAdmin = await assertAdmin(req) // fallback à ta logique existante (cookie/session, etc.)
     if (notAdmin) return notAdmin
   }
 
-if (!rateLimit(req, { limit: 10, windowMs: 60_000 })) {
-      return NextResponse.json(
+  const limiter = rateLimit(req, { limit: 10, windowMs: 60_000 })
+  if (!limiter.ok) {
+    limiter.headers.set("Access-Control-Allow-Origin", "*")
+    return NextResponse.json(
       { ok: false, error: "rate_limited" },
-      { status: 429, headers: { "Access-Control-Allow-Origin": "*" } }
+      { status: 429, headers: limiter.headers }
     )
   }
 

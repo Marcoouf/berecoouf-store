@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { put } from "@vercel/blob";
+import { assertAdmin } from '@/lib/adminAuth'
 
 // Laisse en Node.js (plus permissif pour les gros fichiers)
 export const runtime = "nodejs";
@@ -10,9 +11,9 @@ export const runtime = "nodejs";
  * Return: { url: string }
  */
 export async function POST(req: Request) {
+  const denied = await assertAdmin(req)
+  if (denied) return denied
   try {
-    // TODO: auth admin ici si besoin
-
     const form = await req.formData();
     const file = form.get("file");
     if (!(file instanceof File)) {

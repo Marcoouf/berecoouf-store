@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from '@/lib/prisma'
 import { revalidateArtistPaths } from "@/lib/revalidate";
-
-function assertAdmin() {}
+import { assertAdmin } from '@/lib/adminAuth'
 
 type Params = { params: { id: string } };
 
-export async function POST(_req: Request, { params }: Params) {
+export async function POST(req: Request, { params }: Params) {
+  const denied = await assertAdmin(req)
+  if (denied) return denied
   try {
-    assertAdmin();
     const id = params.id;
 
     const artist = await prisma.artist.findUnique({ where: { id } });

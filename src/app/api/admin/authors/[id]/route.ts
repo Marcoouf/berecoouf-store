@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
-
-function assertAdmin() {}
+import { assertAdmin } from '@/lib/adminAuth'
 
 const authorUpdateSchema = z.object({
   name: z.string().trim().optional().nullable(),
@@ -32,8 +31,9 @@ function mapArtistAuthors(
     .filter((entry): entry is { id: string; name: string; slug: string } => Boolean(entry))
 }
 
-export async function GET(_req: Request, { params }: Params) {
-  assertAdmin()
+export async function GET(req: Request, { params }: Params) {
+  const denied = await assertAdmin(req)
+  if (denied) return denied
   const id = params.id
   const user = await prisma.user.findUnique({
     where: { id },
@@ -61,8 +61,9 @@ export async function GET(_req: Request, { params }: Params) {
 }
 
 export async function PATCH(req: Request, { params }: Params) {
+  const denied = await assertAdmin(req)
+  if (denied) return denied
   try {
-    assertAdmin()
     const id = params.id
 
     const payload = await req.json()
@@ -108,8 +109,9 @@ export async function PATCH(req: Request, { params }: Params) {
   }
 }
 
-export async function DELETE(_req: Request, { params }: Params) {
-  assertAdmin()
+export async function DELETE(req: Request, { params }: Params) {
+  const denied = await assertAdmin(req)
+  if (denied) return denied
   const id = params.id
   try {
     const user = await prisma.user.findUnique({ where: { id }, select: { id: true, role: true } })
