@@ -7,6 +7,16 @@ type EmailLayoutProps = {
   footer?: React.ReactNode
 }
 
+const rawSiteUrl = (process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || 'https://vague-galerie.store').trim()
+const siteUrl = rawSiteUrl.replace(/\/$/, '')
+const siteHostname = (() => {
+  try {
+    return new URL(siteUrl).hostname
+  } catch {
+    return siteUrl.replace(/^https?:\/\//, '')
+  }
+})()
+
 function EmailLayout({ title, intro, children, footer }: EmailLayoutProps) {
   return (
     <html lang="fr">
@@ -61,8 +71,8 @@ function EmailLayout({ title, intro, children, footer }: EmailLayoutProps) {
                 </table>
                 <p style={{ marginTop: 16, fontSize: 12, color: '#9ca3af' }}>
                   Vague — 12 rue d’Hauteville, 75010 Paris ·{' '}
-                  <a href="https://point-bleu.vercel.app" style={{ color: '#2563eb' }}>
-                    point-bleu.vercel.app
+                  <a href={siteUrl} style={{ color: '#2563eb' }}>
+                    {siteHostname}
                   </a>
                 </p>
               </td>

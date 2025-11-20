@@ -99,24 +99,49 @@ export const PATCH = withAdmin(async (req: NextRequest, { params }: Params) => {
   })
 
   const resend = getResendClient()
-  const becameShipped = newStatus === 'shipped' && order.shippingStatus !== 'shipped'
+  const contactEmail = process.env.CONTACT_EMAIL || process.env.SALES_NOTIF_OVERRIDE || 'contact@vague-galerie.store'
+
   const trackingUrl = updates.trackingUrl ?? order.trackingUrl ?? null
 
-  if (resend && becameShipped && order.email) {
+  if (resend && order.email && newStatus && newStatus !== order.shippingStatus) {
+    const statusLabel = formatShippingStatus(newStatus)
+    let introText = ''
+    let extraInfo: React.ReactNode = null
+    switch (newStatus) {
+      case 'packing':
+        introText = 'Ta commande est en préparation dans notre atelier.'
+        break
+      case 'shipped':
+        introText = 'Bonne nouvelle ! Ton colis a été remis aux services postaux et est désormais en route.'
+        extraInfo = (
+          <p style={{ margin: '12px 0' }}>
+            Les envois se font en lettre suivie via La Poste. Compte généralement 2 à 4 jours ouvrés pour la livraison.
+          </p>
+        )
+        break
+      case 'delivered':
+        introText = 'Merci pour ta patience : la livraison est indiquée comme effectuée.'
+        extraInfo = (
+          <p style={{ margin: '12px 0' }}>
+            Si tu n’as rien reçu ou si tu constates un souci, réponds simplement à cet email et nous ferons le nécessaire.
+          </p>
+        )
+        break
+      default:
+        introText = `Le statut de ta commande a été mis à jour : ${statusLabel}.`
+    }
+
     try {
       const html = await renderEmail({
-        title: 'Votre commande est en route ✉️',
+        title: `Commande — ${statusLabel}`,
         intro: <p>Bonjour,</p>,
         children: (
           <>
+            <p style={{ margin: '12px 0' }}>{introText}</p>
             <p style={{ margin: '12px 0' }}>
-              Bonne nouvelle&nbsp;! Ton colis a été remis aux services postaux et est désormais en chemin.
-            </p>
-            <p style={{ margin: '12px 0' }}>
-              Référence commande&nbsp;: <strong>{order.id}</strong>
-            </p>
-            <p style={{ margin: '12px 0' }}>
-              Statut actuel : <strong>{formatShippingStatus('shipped')}</strong>
+              Référence commande : <strong>{order.id}</strong>
+              <br />
+              Statut actuel : <strong>{statusLabel}</strong>
             </p>
             {trackingUrl ? (
               <p style={{ margin: '12px 0' }}>
@@ -127,20 +152,16 @@ export const PATCH = withAdmin(async (req: NextRequest, { params }: Params) => {
                 </a>
               </p>
             ) : (
-              <p style={{ margin: '12px 0' }}>
-                Le suivi sera disponible dans les prochaines heures. Nous t’écrirons si un complément est nécessaire.
-              </p>
+              <p style={{ margin: '12px 0' }}>Nous t’écrirons dès qu’un numéro de suivi sera disponible.</p>
             )}
-            <p style={{ margin: '12px 0' }}>
-              Les envois se font en lettre suivie via La Poste. Compte généralement 2 à 4 jours ouvrés pour la livraison.
-            </p>
+            {extraInfo}
           </>
         ),
         footer: (
           <p>
-            Besoin d’aide&nbsp;? Réponds simplement à cet email ou écris-nous sur{' '}
-            <a href="mailto:contact@point-bleu.fr" style={{ color: '#2563eb' }}>
-              contact@point-bleu.fr
+            Besoin d’aide ? Réponds simplement à cet email ou écris-nous sur{' '}
+            <a href={`mailto:${contactEmail}`} style={{ color: '#2563eb' }}>
+              {contactEmail}
             </a>
             .
           </p>
@@ -150,7 +171,7 @@ export const PATCH = withAdmin(async (req: NextRequest, { params }: Params) => {
       await resend.emails.send({
         from: process.env.RESEND_FROM || 'Vague <noreply@vague.art>',
         to: order.email,
-        subject: 'Votre commande est expédiée',
+        subject: `Commande ${order.id} — ${statusLabel}`,
         html,
       })
     } catch (err) {

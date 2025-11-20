@@ -79,6 +79,38 @@ export async function POST(req: Request) {
     return parts.length ? parts.join('<br />') : null
   }
   const shippingAddressHtml = formatAddress(shippingDetails?.address)
+  const shippingInfoSection = (
+    <div style={{ margin: '16px 0', padding: '12px', border: '1px solid #e5e5e5', borderRadius: 8 }}>
+      <h3 style={{ margin: '0 0 8px 0' }}>Coordonnées client</h3>
+      <p style={{ margin: '4px 0' }}>
+        <strong>Nom :</strong> {shippingDetails?.name || customerDetails?.name || '—'}
+        <br />
+        {customerDetails?.email ? (
+          <>
+            <strong>Email :</strong> {customerDetails.email}
+            <br />
+          </>
+        ) : null}
+        {shippingDetails?.phone || customerDetails?.phone ? (
+          <>
+            <strong>Téléphone :</strong> {shippingDetails?.phone ?? customerDetails?.phone}
+            <br />
+          </>
+        ) : null}
+        {shippingAddressHtml ? (
+          <>
+            <strong>Adresse :</strong>
+            <br />
+            <span dangerouslySetInnerHTML={{ __html: shippingAddressHtml }} />
+          </>
+        ) : (
+          <>
+            <strong>Adresse :</strong> —
+          </>
+        )}
+      </p>
+    </div>
+  )
 
   type Item = { workId: string; variantId: string | null; qty: number; unitPrice: number }
   const items: Item[] = []
@@ -335,6 +367,7 @@ export async function POST(req: Request) {
                 Commande <strong>{orderRecord.id}</strong> — {fmtCurrency(orderTotalCents)}
               </p>
               <p style={{ margin: '12px 0' }}>Client : {email || 'Non renseigné'}</p>
+              {shippingInfoSection}
               <table style={{ borderCollapse: 'collapse', width: '100%', marginTop: 12 }}>
                 <thead>
                   <tr>
@@ -418,36 +451,7 @@ export async function POST(req: Request) {
             <p style={{ margin: '12px 0' }}>
               <strong>Total :</strong> {fmtCurrency(orderTotalCents)}
             </p>
-            <div style={{ margin: '16px 0', padding: '12px', border: '1px solid #e5e5e5', borderRadius: 8 }}>
-              <h3 style={{ margin: '0 0 8px 0' }}>Coordonnées client</h3>
-              <p style={{ margin: '4px 0' }}>
-                <strong>Nom :</strong> {shippingDetails?.name || customerDetails?.name || '—'}
-                <br />
-                {customerDetails?.email ? (
-                  <>
-                    <strong>Email :</strong> {customerDetails.email}
-                    <br />
-                  </>
-                ) : null}
-                {shippingDetails?.phone || customerDetails?.phone ? (
-                  <>
-                    <strong>Téléphone :</strong> {shippingDetails?.phone ?? customerDetails?.phone}
-                    <br />
-                  </>
-                ) : null}
-                {shippingAddressHtml ? (
-                  <>
-                    <strong>Adresse :</strong>
-                    <br />
-                    <span dangerouslySetInnerHTML={{ __html: shippingAddressHtml }} />
-                  </>
-                ) : (
-                  <>
-                    <strong>Adresse :</strong> —
-                  </>
-                )}
-              </p>
-            </div>
+            {shippingInfoSection}
             <table style={{ borderCollapse: 'collapse', width: '100%', marginTop: 16 }}>
               <thead>
                 <tr>
@@ -508,6 +512,65 @@ export async function POST(req: Request) {
     }
   } catch (e) {
     console.error('webhook admin email error', e)
+  }
+
+  try {
+    if (resend && email) {
+      const customerRows = (orderRecord.items ?? []).map((it, idx) => (
+        <tr key={`${it.id}-${idx}`}>
+          <td style={{ padding: '4px 8px' }}>{it.qty}</td>
+          <td style={{ padding: '4px 8px' }}>
+            {it.work?.title || it.workId}
+            {it.variant?.label ? ` — ${it.variant.label}` : ''}
+          </td>
+          <td style={{ padding: '4px 8px', textAlign: 'right' }}>{fmtCurrency(it.unitPrice * it.qty)}</td>
+        </tr>
+      ))
+
+      const customerHtml = await renderEmail({
+        title: 'Votre commande est confirmée',
+        intro: <p>Bonjour {shippingDetails?.name || customerDetails?.name || ''},</p>,
+        children: (
+          <>
+            <p style={{ margin: '12px 0' }}>
+              Merci pour votre commande <strong>{orderRecord.id}</strong>.
+            </p>
+            <p style={{ margin: '12px 0' }}>
+              Montant total : <strong>{fmtCurrency(orderTotalCents)}</strong>
+            </p>
+            {shippingInfoSection}
+            <table style={{ borderCollapse: 'collapse', width: '100%', marginTop: 12 }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: 'left', padding: '4px 8px' }}>Qté</th>
+                  <th style={{ textAlign: 'left', padding: '4px 8px' }}>Article</th>
+                  <th style={{ textAlign: 'right', padding: '4px 8px' }}>Total</th>
+                </tr>
+              </thead>
+              <tbody>{customerRows}</tbody>
+            </table>
+            <p style={{ marginTop: 12 }}>
+              Nous te confirmerons l’expédition par email avec le lien de suivi. Pour toute question, réponds simplement à
+              ce message ou contacte-nous sur{' '}
+              <a href="mailto:contact@vague-galerie.store" style={{ color: '#2563eb' }}>
+                contact@vague-galerie.store
+              </a>
+              .
+            </p>
+          </>
+        ),
+        footer: <p>Merci pour ta confiance — L’équipe Vague.</p>,
+      })
+
+      await resend.emails.send({
+        from: process.env.RESEND_FROM || 'Vague <noreply@vague.art>',
+        to: email,
+        subject: 'Ta commande est confirmée',
+        html: customerHtml,
+      })
+    }
+  } catch (e) {
+    console.error('webhook customer email error', e)
   }
 
   return ok({ orderId: orderRecord.id })
