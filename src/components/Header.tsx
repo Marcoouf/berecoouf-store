@@ -88,9 +88,12 @@ export default function HeaderGlobal() {
           >
             Œuvres
           </Link>
-          <a href="/#about" className={`link-underline hover:text-accent-700 ${is('/#about') ? 'text-accent-700' : ''}`}>
-            À propos
-          </a>
+          <Link
+            href="/notre-demarche-auteurs"
+            className={`link-underline hover:text-accent-700 ${is('/notre-demarche-auteurs') ? 'text-accent-700' : ''}`}
+          >
+            Notre démarche
+          </Link>
         </nav>
 
         {/* Bouton Panier (animé quand le compteur change) */}
@@ -132,9 +135,13 @@ export default function HeaderGlobal() {
             <Link href="/artworks" onClick={() => setMenuOpen(false)} className="py-2 hover:text-accent-700 transition-colors">
               Œuvres
             </Link>
-            <a href="/#about" onClick={() => setMenuOpen(false)} className="py-2 hover:text-accent-700 transition-colors">
-              À propos
-            </a>
+            <Link
+              href="/notre-demarche-auteurs"
+              onClick={() => setMenuOpen(false)}
+              className="py-2 hover:text-accent-700 transition-colors"
+            >
+              Notre démarche
+            </Link>
           </Container>
         </div>
       )}
