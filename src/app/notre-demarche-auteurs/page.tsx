@@ -73,16 +73,15 @@ export default function NotreDemarchePage() {
             <div className="lg:col-span-4 flex flex-col gap-3">
               <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.26em] text-accent">
                 <span className="h-px w-8 bg-accent/70" />
-                Chapitre 01
+                Vendre vos œuvres sans céder vos droits d’auteur
               </div>
-              <h2 className="text-2xl font-semibold text-neutral-900">Vendre vos œuvres sans céder vos droits d’auteur</h2>
             </div>
             <div className="lg:col-span-8 relative">
               <GlowBlock />
               <div className="space-y-3 relative">
                 <Paragraph>VAGUE est née d’un malaise assez simple.</Paragraph>
                 <Paragraph>
-                Je travaille comme juriste en droit des affaires et du numérique, et j’ai autour de moi beaucoup d’illustrateurs, de graphistes, de photographes et d’artistes en général qui peinent à trouver une solution claire et respectueuse pour vendre leurs œuvres. Les dispositifs existent, mais ils sont souvent difficiles à manier, peu transparents juridiquement, ou trop éloignés de leurs besoins réels.
+                  Je travaille comme juriste en droit des affaires et du numérique, et j’ai autour de moi beaucoup d’illustrateurs, de graphistes, de photographes et d’artistes en général qui peinent à trouver une solution claire et respectueuse pour vendre leurs œuvres. Les dispositifs existent, mais ils sont souvent difficiles à manier, peu transparents juridiquement, ou trop éloignés de leurs besoins réels.
                 </Paragraph>
                 <Paragraph>
                   À force de voir ce décalage, l’idée s’est imposée de mettre en place une galerie en ligne qui parte d’un principe inverse : les auteurs gardent leurs droits, et le site ne fait que ce qui est nécessaire pour présenter les œuvres et organiser la vente.
@@ -97,9 +96,8 @@ export default function NotreDemarchePage() {
             <div className="lg:col-span-4 flex flex-col gap-3 lg:translate-y-4">
               <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.26em] text-neutral-900">
                 <span className="h-px w-8 bg-neutral-800/70" />
-                Chapitre 02
+                Une galerie en ligne à taille humaine
               </div>
-              <h2 className="text-2xl font-semibold text-neutral-900">Une galerie en ligne à taille humaine</h2>
             </div>
             <div className="lg:col-span-8 relative">
               <GlowBlock tone="sand" />
@@ -119,9 +117,8 @@ export default function NotreDemarchePage() {
             <div className="lg:col-span-4 flex flex-col gap-3 lg:translate-y-6">
               <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.26em] text-accent">
                 <span className="h-px w-8 bg-accent/70" />
-                Chapitre 03
+                Vos droits d’auteur restent les vôtres
               </div>
-              <h2 className="text-2xl font-semibold text-neutral-900">Vos droits d’auteur restent les vôtres</h2>
             </div>
             <div className="lg:col-span-8 relative">
               <GlowBlock />
@@ -142,9 +139,8 @@ export default function NotreDemarchePage() {
             <div className="lg:col-span-4 flex flex-col gap-3">
               <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.26em] text-neutral-900">
                 <span className="h-px w-8 bg-neutral-800/70" />
-                Chapitre 04
+                Une commission limitée et annoncée
               </div>
-              <h2 className="text-2xl font-semibold text-neutral-900">Une commission limitée et annoncée</h2>
             </div>
             <div className="lg:col-span-8 relative">
               <GlowBlock tone="sand" />
@@ -164,9 +160,8 @@ export default function NotreDemarchePage() {
             <div className="lg:col-span-4 flex flex-col gap-3 lg:translate-y-5">
               <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.26em] text-accent">
                 <span className="h-px w-8 bg-accent/70" />
-                Chapitre 05
+                Ce que j’utilise de vos œuvres pour faire tourner le site
               </div>
-              <h2 className="text-2xl font-semibold text-neutral-900">Ce que j’utilise de vos œuvres pour faire tourner le site</h2>
             </div>
             <div className="lg:col-span-8 relative">
               <GlowBlock />
@@ -187,9 +182,8 @@ export default function NotreDemarchePage() {
             <div className="lg:col-span-4 flex flex-col gap-3">
               <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.26em] text-neutral-900">
                 <span className="h-px w-8 bg-neutral-800/70" />
-                Chapitre 06
+                Un cadre écrit, sans effets de style
               </div>
-              <h2 className="text-2xl font-semibold text-neutral-900">Un cadre écrit, sans effets de style</h2>
             </div>
             <div className="lg:col-span-8 relative">
               <GlowBlock tone="sand" />
@@ -210,9 +204,8 @@ export default function NotreDemarchePage() {
             <div className="lg:col-span-4 flex flex-col gap-3 lg:translate-y-4">
               <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.26em] text-accent">
                 <span className="h-px w-8 bg-accent/70" />
-                Chapitre 07
+                Pour les personnes qui achètent
               </div>
-              <h2 className="text-2xl font-semibold text-neutral-900">Pour les personnes qui achètent</h2>
             </div>
             <div className="lg:col-span-8 relative">
               <GlowBlock />
@@ -232,9 +225,8 @@ export default function NotreDemarchePage() {
             <div className="lg:col-span-4 flex flex-col gap-3">
               <div className="flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.26em] text-neutral-900">
                 <span className="h-px w-8 bg-neutral-800/70" />
-                Chapitre 08
+                Si vous souhaitez proposer vos œuvres
               </div>
-              <h2 className="text-2xl font-semibold text-neutral-900">Si vous souhaitez proposer vos œuvres</h2>
             </div>
             <div className="lg:col-span-8 relative">
               <GlowBlock tone="sand" />
