@@ -32,7 +32,7 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
       artist: { select: { id: true, name: true, slug: true, isOnVacation: true } },
       variants: {
         orderBy: { order: 'asc' },
-        select: { id: true, label: true, price: true, order: true },
+        select: { id: true, label: true, price: true, order: true, stock: true },
       },
     },
   })
@@ -197,6 +197,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                 label: variant.label,
                 price: variant.price,
                 order: variant.order,
+                stock: variant.stock,
               },
             })
           } else {
@@ -206,6 +207,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                 label: variant.label,
                 price: variant.price,
                 order: variant.order,
+                stock: variant.stock,
               },
             })
           }
@@ -218,7 +220,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
           artist: { select: { id: true, name: true, slug: true, isOnVacation: true } },
           variants: {
             orderBy: { order: 'asc' },
-            select: { id: true, label: true, price: true, order: true },
+            select: { id: true, label: true, price: true, order: true, stock: true },
           },
         },
       })

@@ -161,7 +161,9 @@ export default function GlobalCartDrawer() {
             <span>Sous-total</span>
             <span className="tabular-nums">{euro(subtotal)}</span>
           </div>
-          <p className="text-xs text-neutral-500">Taxes et frais d’expédition calculés au paiement.</p>
+          <p className="text-xs text-neutral-500">
+            Livraison France : forfait par artiste, offert au-delà d’un certain montant. Calculée au paiement.
+          </p>
 
           <Link
             href="/cart"

@@ -30,6 +30,7 @@ export const PATCH = withAdmin(async (req: NextRequest, { params }: Params) => {
     select: {
       id: true,
       email: true,
+      shippingAmount: true,
       shippingStatus: true,
       trackingUrl: true,
       items: {
@@ -78,7 +79,16 @@ export const PATCH = withAdmin(async (req: NextRequest, { params }: Params) => {
   const updatedRecord = await prisma.order.update({
     where: { id: orderId },
     data: updates,
-    include: {
+    select: {
+      id: true,
+      email: true,
+      total: true,
+      shippingAmount: true,
+      status: true,
+      shippingStatus: true,
+      trackingUrl: true,
+      createdAt: true,
+      updatedAt: true,
       items: {
         select: {
           id: true,

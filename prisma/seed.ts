@@ -31,7 +31,7 @@ type JsonFormat = {
   label: string
   price: number | string // en euros dans ton JSON ; on convertit en cents
   sku?: string
-  stock?: number | null
+  stock?: number | string | null
   order?: number
 }
 
@@ -175,12 +175,25 @@ const work = await prisma.work.upsert({
   },
 })
     // Sync variants — stratégie simple : on remplace tout
-    const incoming = (w.formats ?? []).map((f, idx) => ({
-      // ne PAS inclure d'id : on laisse Prisma générer
-      label: f.label,
-      price: eurosToCents(f.price) ?? 0,
-      order: typeof f.order === 'number' ? f.order : idx,
-    }))
+    const incoming = (w.formats ?? []).map((f, idx) => {
+      const stockValueRaw =
+        typeof f.stock === 'string'
+          ? Number(f.stock.replace(',', '.'))
+          : typeof f.stock === 'number'
+          ? f.stock
+          : null
+      const stock =
+        typeof stockValueRaw === 'number' && Number.isFinite(stockValueRaw)
+          ? Math.max(0, Math.round(stockValueRaw))
+          : null
+      return {
+        // ne PAS inclure d'id : on laisse Prisma générer
+        label: f.label,
+        price: eurosToCents(f.price) ?? 0,
+        order: typeof f.order === 'number' ? f.order : idx,
+        stock,
+      }
+    })
 
     // Supprime les anciens variants puis (re)crée
     await prisma.variant.deleteMany({ where: { workId: work.id } })
@@ -191,6 +204,7 @@ const work = await prisma.work.upsert({
           label: v.label,
           price: v.price,
           order: v.order,
+          stock: v.stock,
         })),
         skipDuplicates: true,
       })

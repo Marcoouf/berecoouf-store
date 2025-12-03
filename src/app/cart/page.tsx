@@ -12,8 +12,17 @@ async function goToCheckout(payload: any) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   })
-  if (!res.ok) throw new Error('checkout-failed')
-  const data = await res.json()
+  let data: any = {}
+  try {
+    data = await res.json()
+  } catch {
+    data = {}
+  }
+  if (!res.ok) {
+    const err = new Error(data?.error || 'checkout-failed')
+    ;(err as any).detail = data?.detail
+    throw err
+  }
   if (!data?.url) throw new Error('missing-url')
   window.location.href = data.url as string
 }
@@ -50,7 +59,16 @@ export default function CartPage() {
       await goToCheckout(payload)
     } catch (err) {
       console.error(err)
-      alert('Une erreur est survenue lors de la création du paiement. Réessayez.')
+      const message =
+        (err as any)?.message === 'out_of_stock'
+          ? (() => {
+              const detail = (err as any)?.detail
+              const shortage = Array.isArray(detail) && detail[0] ? detail[0] : null
+              const info = shortage?.available !== undefined ? ` (restant: ${shortage.available})` : ''
+              return `Le stock est insuffisant pour certains formats${info}. Mets le panier à jour avant de payer.`
+            })()
+          : 'Une erreur est survenue lors de la création du paiement. Réessayez.'
+      alert(message)
     } finally {
       setLoading(false)
     }
@@ -136,7 +154,7 @@ export default function CartPage() {
             </div>
             <div className="flex justify-between text-sm py-1 text-neutral-500">
               <span>Livraison</span>
-              <span>Calculée à l’étape suivante</span>
+              <span>Forfait par artiste, offerte au-delà d’un certain montant</span>
             </div>
             <div className="mt-2 flex justify-between font-medium">
               <span>Total</span>

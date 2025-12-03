@@ -211,10 +211,17 @@ export default async function ArtworksPage({ searchParams }: { searchParams: Sea
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((art) => {
             const onVacation = Boolean((art as any).artist?.isOnVacation || (art as any).artistOnVacation)
-            const badge = onVacation ? 'En vacances' : null
-            const priceLabel =
-              (art as any).priceMinFormatted ??
-              (typeof (art as any).priceMin === 'number' ? euro((art as any).priceMin) : euro(unitPriceCents(art)))
+            const variants = Array.isArray((art as any).variants) ? ((art as any).variants as any[]) : []
+            const soldOut = variants.length > 0 && variants.every((v) => typeof v?.stock === 'number' && v.stock <= 0)
+            const lowStock =
+              !soldOut &&
+              variants.length > 0 &&
+              variants.some((v) => typeof v?.stock === 'number' && v.stock > 0 && v.stock <= 2)
+            const badge = onVacation ? 'En vacances' : soldOut ? 'Hors stock' : lowStock ? 'Stock bas' : null
+            const priceLabel = soldOut
+              ? 'Épuisé'
+              : (art as any).priceMinFormatted ??
+                (typeof (art as any).priceMin === 'number' ? euro((art as any).priceMin) : euro(unitPriceCents(art)))
 
             return (
               <ArtworkHoverCard

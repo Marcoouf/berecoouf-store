@@ -66,6 +66,7 @@ export const GET = withAdmin(async (req: NextRequest) => {
       id: true,
       email: true,
       total: true,
+      shippingAmount: true,
       status: true,
       shippingStatus: true,
       trackingUrl: true,

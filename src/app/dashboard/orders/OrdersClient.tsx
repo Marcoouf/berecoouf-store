@@ -19,6 +19,7 @@ type Order = {
   id: string
   email: string | null
   total: number
+  shippingAmount: number
   status: string
   shippingStatus: string
   trackingUrl: string | null
@@ -235,6 +236,12 @@ export default function OrdersClient() {
                     </div>
                     <div>
                       Paiement : <span className="font-medium text-neutral-900">{order.status}</span>
+                    </div>
+                    <div className="text-xs text-neutral-500">
+                      Livraison :{' '}
+                      <span className="font-medium text-neutral-800">
+                        {order.shippingAmount > 0 ? formatCurrency(order.shippingAmount) : 'Offerte'}
+                      </span>
                     </div>
                   </div>
                 </header>

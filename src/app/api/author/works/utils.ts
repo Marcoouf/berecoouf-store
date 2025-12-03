@@ -3,6 +3,7 @@ export type VariantInput = {
   label: string
   price: number
   order: number
+  stock: number | null
 }
 
 export function parseNumber(value: unknown): number | null {
@@ -43,6 +44,7 @@ export function normalizeVariants(raw: unknown): { variants: VariantInput[]; err
     const idValue = typeof (entry as any)?.id === 'string' ? (entry as any).id : undefined
     const label = typeof (entry as any)?.label === 'string' ? (entry as any).label.trim() : ''
     const priceRaw = parseNumber((entry as any)?.price)
+    const stockRaw = parseNumber((entry as any)?.stock)
 
     if (!label) {
       errors.push(`variant_${index}_label`)
@@ -59,11 +61,21 @@ export function normalizeVariants(raw: unknown): { variants: VariantInput[]; err
       return
     }
 
+    let stock: number | null = null
+    if (stockRaw !== null) {
+      if (!Number.isFinite(stockRaw) || stockRaw < 0) {
+        errors.push(`variant_${index}_stock`)
+        return
+      }
+      stock = Math.round(stockRaw)
+    }
+
     variants.push({
       id: idValue,
       label,
       price,
       order: index,
+      stock,
     })
   })
 
@@ -94,7 +106,7 @@ export type WorkDetailRecord = {
   published: boolean
   deletedAt: Date | null
   artist: { id: string; name: string; slug: string; isOnVacation: boolean } | null
-  variants: Array<{ id: string; label: string; price: number; order: number }>
+  variants: Array<{ id: string; label: string; price: number; order: number; stock: number | null }>
   updatedAt: Date
 }
 
@@ -130,6 +142,7 @@ export function mapWorkDetail(work: WorkDetailRecord) {
         label: variant.label,
         price: variant.price,
         order: variant.order,
+        stock: variant.stock ?? null,
       })),
   }
 }

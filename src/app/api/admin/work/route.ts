@@ -54,12 +54,14 @@ function normalize(body: any): WorkIn {
   const variants: VariantIn[] = rawVariants.map((v) => {
     const raw = pickNumber(v?.price) ?? 0
     const priceCents = toCents(raw)
+    const stockRaw = pickNumber(v?.stock)
+    const stock = stockRaw != null ? Math.max(0, Math.round(stockRaw)) : null
     return {
       id: v?.id || undefined,
       label: String(v?.label ?? '').trim(),
       price: priceCents,
       sku: v?.sku ?? null,
-      stock: v?.stock ?? null,
+      stock,
     }
   })
 
@@ -182,7 +184,12 @@ export const POST = withAdmin(async (req: NextRequest) => {
         ...(sortedVariants.length
           ? {
               variants: {
-                create: sortedVariants.map((v) => ({ label: v.label, price: v.price, order: v.order ?? 0 })),
+                create: sortedVariants.map((v) => ({
+                  label: v.label,
+                  price: v.price,
+                  order: v.order ?? 0,
+                  stock: v.stock ?? null,
+                })),
               },
             }
           : {}),
@@ -252,11 +259,11 @@ export const PUT = withAdmin(async (req: NextRequest) => {
       if (v.id && v.id.trim()) {
         await tx.variant.update({
           where: { id: v.id },
-          data: { label: v.label, price: v.price, order: v.order ?? 0 },
+          data: { label: v.label, price: v.price, order: v.order ?? 0, stock: v.stock ?? null },
         })
       } else {
         await tx.variant.create({
-          data: { workId: id, label: v.label, price: v.price, order: v.order ?? 0 },
+          data: { workId: id, label: v.label, price: v.price, order: v.order ?? 0, stock: v.stock ?? null },
         })
       }
     }

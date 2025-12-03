@@ -20,6 +20,7 @@ type Order = {
   id: string
   email: string | null
   total: number
+  shippingAmount: number
   status: string
   shippingStatus: string
   trackingUrl: string | null
@@ -317,6 +318,12 @@ export default function AdminOrdersPage() {
                   <div className="flex flex-col items-end gap-2 text-right text-sm">
                     <div>
                       Paiement : <span className="font-medium text-neutral-900">{order.status}</span>
+                    </div>
+                    <div>
+                      Livraison :{' '}
+                      <span className="font-medium text-neutral-900">
+                        {order.shippingAmount > 0 ? formatCurrency(order.shippingAmount) : 'Offerte'}
+                      </span>
                     </div>
                     <div>
                       Total : <span className="font-medium text-neutral-900">{formatCurrency(order.total)}</span>

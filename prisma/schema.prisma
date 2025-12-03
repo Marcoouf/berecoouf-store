@@ -62,6 +62,7 @@ model Variant {
   workId     String
   label      String
   price      Int
+  stock      Int?
   order      Int         @default(0)
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
@@ -81,7 +82,8 @@ enum OrderStatus {
 model Order {
   id              String      @id @default(cuid())
   email           String?
-  total           Int // en centimes (subtotal produits ; les frais de port viennent de Stripe)
+  total           Int // en centimes (produits + frais de port)
+  shippingAmount  Int          @default(0) // centimes
   status          OrderStatus @default(pending)
   stripeSessionId String?
   shippingStatus  ShippingStatus @default(pending)

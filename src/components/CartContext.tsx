@@ -135,8 +135,17 @@ export default function CartProvider({ children }: { children: React.ReactNode }
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
-    if (!res.ok) throw new Error('checkout-failed')
-    const data = await res.json()
+    let data: any = {}
+    try {
+      data = await res.json()
+    } catch {
+      data = {}
+    }
+    if (!res.ok) {
+      const err = new Error(data?.error || 'checkout-failed')
+      ;(err as any).detail = data?.detail
+      throw err
+    }
     if (!data?.url) throw new Error('missing-url')
     window.location.href = data.url as string
   }
@@ -164,7 +173,13 @@ export default function CartProvider({ children }: { children: React.ReactNode }
       await goToCheckout({ items: mapped, email: options?.email })
     } catch (e) {
       console.error(e)
-      alert('Une erreur est survenue lors de la création du paiement. Réessayez ou finalisez depuis le panier complet.')
+      const detail = (e as any)?.detail
+      const shortage = Array.isArray(detail) && detail[0] ? detail[0] : null
+      const message =
+        (e as any)?.message === 'out_of_stock'
+          ? `Stock insuffisant pour au moins un format${shortage?.available !== undefined ? ` (restant: ${shortage.available})` : ''}. Mets le panier à jour avant de payer.`
+          : 'Une erreur est survenue lors de la création du paiement. Réessaie ou finalise depuis le panier complet.'
+      alert(message)
       window.location.href = '/cart'
     } finally {
       setCheckingOut(false)

@@ -25,6 +25,7 @@ type DbVariant = {
   id: string
   label: string
   price: number // centimes
+  stock: number | null
 }
 
 type DbWork = {
@@ -63,7 +64,8 @@ export type Variant = {
   price: number // centimes
   type?: 'digital' | 'print'
   sku?: string
-  stock?: number | null
+  stock?: number | null      // stock restant (si limité)
+  availableStock?: number | null
 }
 
 export type Artwork = {
@@ -130,11 +132,12 @@ function normalizeArtwork(raw: Artwork, artistIndex: Map<string, Artist>): Artwo
 
   // Variants : on prend uniquement celles issues de la DB
   const variants: Variant[] = Array.isArray(raw.variants) ? raw.variants : []
+  const purchasableVariants = variants.filter((v) => v.stock == null || v.stock > 0)
 
   // Prix minimal en centimes (base + variants), en ignorant 0
   const pool: number[] = []
   if (typeof raw.price === 'number' && raw.price > 0) pool.push(raw.price)
-  for (const v of variants) if (typeof v.price === 'number' && v.price > 0) pool.push(v.price)
+  for (const v of purchasableVariants) if (typeof v.price === 'number' && v.price > 0) pool.push(v.price)
   const priceMin = pool.length ? Math.min(...pool) : undefined
   const priceMinFormatted = typeof priceMin === 'number' ? euro(priceMin) : undefined
 
@@ -209,11 +212,22 @@ export async function getCatalog(): Promise<{ artists: Artist[]; artworks: Artwo
       dimensions: true,
       edition: true,
       variants: {
-        select: { id: true, label: true, price: true }, // <= nested select
+        select: { id: true, label: true, price: true, stock: true }, // <= nested select
       },
     },
   }),
 ] as const)
+
+    // Stock déjà vendu/réservé (commandes pending ou paid)
+    const allVariantIds = dbWorks.flatMap((w: any) => (Array.isArray(w?.variants) ? w.variants : []).map((v: any) => v.id)).filter(Boolean)
+    const variantStockUsage = allVariantIds.length
+      ? await prisma.orderItem.groupBy({
+          by: ['variantId'],
+          where: { variantId: { in: allVariantIds }, order: { status: { in: ['pending', 'paid'] } } },
+          _sum: { qty: true },
+        })
+      : []
+    const usedQty = new Map<string, number>(variantStockUsage.map((v) => [v.variantId, Number(v._sum?.qty ?? 0)]))
 
     // Artistes actifs uniquement
     const artists: Artist[] = (dbArtists as unknown as DbArtist[])
@@ -251,11 +265,18 @@ export async function getCatalog(): Promise<{ artists: Artist[]; artworks: Artwo
       paper: w.paper ?? undefined,
       size: w.dimensions ?? undefined,
       edition: w.edition ?? undefined,
-      variants: (Array.isArray(w.variants) ? w.variants : []).map((v) => ({
-        id: v.id,
-        label: v.label,
-        price: fromCents(v.price) ?? 0,
-      })),
+      variants: (Array.isArray(w.variants) ? w.variants : []).map((v) => {
+        const totalStock = v.stock == null ? null : Math.max(0, Number(v.stock))
+        const alreadyUsed = usedQty.get(v.id) ?? 0
+        const remaining = totalStock == null ? null : Math.max(0, totalStock - alreadyUsed)
+        return {
+          id: v.id,
+          label: v.label,
+          price: fromCents(v.price) ?? 0,
+          stock: remaining,
+          availableStock: remaining,
+        }
+      }),
     }))
 
     const artistIndex = new Map<string, Artist>(artists.map((a) => [a.id, a]))

@@ -40,6 +40,7 @@ type WorkDetail = WorkSummary & {
     label: string
     price: number
     order: number
+    stock: number | null
   }>
 }
 
@@ -59,6 +60,7 @@ type FormState = {
     id?: string
     label: string
     price: string
+    stock: string
   }>
 }
 
@@ -99,11 +101,12 @@ function buildForm(detail: WorkDetail): FormState {
           id: variant.id || undefined,
           label: variant.label,
           price: variant.price ? (variant.price / 100).toString() : '',
+          stock: variant.stock != null ? String(variant.stock) : '',
         }),
       ) || []
 
   if (variants.length === 0) {
-    variants.push({ label: '', price: '' })
+    variants.push({ label: '', price: '', stock: '' })
   }
 
   return {
@@ -375,7 +378,7 @@ export default function AuthorWorksPage() {
     })
   }
 
-  const handleVariantChange = (index: number, key: 'label' | 'price', value: string) => {
+  const handleVariantChange = (index: number, key: 'label' | 'price' | 'stock', value: string) => {
     setMessage(null)
     setError(null)
     if (invalidFields.variants?.includes(index)) {
@@ -399,7 +402,7 @@ export default function AuthorWorksPage() {
       prev
         ? {
             ...prev,
-            variants: [...prev.variants, { id: undefined, label: '', price: '' }],
+            variants: [...prev.variants, { id: undefined, label: '', price: '', stock: '' }],
           }
         : prev,
     )
@@ -411,7 +414,7 @@ export default function AuthorWorksPage() {
     setForm((prev) => {
       if (!prev) return prev
       const next = prev.variants.filter((_, i) => i !== index)
-      if (next.length === 0) next.push({ id: undefined, label: '', price: '' })
+      if (next.length === 0) next.push({ id: undefined, label: '', price: '', stock: '' })
       return { ...prev, variants: next }
     })
     if (invalidFields.variants?.length) {
@@ -579,12 +582,13 @@ export default function AuthorWorksPage() {
     }
 
     const variantErrors: string[] = []
-    const variantsPayload: Array<{ id?: string; label: string; price: number; order: number }> = []
+    const variantsPayload: Array<{ id?: string; label: string; price: number; order: number; stock: number | null }> = []
     const invalidVariantIndexes: number[] = []
 
     form.variants.forEach((variant, idx) => {
       const label = variant.label.trim()
       const priceStr = variant.price.trim()
+      const stockStr = variant.stock.trim()
 
       if (!label && !priceStr) {
         return
@@ -602,11 +606,23 @@ export default function AuthorWorksPage() {
         return
       }
 
+      let stock: number | null = null
+      if (stockStr) {
+        const parsed = Number(stockStr.replace(',', '.'))
+        if (!Number.isFinite(parsed) || parsed < 0) {
+          variantErrors.push(`Stock invalide pour "${label}".`)
+          invalidVariantIndexes.push(idx)
+          return
+        }
+        stock = Math.round(parsed)
+      }
+
       variantsPayload.push({
         id: variant.id,
         label,
         price: priceValue,
         order: idx,
+        stock,
       })
     })
 
@@ -1258,7 +1274,7 @@ export default function AuthorWorksPage() {
                         <div
                           key={variant.id ?? `new-${idx}`}
                           className={[
-                            'grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_140px_auto]',
+                            'grid gap-3 rounded-md border p-3 md:grid-cols-[1fr_120px_120px_auto]',
                             variantInvalid ? 'border-red-300 bg-red-50/60' : 'border-neutral-200',
                           ].join(' ')}
                         >
@@ -1271,6 +1287,26 @@ export default function AuthorWorksPage() {
                               value={variant.label}
                               onChange={(e) => handleVariantChange(idx, 'label', e.target.value)}
                               placeholder="Ex. A3 — 297×420 mm"
+                              aria-invalid={variantInvalid ? 'true' : undefined}
+                              className={[
+                                'mt-1 w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2',
+                                variantInvalid
+                                  ? 'border-red-400 focus:border-red-500 focus:ring-red-200'
+                                  : 'border-neutral-300 focus:border-ink focus:ring-ink/10',
+                              ].join(' ')}
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium uppercase text-neutral-500">
+                              Stock (optionnel)
+                            </label>
+                            <input
+                              type="number"
+                              min={0}
+                              step={1}
+                              value={variant.stock}
+                              onChange={(e) => handleVariantChange(idx, 'stock', e.target.value)}
+                              placeholder="Illimité"
                               aria-invalid={variantInvalid ? 'true' : undefined}
                               className={[
                                 'mt-1 w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2',
@@ -1315,7 +1351,7 @@ export default function AuthorWorksPage() {
                   </div>
 
                   <p className="mt-3 text-xs text-neutral-500">
-                    Ajoute un intitulé clair (format, dimensions) et un prix TTC en euros. Supprime une ligne pour retirer un format.
+                    Ajoute un intitulé clair (format, dimensions) et un prix TTC en euros. Indique un stock si l’édition est limitée (laisse vide pour illimité). Supprime une ligne pour retirer un format.
                   </p>
                 </div>
 

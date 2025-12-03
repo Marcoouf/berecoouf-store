@@ -54,14 +54,14 @@ function Hero({ highlight }: { highlight?: HeroHighlight | null }) {
           <FadeIn>
             <div className="mx-auto flex max-w-xl flex-col items-center text-center lg:mx-0 lg:max-w-2xl lg:items-start lg:text-left">
               <div className="inline-flex items-center gap-2 rounded-full border border-accent/40 bg-accent/10 px-3 py-1 text-xs font-medium uppercase tracking-widest text-accent">
-                Editions limitées
+                Tirages signés
               </div>
               <h1 className="mt-4 text-4xl md:text-5xl font-medium tracking-tight leading-tight">
                 Illustrations contemporaines
-                <span className="block text-neutral-500">à collectionner ou offrir</span>
+                <span className="block text-neutral-500">imprimées et expédiées par les artistes</span>
               </h1>
               <p className="mt-6 max-w-prose text-neutral-600">
-                Tirages certifiés, numérotés et emballés avec soin. Chaque pièce inclut sa licence numérique et un certificat d’authenticité signé.
+                Chaque tirage est signé par son auteur et imprimé en petite série via des imprimeurs partenaires choisis et suivis par l’artiste. Nous protégeons le droit d’auteur et veillons à des envois soignés via La Poste.
               </p>
 
               {highlight?.priceLabel && (

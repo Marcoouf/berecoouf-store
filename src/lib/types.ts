@@ -4,7 +4,7 @@ export type Format = {
   id: string
   label: string
   price: MoneyCents // centimes
-  // stock?: number | null // (si besoin plus tard)
+  stock?: number | null // stock disponible ; null = illimité
 }
 
 export type Artwork = {

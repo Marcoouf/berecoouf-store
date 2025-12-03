@@ -56,6 +56,7 @@ export async function GET(req: Request) {
       id: true,
       email: true,
       total: true,
+      shippingAmount: true,
       status: true,
       shippingStatus: true,
       trackingUrl: true,
@@ -86,4 +87,3 @@ export async function GET(req: Request) {
 
   return NextResponse.json({ ok: true, orders: serialized, shippingStatuses: SHIPPING_STATUSES })
 }
-

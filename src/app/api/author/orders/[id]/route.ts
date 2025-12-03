@@ -74,7 +74,16 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const updated = await prisma.order.update({
     where: { id: order.id },
     data: updates,
-    include: {
+    select: {
+      id: true,
+      email: true,
+      total: true,
+      shippingAmount: true,
+      status: true,
+      shippingStatus: true,
+      trackingUrl: true,
+      createdAt: true,
+      updatedAt: true,
       items: {
         select: {
           id: true,
@@ -101,4 +110,3 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const serialized = serializeOrder(updated as any)
   return NextResponse.json({ ok: true, order: serialized, message: `Statut: ${formatShippingStatus(serialized.shippingStatus)}` })
 }
-

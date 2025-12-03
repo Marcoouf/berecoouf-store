@@ -6,7 +6,7 @@ import { useCart } from '@/components/CartContext'
 import type { CartItem } from '@/lib/types'
 
 // Types de props (light)
-export type Format = { id: string; label: string; price: number }
+export type Format = { id: string; label: string; price: number; stock?: number | null }
 export type ArtworkLite = {
   id: string
   title: string
@@ -37,14 +37,21 @@ export default function ArtworkPurchase({ artwork }: { artwork: ArtworkLite }) {
       id: String(v?.id ?? ''),
       label: String(v?.label ?? ''),
       price: Number(v?.price ?? 0) || 0,
+      stock:
+        typeof v?.availableStock === 'number'
+          ? Math.max(0, v.availableStock)
+          : typeof v?.stock === 'number'
+          ? Math.max(0, v.stock)
+          : null,
     }))
     .filter((f) => Number.isFinite(f.price) && f.price > 0 && f.label.trim().length > 0)
 
   // Sélection initiale : 1er format s’il existe, sinon null
-  const [formatId, setFormatId] = useState<string | null>(formats[0]?.id ?? null)
+  const firstAvailableId = formats.find((f) => f.stock == null || f.stock > 0)?.id ?? formats[0]?.id ?? null
+  const [formatId, setFormatId] = useState<string | null>(firstAvailableId)
 
   // Réinit quand l’œuvre change
-  const defaultFormatId = formats[0]?.id ?? null
+  const defaultFormatId = formats.find((f) => f.stock == null || f.stock > 0)?.id ?? formats[0]?.id ?? null
 
   useEffect(() => {
     setFormatId(defaultFormatId)
@@ -70,14 +77,17 @@ export default function ArtworkPurchase({ artwork }: { artwork: ArtworkLite }) {
     (artwork.priceMin as number | undefined) ??
     0
 
+  const hasAvailableFormat = formats.length === 0 || formats.some((f) => f.stock == null || f.stock > 0)
+  const selectedSoldOut = selected != null && selected.stock === 0
   // Affichage formaté (la fonction `euro` attend des centimes)
   const displayPrice = euro(unitPriceCents)
   const artistOnVacation = Boolean((artwork as any).artistOnVacation || (artwork as any).artist?.isOnVacation)
-  const canBuy = unitPriceCents > 0 && !artistOnVacation
+  const canBuy = unitPriceCents > 0 && !artistOnVacation && hasAvailableFormat && !selectedSoldOut
 
   // Feedback visuel sur le bouton « Ajouter au panier »
   const [bump, setBump] = useState(false)
   function handleAdd() {
+    if (!canBuy) return
     const item: CartItem = {
       key: `${artwork.id}-${selected?.id ?? 'default'}`,
       qty: 1,
@@ -106,20 +116,25 @@ export default function ArtworkPurchase({ artwork }: { artwork: ArtworkLite }) {
           <div className="flex flex-wrap gap-2">
             {formats.map((f) => {
               const active = f.id === formatId
+              const disabled = f.stock === 0
               return (
                 <button
                   key={f.id}
                   type="button"
-                  onClick={() => setFormatId(f.id)}
+                  onClick={() => !disabled && setFormatId(f.id)}
                   className={[
                     'rounded-full border px-3 py-1 text-xs transition',
                     active
                       ? 'bg-accent text-ink border-accent'
+                      : disabled
+                      ? 'bg-neutral-100 text-neutral-400 border-neutral-200 cursor-not-allowed'
                       : 'bg-white text-neutral-700 border-neutral-200 hover:bg-accent-light hover:border-accent hover:text-accent',
                   ].join(' ')}
                   aria-pressed={active}
+                  disabled={disabled}
                 >
                   {f.label}
+                  {typeof f.stock === 'number' ? (f.stock === 0 ? ' — Épuisé' : ` — ${f.stock} ex.`) : null}
                 </button>
               )
             })}
@@ -129,6 +144,11 @@ export default function ArtworkPurchase({ artwork }: { artwork: ArtworkLite }) {
 
       {/* Prix */}
       <div className="text-lg tabular-nums">{displayPrice}</div>
+      {!hasAvailableFormat || selectedSoldOut ? (
+        <div className="mt-2 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-600">
+          Hors stock pour ce format
+        </div>
+      ) : null}
       {artistOnVacation ? (
         <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
           L’artiste est en vacances : les commandes sont momentanément suspendues.

@@ -1,4 +1,5 @@
 // src/app/merci/page.tsx
+import type Stripe from 'stripe'
 import { stripe } from '@/lib/stripe'
 import { prisma } from '@/lib/prisma'
 import CheckoutSuccessClient from '@/components/CheckoutSuccessClient'
@@ -40,7 +41,7 @@ export default async function MerciPage({ searchParams }: Props) {
 
   // Récupère la session + ses lignes
   const session = await stripe.checkout.sessions.retrieve(sessionId, {
-    expand: ['line_items.data.price.product'],
+    expand: ['line_items.data.price.product', 'payment_intent.latest_charge'],
   })
 
   const email = session.customer_details?.email ?? session.customer_email ?? ''
@@ -58,6 +59,18 @@ export default async function MerciPage({ searchParams }: Props) {
 
   const shippingStatus = orderRecord?.shippingStatus ?? null
   const trackingUrl = orderRecord?.trackingUrl ?? null
+  const trackingTarget = trackingUrl || '#suivi'
+
+  // URL du reçu Stripe (charge associée à la session)
+  const paymentIntent = session.payment_intent
+  const latestCharge =
+    paymentIntent && typeof paymentIntent !== 'string'
+      ? (paymentIntent as Stripe.PaymentIntent).latest_charge
+      : null
+  const receiptUrl =
+    latestCharge && typeof latestCharge !== 'string'
+      ? (latestCharge as Stripe.Charge)?.receipt_url ?? null
+      : (paymentIntent as any)?.charges?.data?.[0]?.receipt_url ?? null
 
   return (
     <div className="relative">
@@ -97,7 +110,7 @@ export default async function MerciPage({ searchParams }: Props) {
         </section>
 
         {orderRecord ? (
-          <section className="mt-6 rounded-xl border border-neutral-200 bg-white/70 p-4">
+          <section id="suivi" className="mt-6 rounded-xl border border-neutral-200 bg-white/70 p-4">
             <h2 className="font-medium mb-2">Suivi d’expédition</h2>
             <p className="text-sm text-neutral-600">
               Statut :{' '}
@@ -127,17 +140,29 @@ export default async function MerciPage({ searchParams }: Props) {
         ) : null}
 
         <section className="mt-6 grid gap-3 md:grid-cols-2">
-          <a
-            href={`mailto:contact@point-bleu.fr?subject=Reçu%20commande%20${encodeURIComponent(session.id)}`}
-            className="group inline-flex items-center justify-center gap-2 rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100 focus:outline-none focus:ring-2 focus:ring-accent/40"
-          >
-            <span aria-hidden className="text-base">
-              📄
-            </span>
-            Télécharger le reçu PDF
-          </a>
+          {receiptUrl ? (
+            <a
+              href={receiptUrl}
+              target="_blank"
+              rel="noopener"
+              className="group inline-flex items-center justify-center gap-2 rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100 focus:outline-none focus:ring-2 focus:ring-accent/40"
+            >
+              <span aria-hidden className="text-base">📄</span>
+              Télécharger le reçu PDF
+            </a>
+          ) : (
+            <a
+              href={`mailto:contact@vague-galerie.store?subject=Reçu%20commande%20${encodeURIComponent(session.id)}`}
+              className="group inline-flex items-center justify-center gap-2 rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100 focus:outline-none focus:ring-2 focus:ring-accent/40"
+            >
+              <span aria-hidden className="text-base">📄</span>
+              Demander le reçu PDF
+            </a>
+          )}
           <Link
-            href="/faq#expedition"
+            href={trackingTarget}
+            target={trackingUrl ? '_blank' : undefined}
+            rel={trackingUrl ? 'noopener' : undefined}
             className="group inline-flex items-center justify-center gap-2 rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 transition hover:bg-neutral-100 focus:outline-none focus:ring-2 focus:ring-accent/40"
           >
             <span aria-hidden className="text-base">🚚</span>

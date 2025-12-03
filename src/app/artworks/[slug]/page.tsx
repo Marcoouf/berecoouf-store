@@ -51,7 +51,7 @@ export default async function Page({ params }: { params: { slug: string } }) {
   if (!artwork) notFound()
 
   // Normalisation: variants & priceMin pour l'UI (types solides)
-  type VariantUI = { id: string; label: string; price: number }
+  type VariantUI = { id: string; label: string; price: number; stock?: number | null }
 
   const rawVariants = Array.isArray((artwork as any).variants)
     ? (artwork as any).variants
@@ -69,13 +69,23 @@ export default async function Page({ params }: { params: { slug: string } }) {
       id: String(v?.id ?? ''),
       label: String(v?.label ?? ''),
       price: Number(v?.price ?? 0) || 0,
+      stock:
+        typeof v?.availableStock === 'number'
+          ? Math.max(0, v.availableStock)
+          : typeof v?.stock === 'number'
+          ? Math.max(0, v.stock)
+          : null,
     }))
     // On ne garde que les formats valides (prix > 0 et label non vide)
     .filter((v) => Number.isFinite(v.price) && v.price > 0 && v.label.trim().length > 0)
 
   const prices = variants
     .map((v) => Number(v.price))
-    .filter((n) => Number.isFinite(n) && n >= 0)
+    .filter((n, idx) => {
+      const variant = variants[idx]
+      const available = variant?.stock == null || variant.stock > 0
+      return available && Number.isFinite(n) && n >= 0
+    })
 
   const base = Number((artwork as any)?.basePrice ?? (artwork as any)?.price ?? 0)
   const priceMin = prices.length > 0
@@ -195,7 +205,7 @@ export default async function Page({ params }: { params: { slug: string } }) {
               image: String((artwork as any).image ?? ''),
               price: Number(priceMin) || 0,
               artistId: String(artwork.artistId),
-              formats: variants.map((v) => ({ id: v.id, label: v.label, price: v.price })),
+              formats: variants.map((v) => ({ id: v.id, label: v.label, price: v.price, stock: v.stock })),
               artistOnVacation: Boolean((artwork as any).artistOnVacation ?? artist?.isOnVacation ?? false),
             }}
           />
@@ -212,14 +222,27 @@ export default async function Page({ params }: { params: { slug: string } }) {
         <section className="mt-12">
           <h2 className="mb-4 text-lg font-medium">{relatedTitle}</h2>
           <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
-            {related.map((art) => (
-              <ArtworkHoverCard
-                key={art.id}
-                artwork={art}
-                artistName={artistsById[art.artistId] ?? null}
-                priceLabel={(art as any).priceMinFormatted ?? euro((art as any).priceMin ?? (art as any).price ?? 0)}
-              />
-            ))}
+            {related.map((art) => {
+              const variants = Array.isArray((art as any).variants) ? ((art as any).variants as any[]) : []
+              const soldOut = variants.length > 0 && variants.every((v) => typeof v?.stock === 'number' && v.stock <= 0)
+              const lowStock =
+                !soldOut &&
+                variants.length > 0 &&
+                variants.some((v) => typeof v?.stock === 'number' && v.stock > 0 && v.stock <= 2)
+              const badge = soldOut ? 'Hors stock' : lowStock ? 'Stock bas' : null
+              const priceLabel = soldOut
+                ? 'Épuisé'
+                : (art as any).priceMinFormatted ?? euro((art as any).priceMin ?? (art as any).price ?? 0)
+              return (
+                <ArtworkHoverCard
+                  key={art.id}
+                  artwork={art}
+                  artistName={artistsById[art.artistId] ?? null}
+                  priceLabel={priceLabel}
+                  badge={badge}
+                />
+              )
+            })}
           </div>
         </section>
       )}

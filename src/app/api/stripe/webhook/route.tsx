@@ -59,6 +59,7 @@ export async function POST(req: Request) {
 
   const email = session.customer_details?.email || session.customer_email || ''
   const totalCents = session.amount_total ?? 0
+  const amountShipping = (session.total_details as any)?.amount_shipping ?? 0
   const currency = (session.currency || 'eur').toUpperCase()
   const customerDetails = session.customer_details
   const shippingDetails = (session as Stripe.Checkout.Session & { shipping_details?: any }).shipping_details ?? null
@@ -195,6 +196,7 @@ export async function POST(req: Request) {
         data: {
           status: 'paid',
           total: typeof totalCents === 'number' ? totalCents : existing.total,
+          shippingAmount: typeof amountShipping === 'number' ? amountShipping : existing.shippingAmount ?? 0,
           email: email || existing.email,
           stripeSessionId: session.id,
         },
@@ -240,6 +242,7 @@ export async function POST(req: Request) {
       data: {
         email: email || null,
         total: typeof totalCents === 'number' ? totalCents : 0,
+        shippingAmount: typeof amountShipping === 'number' ? amountShipping : 0,
         status: 'paid',
         stripeSessionId: session.id,
         items: {

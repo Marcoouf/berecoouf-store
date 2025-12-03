@@ -16,6 +16,7 @@ export function serializeOrder(order: OrderWithRelations) {
     id: order.id,
     email: order.email,
     total: order.total,
+    shippingAmount: (order as any).shippingAmount ?? 0,
     status: order.status,
     shippingStatus: order.shippingStatus,
     trackingUrl: order.trackingUrl,

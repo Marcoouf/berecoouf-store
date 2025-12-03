@@ -224,8 +224,16 @@ export default async function ArtistPage({ params }: Props) {
         <div className="grid gap-6 sm:grid-cols-2 md:grid-cols-3">
           {works.map((w: any) => {
             const workOnVacation = Boolean((w as any).artistOnVacation ?? (w as any).artist?.isOnVacation ?? isOnVacation)
-            const badge = workOnVacation ? 'Vacances' : null
-            const priceLabel = (w as any).priceMinFormatted ?? euro((w as any).priceMin ?? 0)
+            const variants = Array.isArray((w as any).variants) ? ((w as any).variants as any[]) : []
+            const soldOut = variants.length > 0 && variants.every((v) => typeof v?.stock === 'number' && v.stock <= 0)
+            const lowStock =
+              !soldOut &&
+              variants.length > 0 &&
+              variants.some((v) => typeof v?.stock === 'number' && v.stock > 0 && v.stock <= 2)
+            const badge = workOnVacation ? 'Vacances' : soldOut ? 'Hors stock' : lowStock ? 'Stock bas' : null
+            const priceLabel = soldOut
+              ? 'Épuisé'
+              : (w as any).priceMinFormatted ?? euro((w as any).priceMin ?? 0)
             return (
               <ArtworkHoverCard
                 key={w.id}

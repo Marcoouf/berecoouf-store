@@ -104,7 +104,7 @@ export async function POST(req: Request) {
       artist: { select: { id: true, name: true, slug: true, isOnVacation: true } },
       variants: {
         orderBy: { order: 'asc' },
-        select: { id: true, label: true, price: true, order: true },
+        select: { id: true, label: true, price: true, order: true, stock: true },
       },
     },
   })

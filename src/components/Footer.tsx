@@ -11,10 +11,10 @@ export type FooterLinks = {
 }
 
 const guaranteeItems = [
-  'Certificat d’authenticité signé',
-  'Éditions limitées numérotées',
-  'Impression fine art & contrôle qualité',
-  'Livraison assurée et suivie en 3 à 5 jours',
+  'Tirages signés par l’artiste',
+  'Impression pilotée par l’auteur avec ses imprimeurs partenaires',
+  'Droit d’auteur respecté : reproduction interdite, usage personnel uniquement',
+  'Envois soignés via La Poste, suivi proposé quand disponible',
 ]
 
 export default async function Footer() {
@@ -65,10 +65,10 @@ export default async function Footer() {
               Vague
             </div>
             <p className="mt-3 max-w-sm">
-              Galerie d’art en ligne — illustrations contemporaines, tirages numérotés et fichiers numériques sécurisés.
+              Galerie d’art en ligne — illustrations contemporaines, tirages signés et expédiés par les artistes.
             </p>
             <p className="mt-3 text-xs text-neutral-500">
-              Nous travaillons avec des ateliers partenaires certifiés (Hahnemühle) pour garantir une restitution fidèle des œuvres.
+              Les artistes pilotent leurs impressions avec des partenaires de confiance, signent chaque tirage et gèrent l’envoi. Nous protégeons leurs droits d’auteur et veillons à des expéditions soignées pour les collectionneurs.
             </p>
           </div>
 
