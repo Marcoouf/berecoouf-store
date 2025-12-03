@@ -88,6 +88,36 @@ export default async function DashboardPage() {
     },
   ]
 
+  const adminCards = isAdmin
+    ? [
+        {
+          title: 'Œuvres (admin)',
+          description: 'Créer ou éditer les fiches, formats, visuels.',
+          href: '/admin/works',
+        },
+        {
+          title: 'Artistes (admin)',
+          description: 'Bio, portrait, couverture, réseaux.',
+          href: '/admin/artists',
+        },
+        {
+          title: 'Commandes (admin)',
+          description: 'Suivi et statut des commandes clients.',
+          href: '/admin/orders',
+        },
+        {
+          title: 'Comptes auteurs',
+          description: 'Créer des accès et rattacher aux artistes.',
+          href: '/admin/authors',
+        },
+        {
+          title: 'Connexions / logs',
+          description: 'Historique des connexions auteurs et admin.',
+          href: '/admin/logs',
+        },
+      ]
+    : []
+
   return (
     <div className="mx-auto max-w-5xl px-4 py-12 space-y-10">
       <div className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-accent-100 via-white to-white p-6 sm:p-8">
@@ -213,15 +243,6 @@ export default async function DashboardPage() {
               </Link>
               {isAdmin ? (
                 <Link
-                  href="/admin"
-                  className="flex items-center justify-between rounded-2xl border border-neutral-200 px-4 py-3 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50"
-                >
-                  <span>⚙️ Accéder à l’admin complète</span>
-                  <span aria-hidden>→</span>
-                </Link>
-              ) : null}
-              {isAdmin ? (
-                <Link
                   href="/admin/orders"
                   className="flex items-center justify-between rounded-2xl border border-neutral-200 px-4 py-3 text-sm font-medium text-neutral-700 transition hover:bg-neutral-50"
                 >
@@ -255,6 +276,30 @@ export default async function DashboardPage() {
           </div>
         </div>
       </section>
+
+      {isAdmin ? (
+        <section className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-widest text-neutral-500">Administration</h2>
+            <span className="text-xs text-neutral-400">Raccourcis consolidés</span>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            {adminCards.map((card) => (
+              <Link
+                key={card.href}
+                href={card.href}
+                className="group rounded-2xl border border-neutral-200 bg-white/80 p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-neutral-300 hover:shadow-md"
+              >
+                <h3 className="text-lg font-semibold text-neutral-900">{card.title}</h3>
+                <p className="mt-2 text-sm text-neutral-500">{card.description}</p>
+                <span className="mt-4 inline-flex items-center text-sm font-medium text-accent group-hover:text-accent-dark">
+                  Ouvrir →
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <div className="flex justify-end">
         <LogoutButton />

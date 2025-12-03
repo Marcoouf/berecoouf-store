@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { motion, useScroll, useSpring, useReducedMotion } from 'framer-motion'
 import { useCartCtx } from '@/components/CartContext'
 import { useCartCount } from '@/state/cart'
@@ -29,29 +30,12 @@ export default function HeaderGlobal() {
   return (
     <header className="sticky top-0 z-[60] w-full border-b border-line/70 bg-white/70 backdrop-blur">
       <Container className="py-3 flex items-center justify-between">
-        {/* Logo + point animé */}
-        <Link
-          href="/"
-          className="group site-brand flex items-center gap-2 text-sm tracking-widest uppercase"
-          data-brand-wave
-        >
-          <motion.svg
-            aria-hidden
-            viewBox="0 0 24 12"
-            className="brand-wave h-3 w-5 text-accent group-hover:text-accent-dark"
-            animate={prefersReduced ? { y: 0 } : { y: [0, -1, 0] }}
-            transition={prefersReduced ? undefined : { duration: 2, repeat: Infinity, repeatType: 'mirror', ease: 'easeInOut' }}
-            style={{ willChange: 'transform' }}
-          >
-            <path
-              d="M1 6c2.5 0 2.5-4 5-4s2.5 4 5 4 2.5-4 5-4 2.5 4 5 4"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-          </motion.svg>
-          <span>Vague</span>
+        {/* Logo image */}
+        <Link href="/" className="group site-brand flex items-center gap-2 text-sm tracking-widest uppercase" data-brand-wave>
+          <div className="relative h-8 w-8 overflow-hidden rounded-lg border border-white/60 shadow-sm ring-2 ring-accent/30 transition group-hover:shadow-md group-hover:ring-accent/60">
+            <Image src="/logo-vague.png" alt="Vague logo" fill className="object-contain" sizes="32px" priority />
+          </div>
+          <span className="text-neutral-900">Vague</span>
         </Link>
 
         {/* Burger (mobile) */}

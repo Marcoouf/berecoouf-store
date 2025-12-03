@@ -38,11 +38,6 @@ const NAV_ITEMS: NavItem[] = [
     label: 'Connexions',
     description: 'Historique des accès',
   },
-  {
-    href: '/admin/tools',
-    label: 'Outils',
-    description: 'Maintenance & scripts',
-  },
 ]
 
 function isActive(pathname: string, item: NavItem) {

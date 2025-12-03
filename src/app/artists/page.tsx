@@ -1,6 +1,6 @@
 // src/app/artists/page.tsx
 import Link from 'next/link'
-import ConditionalPaddingImage from '@/components/ConditionalPaddingImage'
+import SmartImage from '@/components/SmartImage'
 import Breadcrumb from '@/components/Breadcrumb'
 import { prisma } from '@/lib/prisma'
 
@@ -77,10 +77,17 @@ export default async function ArtistsPage() {
                   className="group block rounded-3xl border border-neutral-200/80 bg-gradient-to-br from-[#f9fbff] via-white to-[#edf3ff] shadow-[0_18px_28px_rgba(15,23,42,0.10)] transition-transform hover:-translate-y-[2px] hover:shadow-[0_26px_40px_rgba(15,23,42,0.16)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
                   aria-label={`Voir la page de ${a.name}`}
                 >
-                  <div className="flex min-h-[176px] flex-col gap-6 p-6 sm:flex-row sm:items-center sm:gap-8 sm:p-8">
-                    <div className="relative flex-none">
-                      <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-[18px] border border-accent/40 bg-white/80 shadow-inner">
-                        <ConditionalPaddingImage src={portrait} alt={`Portrait de ${a.name}`} padding={4} imageClassName="!object-cover" />
+                  <div className="flex min-h-[176px] flex-col gap-5 p-6 sm:flex-row sm:items-center sm:gap-8 sm:p-8">
+                    <div className="relative w-full overflow-hidden rounded-[18px] border border-accent/40 bg-white/80 shadow-inner sm:w-[220px] sm:flex-none">
+                      <div className="relative aspect-square w-full sm:aspect-[4/5]">
+                        <SmartImage
+                          src={portrait}
+                          alt={`Portrait de ${a.name}`}
+                          fill
+                          sizes="(min-width: 640px) 220px, 100vw"
+                          className="object-contain"
+                          wrapperClassName="relative h-full w-full"
+                        />
                       </div>
                     </div>
                     <div className="min-w-0 flex-1 text-neutral-600">
