@@ -41,30 +41,20 @@ export default function ArtworkImageCarousel({
         .filter((u): u is string => typeof u === 'string' && u.trim().length > 0)
 
     const normalized = toStringArray(images)
-    const legacy = [mockup, image].filter(
+    // On force le mockup en tête s'il existe, puis toutes les images normalisées, puis le fallback image plein
+    const ordered = [mockup, ...normalized, image].filter(
       (src): src is string => typeof src === 'string' && src.trim().length > 0,
     )
-    const base = normalized.length > 0 ? normalized : legacy
 
     const unique: string[] = []
     const seen = new Set<string>()
-    base.forEach((src) => {
+    ordered.forEach((src) => {
       if (seen.has(src)) return
       seen.add(src)
       unique.push(src)
     })
 
-    const prioritized: string[] = []
-    ;[mockup, image]
-      .filter((src): src is string => typeof src === 'string' && seen.has(src))
-      .forEach((src) => {
-        if (!prioritized.includes(src)) prioritized.push(src)
-      })
-    unique.forEach((src) => {
-      if (!prioritized.includes(src)) prioritized.push(src)
-    })
-
-    return prioritized
+    return unique
   }, [images, mockup, image])
   const [idx, setIdx] = useState(0)
   const wrap = useCallback((n: number) => (n + slides.length) % slides.length, [slides.length])

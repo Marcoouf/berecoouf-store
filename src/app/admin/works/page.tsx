@@ -1,998 +1,735 @@
-'use client'
-export const dynamic = 'force-dynamic'
+"use client"
 
-import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import ConditionalPaddingImage from '@/components/ConditionalPaddingImage'
-import { AdminPageHeader } from '@/components/admin/AdminPageHeader'
+import { useEffect, useMemo, useRef, useState } from "react"
+import SmartImage from "@/components/SmartImage"
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader"
 
-type Toast = { id: string; kind: 'success' | 'error' | 'info'; msg: string }
-type FormatRow = { id: string; label: string; price: number }
+// ----------------- Helpers -----------------
+const clsx = (...xs: Array<string | false | null | undefined>) => xs.filter(Boolean).join(" ")
 
-type ArtworkDraft = {
+const euro = new Intl.NumberFormat("fr-FR", { style: "currency", currency: "EUR" })
+const toCents = (val: string) => {
+  const n = Number(String(val).replace(",", "."))
+  if (!Number.isFinite(n)) return 0
+  // On considère que l'admin saisit des euros → conversion centimes
+  return Math.max(0, Math.round(n * 100))
+}
+
+const DEFAULT_FORMATS: VariantForm[] = [
+  { label: "Format A3", price: "120", stock: "" },
+  { label: "Format A2", price: "190", stock: "" },
+]
+
+// ----------------- Types -----------------
+type ArtistOption = { id: string; name: string; slug: string }
+type VariantForm = { id?: string; label: string; price: string; stock: string }
+type WorkForm = {
+  id?: string
+  slug: string
+  title: string
+  artistId: string
+  description: string
+  technique: string
+  year: string
+  paper: string
+  dimensions: string
+  image: string
+  mockup: string
+  published: boolean
+  variants: VariantForm[]
+}
+
+type CatalogWork = {
   id: string
   slug: string
   title: string
   artistId: string
-  image: string
+  cover?: { url: string }
+  image?: string
   mockup?: string
-  price: number
+  price?: number
+  priceMin?: number
   description?: string
   year?: number
   technique?: string
   paper?: string
-  edition?: string
-  formats?: FormatRow[]
+  size?: string
+  variants?: Array<{ id: string; label: string; price: number; stock?: number | null }>
 }
 
-const artistsForSelect = [
-  { value: 'a-Couf', label: 'Marcouf Lebar' },
-  { value: 'b-Béré', label: 'Bérénice Duchemain' },
-  { value: 'c-Cam',  label: 'Camille Dubois' },
-]
+type CatalogArtist = { id: string; name: string; slug: string }
 
-function safeSlug(s: string) {
-  return s
-    .normalize('NFKD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '')
+// ----------------- API calls -----------------
+async function fetchArtists(): Promise<ArtistOption[]> {
+  const res = await fetch("/api/admin/artists", { cache: "no-store" })
+  if (!res.ok) throw new Error("Impossible de charger les artistes.")
+  const data = await res.json()
+  return Array.isArray(data) ? data : []
 }
 
-function uid(prefix = 'w') {
-  return `${prefix}-${Math.random().toString(36).slice(2, 8)}`
+async function fetchCatalog(): Promise<{ artists: CatalogArtist[]; artworks: CatalogWork[] }> {
+  const res = await fetch("/api/catalog", { cache: "no-store" })
+  if (!res.ok) throw new Error("Impossible de charger le catalogue.")
+  const data = await res.json()
+  return {
+    artists: Array.isArray(data?.artists) ? data.artists : [],
+    artworks: Array.isArray(data?.artworks) ? data.artworks : [],
+  }
 }
 
-function AdminPageInner() {
-  // Accès sécurisé côté serveur via middleware + cookie HttpOnly (voir /admin/login et middleware)
-
-  const [value, set] = useState<ArtworkDraft>({
-    id: uid(),
-    slug: '',
-    title: '',
-    artistId: artistsForSelect[0].value,
-    image: '',
-    mockup: '',
-    price: 0,
-    description: '',
-    year: undefined,
-    technique: '',
-    paper: '',
-    edition: '',
-    formats: [
-      { id: uid('f'), label: 'A3 — 297×420mm', price: 120 },
-      { id: uid('f'), label: 'A2 — 420×594mm', price: 180 },
-      { id: uid('f'), label: 'A1 — 594×841mm', price: 220 },
-    ],
-  })
-
-  const [existing, setExisting] = useState<ArtworkDraft[]>([])
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [uploading, setUploading] = useState(false)
-  const [uploadError, setUploadError] = useState<string | null>(null)
-
-  // Toasts + progression upload
-  const [toasts, setToasts] = useState<Toast[]>([])
-  const [imgProgress, setImgProgress] = useState(0)
-  const [mockProgress, setMockProgress] = useState(0)
-
-function addToast(kind: Toast['kind'], msg: string) {
-  const id = Math.random().toString(36).slice(2, 8)
-  setToasts(t => [...t, { id, kind, msg }])
-  setTimeout(() => {
-    setToasts(t => t.filter(x => x.id !== id))
-  }, 4000)
+async function uploadWithKind(file: File, kind: "artwork" | "mockup") {
+  const fd = new FormData()
+  fd.append("file", file)
+  fd.append("kind", kind)
+  fd.append("originalName", file.name)
+  const res = await fetch("/api/upload", { method: "POST", body: fd })
+  const ct = res.headers.get("content-type") || ""
+  const body = ct.includes("application/json") ? await res.json() : { error: await res.text() }
+  if (!res.ok || !body?.url) throw new Error(body?.error || "Upload échoué")
+  return body.url as string
 }
+
+// ----------------- Component -----------------
+function emptyWork(): WorkForm {
+  return {
+    slug: "",
+    title: "",
+    artistId: "",
+    description: "",
+    technique: "",
+    year: "",
+    paper: "",
+    dimensions: "",
+    image: "",
+    mockup: "",
+    published: true,
+    variants: [...DEFAULT_FORMATS],
+  }
+}
+
+type Toast = { id: string; kind: "success" | "error" | "info"; message: string }
+
+function formatPrice(cents?: number) {
+  if (!cents) return ""
+  return euro.format(cents / 100)
+}
+
+function firstImage(w: CatalogWork): string | null {
+  const candidates = [
+    w.cover?.url,
+    typeof w.image === "string" ? w.image : null,
+    typeof w.mockup === "string" ? w.mockup : null,
+  ].filter(Boolean) as string[]
+  return candidates.find(Boolean) || null
+}
+
+function workToForm(w: CatalogWork): WorkForm {
+  return {
+    id: w.id,
+    slug: w.slug,
+    title: w.title,
+    artistId: w.artistId,
+    description: w.description ?? "",
+    technique: w.technique ?? "",
+    year: w.year ? String(w.year) : "",
+    paper: w.paper ?? "",
+    dimensions: w.size ?? "",
+    image: firstImage(w) || "",
+    mockup: typeof w.mockup === "string" ? w.mockup : "",
+    published: true,
+    variants:
+      Array.isArray(w.variants) && w.variants.length
+        ? w.variants.map((v) => ({
+            id: v.id,
+            label: v.label || "",
+            price: (v.price / 100).toString(),
+            stock: v.stock == null ? "" : String(v.stock),
+          }))
+        : [...DEFAULT_FORMATS],
+  }
+}
+
+function adaptApiWork(raw: any): CatalogWork {
+  if (!raw) {
+    return {
+      id: "",
+      slug: "",
+      title: "",
+      artistId: "",
+      image: "",
+      mockup: "",
+      price: undefined,
+      priceMin: undefined,
+      variants: [],
+    }
+  }
+  return {
+    id: raw.id ?? "",
+    slug: raw.slug ?? "",
+    title: raw.title ?? "",
+    artistId: raw.artistId ?? raw.artist?.id ?? "",
+    image: raw.imageUrl ?? raw.image ?? raw.cover ?? undefined,
+    mockup: raw.mockupUrl ?? raw.mockup ?? undefined,
+    price: typeof raw.basePrice === "number" ? Math.round(raw.basePrice) : typeof raw.price === "number" ? Math.round(raw.price) : undefined,
+    priceMin:
+      typeof raw.basePrice === "number"
+        ? Math.round(raw.basePrice)
+        : typeof raw.priceMin === "number"
+        ? Math.round(raw.priceMin)
+        : typeof raw.price === "number"
+        ? Math.round(raw.price)
+        : undefined,
+    description: raw.description ?? undefined,
+    year: raw.year ?? undefined,
+    technique: raw.technique ?? undefined,
+    paper: raw.paper ?? undefined,
+    size: raw.dimensions ?? raw.size ?? undefined,
+    variants: Array.isArray(raw.variants)
+      ? raw.variants.map((v: any) => ({
+          id: v.id,
+          label: v.label ?? "",
+          price:
+            typeof v.price === "number"
+              ? Math.round(v.price)
+              : typeof v.price === "string"
+              ? toCents(v.price)
+              : 0,
+          stock: v.stock ?? v.availableStock ?? null,
+        }))
+      : [],
+  }
+}
+
+export default function AdminWorksPage() {
+  const [artists, setArtists] = useState<ArtistOption[]>([])
+  const [works, setWorks] = useState<CatalogWork[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [form, setForm] = useState<WorkForm>(emptyWork())
+  const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState<{ cover: boolean; mockup: boolean }>({ cover: false, mockup: false })
+  const [toast, setToast] = useState<Toast | null>(null)
+  const [filter, setFilter] = useState("")
+  const toastRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
     let active = true
-    fetch('/api/catalog')
-      .then(r => r.json())
-      .then(data => {
+    async function load() {
+      setLoading(true)
+      setError(null)
+      try {
+        const [artistsRes, catalog] = await Promise.all([fetchArtists(), fetchCatalog()])
         if (!active) return
-        const arr = Array.isArray(data?.artworks) ? data.artworks : []
-        setExisting(arr)
-      })
-      .catch(() => {})
-    return () => { active = false }
+        setArtists(artistsRes)
+        setWorks(catalog.artworks)
+      } catch (e: any) {
+        if (!active) return
+        setError(e?.message || "Erreur de chargement")
+      } finally {
+        if (active) setLoading(false)
+      }
+    }
+    load()
+    return () => {
+      active = false
+    }
   }, [])
 
-  // ------ helper: recharger la liste depuis /api/catalog ------
-  async function refreshExisting() {
-    try {
-      const r = await fetch('/api/catalog', { cache: 'no-store' })
-      const data = await r.json()
-      const arr = Array.isArray(data?.artworks) ? data.artworks : []
-      setExisting(arr)
-    } catch {}
-  }
-
-  const setField = <K extends keyof ArtworkDraft>(k: K, v: ArtworkDraft[K]) =>
-    set(prev => ({ ...prev, [k]: v }))
-
-  const derivedSlug = useMemo(() => {
-    if (value.slug?.trim()) return value.slug
-    return safeSlug(value.title || value.id)
-  }, [value.slug, value.title, value.id])
-
-  // Upload image -> appelle /api/upload
-  const fileRef = useRef<HTMLInputElement>(null)
-
-  async function uploadWithProgress(
-  file: File,
-  kind: 'artwork' | 'mockup',
-  onProgress: (p: number) => void
-) {
-  return new Promise<{ ok: boolean; url?: string; path?: string; error?: string }>((resolve) => {
-    const fd = new FormData()
-    fd.append('file', file)
-    fd.append('kind', kind)
-    fd.append('originalName', file.name || 'image')
-
-    const xhr = new XMLHttpRequest()
-    xhr.open('POST', '/api/upload', true)
-    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest')
-    // Ask XHR to parse JSON for us when supported
-    try { xhr.responseType = 'json' } catch {}
-    xhr.withCredentials = true
-    xhr.upload.onprogress = (evt) => {
-      if (evt.lengthComputable) {
-        const p = Math.round((evt.loaded / evt.total) * 100)
-        onProgress(p)
-      }
+  useEffect(() => {
+    if (!toast) return
+    const id = window.setTimeout(() => setToast(null), 3500)
+    if (toastRef.current) {
+      toastRef.current.scrollIntoView({ behavior: "smooth", block: "start" })
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" })
     }
-    xhr.onreadystatechange = () => {
-      if (xhr.readyState === 4) {
-        try {
-          const res: any = (xhr.responseType === 'json' ? xhr.response : JSON.parse(xhr.responseText || '{}')) || {}
-          if (xhr.status >= 200 && xhr.status < 300 && (res?.url || res?.path)) {
-            resolve({ ok: true, url: res.url, path: res.path })
-          } else {
-            const msg = res?.error || res?.message || (xhr.status ? `HTTP ${xhr.status}` : 'Réponse invalide')
-            resolve({ ok: false, error: msg })
-          }
-        } catch (e) {
-          resolve({ ok: false, error: 'Réponse invalide' })
-        }
-      }
+    return () => window.clearTimeout(id)
+  }, [toast])
+
+  const addToast = (kind: Toast["kind"], message: string) => {
+    setToast({ id: `${Date.now()}`, kind, message })
+  }
+
+  const grouped = useMemo(() => {
+    const map = new Map<string, { artist: ArtistOption | null; items: CatalogWork[] }>()
+    for (const w of works) {
+      const artist = artists.find((a) => a.id === w.artistId) || null
+      if (!map.has(w.artistId)) map.set(w.artistId, { artist, items: [] })
+      map.get(w.artistId)!.items.push(w)
     }
-    xhr.onerror = () => resolve({ ok: false, error: 'Erreur réseau' })
-    xhr.send(fd)
-  })
-}
-  
-  function chooseFile() {
-    fileRef.current?.click()
-  }
-async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-  const f = e.target.files?.[0]
-  if (!f) return
-  setUploading(true)
-  setUploadError(null)
-  setImgProgress(0)
-  try {
-    const json = await uploadWithProgress(f, 'artwork', setImgProgress)
-    if (!json?.ok || !json.url) throw new Error(json?.error || "Upload failed (pas d'URL)")
-    setField('image', json.url)
-    addToast('success', 'Image envoyée ✅')
-  } catch (err: any) {
-    const msg = err?.message || 'Erreur upload'
-    setUploadError(msg)
-    addToast('error', msg)
-  } finally {
-    setUploading(false)
-    setTimeout(() => setImgProgress(0), 600)
-    if (fileRef.current) fileRef.current.value = ''
-  }
-}
-
-  // Upload mockup (optionnel) -> /api/upload
-  const mockupRef = useRef<HTMLInputElement>(null)
-  const [uploadingMockup, setUploadingMockup] = useState(false)
-  const [uploadErrorMockup, setUploadErrorMockup] = useState<string | null>(null)
-
-  function chooseMockup() {
-    mockupRef.current?.click()
-  }
-async function onMockupChange(e: React.ChangeEvent<HTMLInputElement>) {
-  const f = e.target.files?.[0]
-  if (!f) return
-  setUploadingMockup(true)
-  setUploadErrorMockup(null)
-  setMockProgress(0)
-  try {
-    const json = await uploadWithProgress(f, 'mockup', setMockProgress)
-    if (!json?.ok || !json.url) throw new Error(json?.error || "Upload failed (pas d'URL)")
-    setField('mockup', json.url)
-    addToast('success', 'Mockup envoyé ✅')
-  } catch (err: any) {
-    const msg = err?.message || 'Erreur upload'
-    setUploadErrorMockup(msg)
-    addToast('error', msg)
-  } finally {
-    setUploadingMockup(false)
-    setTimeout(() => setMockProgress(0), 600)
-    if (mockupRef.current) mockupRef.current.value = ''
-  }
-}
-
-  // Formats
-  function addFormat() {
-    set(prev => ({
-      ...prev,
-      formats: [...(prev.formats ?? []), { id: uid('f'), label: '', price: 0 }],
+    return Array.from(map.values()).map((g) => ({
+      artist: g.artist,
+      items: g.items.sort((a, b) => a.title.localeCompare(b.title)),
     }))
+  }, [works, artists])
+
+  const filteredGroups = useMemo(() => {
+    const q = filter.trim().toLowerCase()
+    if (!q) return grouped
+    return grouped
+      .map((g) => ({
+        artist: g.artist,
+        items: g.items.filter((w) => {
+          const haystack = [w.title, w.slug, g.artist?.name || "", g.artist?.slug || ""].join(" ").toLowerCase()
+          return haystack.includes(q)
+        }),
+      }))
+      .filter((g) => g.items.length > 0)
+  }, [grouped, filter])
+
+  const handleSelect = (w: CatalogWork) => {
+    setForm(workToForm(w))
+    setToast(null)
+    window.scrollTo({ top: 0, behavior: "smooth" })
   }
-  function setFormat(idx: number, patch: Partial<FormatRow>) {
-    set(prev => {
-      const arr = [...(prev.formats ?? [])]
-      arr[idx] = { ...arr[idx], ...patch }
-      return { ...prev, formats: arr }
-    })
+
+  const handleDuplicate = (w: CatalogWork) => {
+    const f = workToForm(w)
+    delete f.id
+    f.slug = `${f.slug}-copie`
+    setForm(f)
+    addToast("info", "Duplication prête (slug suffixé)")
   }
-  function delFormat(idx: number) {
-    set(prev => {
-      const arr = (prev.formats ?? []).filter((_, i) => i !== idx)
-      return { ...prev, formats: arr }
+
+  const handleNew = () => {
+    setForm(emptyWork())
+    setToast(null)
+  }
+
+  const handleVariantChange = (index: number, key: keyof VariantForm, value: string) => {
+    setForm((prev) => {
+      const next = { ...prev, variants: prev.variants.map((v, i) => (i === index ? { ...v, [key]: value } : v)) }
+      return next
     })
   }
 
-  const imageUrl = typeof value.image === 'string' ? value.image.trim() : ''
-  const mockupUrl = typeof value.mockup === 'string' ? value.mockup.trim() : ''
-  const imageMissing = imageUrl.length === 0
-  const canSubmit =
-    value.title.trim().length > 0 &&
-    (value.slug.trim().length > 0 || derivedSlug.length > 0) &&
-    value.artistId &&
-    imageUrl.length > 0 &&
-    ((value.price ?? 0) > 0 || (value.formats ?? []).some(f => (f.price ?? 0) > 0))
+  const handleAddVariant = () => {
+    setForm((prev) => ({ ...prev, variants: [...prev.variants, { label: "", price: "", stock: "" }] }))
+  }
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (uploading || uploadingMockup) {
-      alert('Upload en cours — patiente avant d’enregistrer.')
+  const handleRemoveVariant = (index: number) => {
+    setForm((prev) => ({ ...prev, variants: prev.variants.filter((_, i) => i !== index) }))
+  }
+
+  const handleUpload = async (file: File, target: "cover" | "mockup") => {
+    try {
+      setUploading((p) => ({ ...p, [target]: true }))
+      const url = await uploadWithKind(file, target === "cover" ? "artwork" : "mockup")
+      setForm((prev) => ({
+        ...prev,
+        image: target === "cover" ? url : prev.image,
+        mockup: target === "mockup" ? url : prev.mockup,
+      }))
+      addToast("success", "Image envoyée ✅")
+    } catch (err: any) {
+      addToast("error", err?.message || "Upload impossible")
+    } finally {
+      setUploading((p) => ({ ...p, [target]: false }))
+    }
+  }
+
+  const handleSubmit = async (evt: React.FormEvent<HTMLFormElement>) => {
+    evt.preventDefault()
+    if (!form.title.trim() || !form.slug.trim() || !form.artistId) {
+      addToast("error", "Titre, slug et artiste sont requis.")
       return
     }
-    if (!canSubmit) return
+    const variants = form.variants
+      .map((v) => ({
+        id: v.id,
+        label: v.label.trim(),
+        price: toCents(v.price),
+        stock: v.stock === "" ? null : Math.max(0, Math.round(Number(v.stock))),
+      }))
+      .filter((v) => v.label && v.price > 0)
 
-    // ---- Route unique admin /api/admin/work ----
-    // L'API accepte image/mockup/price (euros) et formats[]
-    const payloadForApi = {
-      id: editingId ? String(value.id) : undefined,
-      title: value.title,
-      slug: derivedSlug,
-      artistId: value.artistId,
-      image: imageUrl,
-      mockup: mockupUrl || null,
-      // prix de base en euros si aucun format, sinon on le laisse vide (le serveur prendra min(formats))
-      price: (value.price && value.price > 0 ? Number(value.price) : undefined),
-      description: value.description || null,
-      year: value.year ?? null,
-      technique: value.technique || null,
-      paper: value.paper || null,
-      edition: value.edition || null,
-      published: true,
-      formats: (value.formats ?? [])
-        .filter(f => f.label.trim())
-        .sort((a, b) => Number(a.price || 0) - Number(b.price || 0))
-        .map(f => ({
-          id: String(f.id || '').startsWith('f-') ? undefined : f.id,
-          label: f.label,
-          price: Number(f.price || 0),
-        })),
+    if (!variants.length) {
+      addToast("error", "Ajoute au moins un format avec un prix.")
+      return
     }
 
-    const endpoint = editingId
-      ? `/api/admin/work?id=${encodeURIComponent(String(value.id))}`
-      : '/api/admin/work'
-    const method = editingId ? 'PUT' : 'POST'
+    const basePrice = variants.reduce((min, v) => (v.price > 0 && v.price < min ? v.price : min), Infinity)
+    const payload = {
+      id: form.id,
+      slug: form.slug.trim(),
+      title: form.title.trim(),
+      artistId: form.artistId,
+      description: form.description || null,
+      technique: form.technique || null,
+      year: form.year ? Number(form.year) : null,
+      paper: form.paper || null,
+      dimensions: form.dimensions || null,
+      image: form.image,
+      mockup: form.mockup || null,
+      published: form.published,
+      basePrice: Number.isFinite(basePrice) ? basePrice : 0,
+      variants,
+    }
 
+    setSaving(true)
     try {
-      const res = await fetch(endpoint, {
-        method,
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payloadForApi),
+      const isEdit = Boolean(form.id)
+      const res = await fetch(isEdit ? `/api/admin/work?id=${encodeURIComponent(form.id || "")}` : "/api/admin/work", {
+        method: isEdit ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       })
-      const j = await res.json().catch(() => ({}))
-      if (!res.ok || j?.ok === false) {
-        throw new Error(j?.error || `HTTP ${res.status}`)
-      }
-
-      addToast('success', editingId ? 'Œuvre mise à jour ✅' : 'Œuvre enregistrée ✅')
-
-      // Recharge la liste et garde le contexte
-      await refreshExisting()
-      if (editingId) {
-        // on reste sur l'œuvre éditée
-        setEditingId(value.id)
-      } else {
-        // reset uniquement en création
-        set({
-          id: uid(),
-          slug: '',
-          title: '',
-          artistId: artistsForSelect[0].value,
-          image: '',
-          mockup: '',
-          price: 0,
-          description: '',
-          year: undefined,
-          technique: '',
-          paper: '',
-          edition: '',
-          formats: [
-            { id: uid('f'), label: 'A3 — 297×420mm', price: 120 },
-            { id: uid('f'), label: 'A2 — 420×594mm', price: 180 },
-            { id: uid('f'), label: 'A1 — 594×841mm', price: 220 },
-          ],
-        })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || data?.ok === false) throw new Error(data?.error || "Enregistrement impossible")
+      addToast("success", isEdit ? "Œuvre mise à jour ✅" : "Œuvre créée ✅")
+      const catalog = await fetchCatalog()
+      setWorks(catalog.artworks)
+      if (data?.artwork) {
+        const normalized = adaptApiWork(data.artwork)
+        setForm(workToForm(normalized))
+      } else if (payload.slug) {
+        const found = catalog.artworks.find((w) => w.slug === payload.slug)
+        if (found) setForm(workToForm(found))
       }
     } catch (err: any) {
-      addToast('error', err?.message || 'Échec enregistrement')
+      addToast("error", err?.message || "Erreur inconnue")
+    } finally {
+      setSaving(false)
     }
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-10">
+    <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
       <AdminPageHeader
         title="Œuvres"
-        subtitle="Créer une nouvelle fiche ou modifier une œuvre existante."
-        actions={[
-          { type: 'link', href: '/admin/authors', label: 'Comptes auteurs' },
-        ]}
+        subtitle="Créer ou modifier une fiche œuvre, avec formats et stock."
+        actions={[{ type: "link", href: "/admin", label: "← Tableau de bord" }]}
       />
 
-      <div className="mb-6 rounded-xl border p-4">
-        <div className="text-sm font-medium mb-2">Mode</div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div>
-            <label className="mb-1 block text-sm">Choisir une œuvre existante</label>
-            <select
-              className="w-full rounded-md border px-3 py-2 text-sm"
-              value={editingId ?? ''}
-              onChange={(e) => {
-                const id = e.target.value || null
-                setEditingId(id)
-                if (!id) {
-                  // reset nouveau brouillon
-                  set({
-                    id: uid(),
-                    slug: '',
-                    title: '',
-                    artistId: artistsForSelect[0].value,
-                    image: '',
-                    mockup: '',
-                    price: 0,
-                    description: '',
-                    year: undefined,
-                    technique: '',
-                    paper: '',
-                    edition: '',
-                    formats: [
-                      { id: uid('f'), label: 'A3 — 297×420mm', price: 120 },
-                      { id: uid('f'), label: 'A2 — 420×594mm', price: 180 },
-                      { id: uid('f'), label: 'A1 — 594×841mm', price: 220 },
-                    ],
-                  })
-                } else {
-                  const found = existing.find(x => x.id === id)
-                  if (found) {
-                    const formats = (Array.isArray((found as any).formats) && (found as any).formats.length > 0)
-                      ? (found as any).formats
-                      : (Array.isArray((found as any).variants) && (found as any).variants.length > 0)
-                        ? (found as any).variants.map((v: any) => ({ id: v.id || uid('f'), label: v.label, price: Number(v.price) || 0 }))
-                        : [
-                            { id: uid('f'), label: 'A3 — 297×420mm', price: 120 },
-                            { id: uid('f'), label: 'A2 — 420×594mm', price: 180 },
-                            { id: uid('f'), label: 'A1 — 594×841mm', price: 220 },
-                          ]
-                    const normalizedFormats = [...formats].map(f => ({
-                      ...f,
-                      price: Number(f.price ?? 0),
-                    })).sort((a, b) => a.price - b.price)
-                    set({
-                      ...found,
-                      id: String(found.id),
-                      formats: normalizedFormats,
-                      image: String((found as any).image || (found as any).imageUrl || ''),
-                      mockup: (found as any).mockup || (found as any).mockupUrl || '',
-                    } as any)
-                  }
-                }
-              }}
-            >
-              <option value="">— Nouvelle œuvre</option>
-              {existing.map(w => (
-                <option key={w.id} value={w.id}>{w.title} — {w.slug}</option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-neutral-500">Sélectionne une œuvre pour l’éditer, ou laisse vide pour créer.</p>
-          </div>
-
-          <div className="flex items-end gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                if (!editingId) return
-                const found = existing.find(x => x.id === editingId)
-                if (!found) return
-                set({
-                  ...found,
-                  id: uid(),
-                  slug: '',
-                  title: `${found.title} (copie)`,
-                } as any)
-                setEditingId(null)
-              }}
-              className="rounded-md border px-3 py-2 text-sm hover:bg-neutral-50 disabled:opacity-50"
-              disabled={!editingId}
-            >
-              Dupliquer
-            </button>
-            <button
-              type="button"
-              onClick={async () => {
-                if (!editingId) return
-                const found = existing.find(x => x.id === editingId)
-                const title = found?.title || '(sans titre)'
-                const slug = (found as any)?.slug || ''
-                const ok = confirm(
-                  `Supprimer définitivement cette œuvre ?\n\n` +
-                  `Titre : ${title}\n` +
-                  `Slug : ${slug}\n\n` +
-                  `Cette action est irréversible.`
-                )
-                if (!ok) return
-                const res = await fetch(`/api/admin/work?id=${encodeURIComponent(editingId)}`, {
-                  method: 'DELETE',
-                  credentials: 'include',
-                })
-                const j = await res.json().catch(() => ({}))
-                if (!res.ok || !j?.ok) {
-                  alert('Suppression échouée')
-                  return
-                }
-                setExisting(prev => prev.filter(x => x.id !== editingId))
-                await refreshExisting()
-                setEditingId(null)
-                set({
-                  id: uid(),
-                  slug: '',
-                  title: '',
-                  artistId: artistsForSelect[0].value,
-                  image: '',
-                  mockup: '',
-                  price: 0,
-                  description: '',
-                  year: undefined,
-                  technique: '',
-                  paper: '',
-                  edition: '',
-                  formats: [
-                    { id: uid('f'), label: 'A3 — 297×420mm', price: 120 },
-                    { id: uid('f'), label: 'A2 — 420×594mm', price: 180 },
-                    { id: uid('f'), label: 'A1 — 594×841mm', price: 220 },
-                  ],
-                })
-                addToast('success', j?.softDeleted ? 'Œuvre archivée (commandes existantes) ✅' : 'Œuvre supprimée ✅')
-              }}
-              className="rounded-md border px-3 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
-              disabled={!editingId}
-            >
-              Supprimer
-            </button>
-          </div>
+      {toast && (
+        <div
+          ref={toastRef}
+          className={clsx(
+            "mb-4 rounded-lg border px-4 py-3 text-sm shadow-sm",
+            toast.kind === "success" && "border-green-200 bg-green-50 text-green-800",
+            toast.kind === "error" && "border-red-200 bg-red-50 text-red-800",
+            toast.kind !== "success" && toast.kind !== "error" && "border-neutral-200 bg-neutral-50",
+          )}
+        >
+          {toast.message}
         </div>
-      </div>
+      )}
 
-      <form onSubmit={onSubmit} className="space-y-8">
-        {/* Upload + aperçu */}
-        <div className="flex flex-col gap-4 md:flex-row md:items-start md:gap-8">
-          <div
-            className={[
-              'flex-1 space-y-3 transition-shadow',
-              imageMissing ? 'rounded-xl outline outline-2 outline-red-300/80 outline-offset-4' : '',
-            ].join(' ').trim()}
-          >
-            <label id="admin-work-image-label" className="block text-sm font-medium">
-              Fichier image <span className="ml-1 text-red-600">*</span>
-              <span className="ml-2 text-xs font-normal text-neutral-500">(max 2,5 Mo)</span>
-            </label>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={chooseFile}
-                className="rounded-md bg-accent px-3 py-2 text-sm font-medium text-ink hover:bg-accent-dark disabled:opacity-60"
-                disabled={uploading}
-              >
-                {uploading ? 'Upload…' : 'Uploader vers le serveur'}
-              </button>
-              {uploadError && <span className="text-sm text-red-600">{uploadError}</span>}
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <input
-                type="url"
-                placeholder="Coller une URL d’image (https://…)"
-                className="w-full max-w-md rounded-md border px-3 py-2 text-sm"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    const v = (e.currentTarget as HTMLInputElement).value.trim()
-                    if (v) {
-                      setField('image', v)
-                      addToast('success', 'URL image appliquée ✅')
-                    }
-                  }
-                }}
-              />
-              <button
-                type="button"
-                className="rounded-md border px-3 py-2 text-sm hover:bg-neutral-50"
-                onClick={(e) => {
-                  const input = (e.currentTarget.previousElementSibling as HTMLInputElement)
-                  const v = input?.value?.trim()
-                  if (v) {
-                    setField('image', v)
-                    addToast('success', 'URL image appliquée ✅')
-                  }
-                }}
-              >
-                Utiliser cette URL
-              </button>
-              {value.image && (
-                <button
-                  type="button"
-                  className="rounded-md border px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                  onClick={() => setField('image', '')}
-                  title="Retirer l’image actuelle"
-                >
-                  Retirer l’image
-                </button>
-              )}
-            </div>
-            {imageMissing && (
-              <p className="text-xs font-medium text-red-600">
-                Ajoute une image principale avant d’enregistrer.
-              </p>
-            )}
-            {imgProgress > 0 && (
-  <div className="mt-2 h-2 w-full rounded bg-neutral-100">
-    <div
-      className="h-2 rounded bg-accent transition-[width]"
-      style={{ width: `${imgProgress}%` }}
-      aria-label={`Progression upload image ${imgProgress}%`}
-    />
-  </div>
-)}
-            <div className="mt-1">
-              {uploading ? (
-                <span className="inline-flex items-center rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] text-neutral-700">
-                  Upload de l’image en cours…
-                </span>
-              ) : value.image?.startsWith('http') ? (
-                <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[11px] text-green-700">
-                  Image prête ✅
-                </span>
-              ) : (
-                <span className="inline-flex items-center rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] text-neutral-600">
-                  Aucune image
-                </span>
-              )}
-            </div>
+      {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</div>}
+
+      <div className="grid items-start gap-6 lg:grid-cols-[320px,1fr]">
+        <aside className="rounded-2xl border border-neutral-200 bg-white shadow-sm">
+          <div className="flex items-center gap-3 border-b border-neutral-100 px-4 py-3">
             <input
-              ref={fileRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/avif,image/gif"
-              className="hidden"
-              onChange={onFileChange}
+              type="search"
+              placeholder="Rechercher titre ou artiste…"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="flex-1 rounded-md border px-3 py-2 text-sm"
             />
-            {value.image && (
-              <p className="break-all text-xs text-neutral-500">Chemin : {value.image}</p>
+            <button
+              type="button"
+              onClick={handleNew}
+              className="rounded-md border border-accent-200 bg-accent-50 px-3 py-2 text-sm text-accent-700 hover:bg-accent-100"
+            >
+              + Nouvelle
+            </button>
+          </div>
+          <div className="max-h-[calc(100vh-240px)] overflow-y-auto px-4 py-3">
+            {loading && <div className="py-2 text-sm text-neutral-500">Chargement…</div>}
+            {!loading && filteredGroups.length === 0 && (
+              <div className="py-2 text-sm text-neutral-500">Aucune œuvre trouvée.</div>
             )}
+            <div className="space-y-4">
+              {filteredGroups.map((group, idx) => (
+                <div key={group.artist?.id || `unknown-${idx}`} className="space-y-2">
+                  <div className="text-xs uppercase tracking-wide text-neutral-500">
+                    {group.artist?.name || "Artiste"}
+                  </div>
+                  <div className="space-y-2">
+                    {group.items.map((w) => {
+                      const selected = form.id === w.id
+                      const img = firstImage(w)
+                      return (
+                        <div
+                          key={w.id}
+                          className={clsx(
+                            "relative overflow-hidden rounded-xl border",
+                            selected ? "border-accent-200 bg-accent-50" : "border-neutral-200 bg-white",
+                          )}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => handleSelect(w)}
+                            className="flex w-full items-center gap-3 px-3 py-2 text-left"
+                          >
+                            <div className="relative h-12 w-12 overflow-hidden rounded-lg bg-neutral-50">
+                              {img ? (
+                                <SmartImage src={img} alt={w.title} fill className="object-cover" sizes="64px" />
+                              ) : (
+                                <div className="flex h-full items-center justify-center text-[10px] text-neutral-400">Aperçu</div>
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="truncate text-sm font-medium">{w.title}</div>
+                              <div className="text-xs text-neutral-500">
+                                {group.artist?.name || "?"} · {w.slug}
+                              </div>
+                              {w.priceMin ? (
+                                <div className="text-xs text-neutral-600">{formatPrice(w.priceMin)}</div>
+                              ) : null}
+                            </div>
+                          </button>
+                          <div className="flex items-center justify-end gap-2 border-t border-neutral-100 px-3 py-2">
+                            <button
+                              type="button"
+                              onClick={() => handleDuplicate(w)}
+                              className="text-xs text-neutral-500 hover:text-neutral-700"
+                            >
+                              Dupliquer
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </aside>
 
-            <div className="mt-6">
-              <label className="block text-sm font-medium">
-                Fichier mockup (optionnel)
-                <span className="ml-2 text-xs font-normal text-neutral-500">(max 2,5 Mo)</span>
-              </label>
-              <div className="mt-2 flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={chooseMockup}
-                  className="rounded-md border px-3 py-2 text-sm hover:bg-neutral-50 disabled:opacity-60"
-                  disabled={uploadingMockup}
-                >
-                  {uploadingMockup ? 'Upload…' : 'Uploader le mockup'}
-                </button>
-                {uploadErrorMockup && (
-                  <span className="text-sm text-red-600">{uploadErrorMockup}</span>
-                )}
+        <main className="min-w-0 rounded-2xl border border-neutral-200 bg-white shadow-sm">
+          <form onSubmit={handleSubmit} className="space-y-6 p-5" autoComplete="off">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-xs uppercase tracking-wide text-neutral-500">Fiche</div>
+                <h2 className="text-xl font-semibold">{form.id ? "Modifier l’œuvre" : "Nouvelle œuvre"}</h2>
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2 text-sm text-neutral-700">
+                  <input
+                    type="checkbox"
+                    checked={form.published}
+                    onChange={(e) => setForm((p) => ({ ...p, published: e.target.checked }))}
+                  />
+                  Publiée
+                </label>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 disabled:opacity-60"
+                >
+                  {saving ? "Enregistrement…" : form.id ? "Mettre à jour" : "Créer"}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-neutral-700">Titre *</label>
                 <input
-                  type="url"
-                  placeholder="Coller une URL de mockup (https://…)"
-                  className="w-full max-w-md rounded-md border px-3 py-2 text-sm"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      const v = (e.currentTarget as HTMLInputElement).value.trim()
-                      if (v) {
-                        setField('mockup', v)
-                        addToast('success', 'URL mockup appliquée ✅')
-                      }
-                    }
-                  }}
+                  type="text"
+                  value={form.title}
+                  onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
+                  className="w-full rounded-md border px-3 py-2 text-sm"
                 />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-neutral-700">Slug *</label>
+                <input
+                  type="text"
+                  value={form.slug}
+                  onChange={(e) => setForm((p) => ({ ...p, slug: e.target.value }))}
+                  className="w-full rounded-md border px-3 py-2 text-sm"
+                  placeholder="mon-oeuvre"
+                />
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-neutral-700">Artiste *</label>
+                <select
+                  value={form.artistId}
+                  onChange={(e) => setForm((p) => ({ ...p, artistId: e.target.value }))}
+                  className="w-full rounded-md border px-3 py-2 text-sm"
+                >
+                  <option value="">Sélectionner…</option>
+                  {artists.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} ({a.slug})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-neutral-700">Année</label>
+                  <input
+                    type="text"
+                    value={form.year}
+                    onChange={(e) => setForm((p) => ({ ...p, year: e.target.value }))}
+                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    placeholder="2024"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-neutral-700">Technique</label>
+                  <input
+                    type="text"
+                    value={form.technique}
+                    onChange={(e) => setForm((p) => ({ ...p, technique: e.target.value }))}
+                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    placeholder="Sérigraphie…"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-neutral-700">Papier</label>
+                  <input
+                    type="text"
+                    value={form.paper}
+                    onChange={(e) => setForm((p) => ({ ...p, paper: e.target.value }))}
+                    className="w-full rounded-md border px-3 py-2 text-sm"
+                    placeholder="Hahnemühle…"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-neutral-700">Dimensions</label>
+              <input
+                type="text"
+                value={form.dimensions}
+                onChange={(e) => setForm((p) => ({ ...p, dimensions: e.target.value }))}
+                className="w-full rounded-md border px-3 py-2 text-sm"
+                placeholder="40x50 cm…"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-neutral-700">Description</label>
+              <textarea
+                value={form.description}
+                onChange={(e) => setForm((p) => ({ ...p, description: e.target.value }))}
+                className="min-h-[120px] w-full rounded-md border px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-neutral-700">Image principale *</label>
+                <div className="flex flex-col gap-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) handleUpload(file, "cover")
+                    }}
+                    disabled={uploading.cover}
+                    className="w-full cursor-pointer text-sm file:mr-3 file:rounded-md file:border file:border-neutral-300 file:bg-white file:px-3 file:py-1.5 file:text-sm file:font-medium hover:file:bg-neutral-50"
+                  />
+                </div>
+                <div className="relative aspect-[4/3] overflow-hidden rounded-xl border bg-neutral-50">
+                  {form.image ? (
+                    <SmartImage src={form.image} alt="Aperçu" fill className="object-contain" sizes="400px" />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-sm text-neutral-400">Aucune image</div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-neutral-700">Mockup (optionnel)</label>
+                <div className="flex flex-col gap-2">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) handleUpload(file, "mockup")
+                    }}
+                    disabled={uploading.mockup}
+                    className="w-full cursor-pointer text-sm file:mr-3 file:rounded-md file:border file:border-neutral-300 file:bg-white file:px-3 file:py-1.5 file:text-sm file:font-medium hover:file:bg-neutral-50"
+                  />
+                </div>
+                <div className="relative aspect-[4/3] overflow-hidden rounded-xl border bg-neutral-50">
+                  {form.mockup ? (
+                    <SmartImage src={form.mockup} alt="Mockup" fill className="object-contain" sizes="400px" />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-sm text-neutral-400">Aucun mockup</div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-neutral-200 bg-neutral-50/50 p-4">
+              <div className="mb-3 flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-semibold text-neutral-800">Formats & stock</div>
+                  <p className="text-xs text-neutral-500">Prix en euros (convertis en centimes côté API). Stock vide = illimité.</p>
+                </div>
                 <button
                   type="button"
-                  className="rounded-md border px-3 py-2 text-sm hover:bg-neutral-50"
-                  onClick={(e) => {
-                    const input = (e.currentTarget.previousElementSibling as HTMLInputElement)
-                    const v = input?.value?.trim()
-                    if (v) {
-                      setField('mockup', v)
-                      addToast('success', 'URL mockup appliquée ✅')
-                    }
-                  }}
+                  onClick={handleAddVariant}
+                  className="rounded-md border border-neutral-300 px-3 py-1.5 text-xs font-medium hover:bg-neutral-100"
                 >
-                  Utiliser cette URL
+                  + Ajouter un format
                 </button>
-                {value.mockup && (
-                  <button
-                    type="button"
-                    className="rounded-md border px-3 py-2 text-sm text-red-600 hover:bg-red-50"
-                    onClick={() => setField('mockup', '')}
-                    title="Retirer le mockup actuel"
-                  >
-                    Retirer le mockup
-                  </button>
-                )}
               </div>
-              {mockProgress > 0 && (
-  <div className="mt-2 h-2 w-full rounded bg-neutral-100">
-    <div
-      className="h-2 rounded bg-accent transition-[width]"
-      style={{ width: `${mockProgress}%` }}
-      aria-label={`Progression upload mockup ${mockProgress}%`}
-    />
-  </div>
-)}
-              <div className="mt-1">
-                {uploadingMockup ? (
-                  <span className="inline-flex items-center rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] text-neutral-700">
-                    Upload du mockup en cours…
-                  </span>
-                ) : value.mockup?.startsWith('http') ? (
-                  <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-[11px] text-green-700">
-                    Mockup prêt ✅
-                  </span>
-                ) : (
-                  <span className="inline-flex items-center rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] text-neutral-600">
-                    Aucun mockup
-                  </span>
-                )}
-              </div>
-              <input
-                ref={mockupRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp,image/avif,image/gif"
-                className="hidden"
-                onChange={onMockupChange}
-              />
-              {value.mockup && (
-                <p className="mt-2 break-all text-xs text-neutral-500">Chemin mockup : {value.mockup}</p>
-              )}
-            </div>
-          </div>
-
-          <div className="w-44 shrink-0 space-y-3">
-            <div className="rounded-xl border bg-white/70">
-              <div className="relative aspect-[4/5] overflow-hidden rounded-xl">
-                {value.image ? (
-                  <>
-                    <ConditionalPaddingImage
-                      src={value.image}
-                      alt="Aperçu image"
-                      padding={28}
-                      className="bg-white"
-                      imageClassName="!object-contain"
-                    />
-                    <div className="absolute left-1/2 top-1 -translate-x-1/2 rounded-full bg-white/80 px-2 py-0.5 shadow backdrop-blur supports-[backdrop-filter]:bg-white/60">
-                      <button
-                        type="button"
-                        className="text-[11px] underline underline-offset-2"
-                        onClick={() => {
-                          navigator.clipboard?.writeText(value.image).then(() => addToast('info', 'URL copiée'))
-                        }}
-                      >
-                        Copier l’URL
-                      </button>
-                      <span className="mx-1 text-neutral-400">•</span>
-                      <a href={value.image} target="_blank" rel="noreferrer" className="text-[11px] underline underline-offset-2">
-                        Ouvrir
-                      </a>
+              <div className="space-y-3">
+                {form.variants.map((v, idx) => (
+                  <div key={idx} className="rounded-lg border border-neutral-200 bg-white p-3 shadow-sm">
+                    <div className="grid gap-3 md:grid-cols-[2fr,1fr,1fr,auto] md:items-center">
+                      <div className="space-y-1">
+                        <label className="text-xs text-neutral-500">Label</label>
+                        <input
+                          type="text"
+                          value={v.label}
+                          onChange={(e) => handleVariantChange(idx, "label", e.target.value)}
+                          className="w-full rounded-md border px-3 py-2 text-sm"
+                          placeholder="Format A3…"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-neutral-500">Prix (€)</label>
+                        <input
+                          type="text"
+                          value={v.price}
+                          onChange={(e) => handleVariantChange(idx, "price", e.target.value)}
+                          className="w-full rounded-md border px-3 py-2 text-sm"
+                          placeholder="120"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-xs text-neutral-500">Stock</label>
+                        <input
+                          type="text"
+                          value={v.stock}
+                          onChange={(e) => handleVariantChange(idx, "stock", e.target.value)}
+                          className="w-full rounded-md border px-3 py-2 text-sm"
+                          placeholder="illimité si vide"
+                        />
+                      </div>
+                      <div className="flex items-center justify-end">
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveVariant(idx)}
+                          className="text-xs text-red-500 hover:text-red-600"
+                        >
+                          Supprimer
+                        </button>
+                      </div>
                     </div>
-                  </>
-                ) : (
-                  <div className="absolute inset-0 grid place-items-center text-xs text-neutral-500">Aucun visuel</div>
-                )}
+                  </div>
+                ))}
               </div>
             </div>
-            <div className="rounded-xl border bg-white/70">
-              <div className="relative aspect-[4/5] overflow-hidden rounded-xl">
-                {value.mockup ? (
-                  <>
-                    <ConditionalPaddingImage
-                      src={value.mockup}
-                      alt="Aperçu mockup"
-                      padding={28}
-                      className="bg-white"
-                      imageClassName="!object-contain"
-                    />
-                    <div className="absolute left-1/2 top-1 -translate-x-1/2 rounded-full bg-white/80 px-2 py-0.5 shadow backdrop-blur supports-[backdrop-filter]:bg-white/60">
-                      <button
-                        type="button"
-                        className="text-[11px] underline underline-offset-2"
-                        onClick={() => {
-                          navigator.clipboard?.writeText(value.mockup!).then(() => addToast('info', 'URL copiée'))
-                        }}
-                      >
-                        Copier l’URL
-                      </button>
-                      <span className="mx-1 text-neutral-400">•</span>
-                      <a href={value.mockup} target="_blank" rel="noreferrer" className="text-[11px] underline underline-offset-2">
-                        Ouvrir
-                      </a>
-                    </div>
-                  </>
-                ) : (
-                  <div className="absolute inset-0 grid place-items-center text-[10px] text-neutral-500">Aucun mockup</div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Infos principales */}
-        <div className="grid gap-4 md:grid-cols-2">
-          <Field
-            label="Titre"
-            value={value.title}
-            onChange={v => setField('title', v)}
-            placeholder="ex : Mono Field 02"
-            required
-          />
-          <Select
-            label="Artiste"
-            value={value.artistId}
-            onChange={v => setField('artistId', v)}
-            options={artistsForSelect}
-            required
-          />
-          <Field
-            label="Slug"
-            value={value.slug}
-            onChange={v => setField('slug', v)}
-            placeholder={`(auto) ${derivedSlug}`}
-          />
-          <Field
-            label="Prix de base (€)"
-            type="number"
-            value={String(value.price || 0)}
-            onChange={v => setField('price', Number(v || 0))}
-            desc="Utilisé si aucun format n’est renseigné, ou comme fallback."
-          />
-        </div>
-
-        {/* Métadonnées impression */}
-        <div className="rounded-xl border p-4">
-          <div className="mb-3 text-sm font-medium">Détails d’impression</div>
-          <div className="grid gap-3 md:grid-cols-2">
-            <Field label="Année" type="number" value={String(value.year ?? '')} onChange={v => setField('year', v ? Number(v) : undefined)} />
-            <Field label="Technique" value={value.technique ?? ''} onChange={v => setField('technique', v)} />
-            <Field label="Papier" value={value.paper ?? ''} onChange={v => setField('paper', v)} />
-            <Field label="Édition" className="md:col-span-2" value={value.edition ?? ''} onChange={v => setField('edition', v)} />
-          </div>
-        </div>
-
-        {/* Formats (dimension + prix) */}
-        <div className="rounded-xl border p-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="text-sm font-medium">Formats</div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={addFormat}
-                className="rounded-md border px-2 py-1 text-xs hover:bg-neutral-50"
-              >
-                + Ajouter un format
-              </button>
-              <button
-                type="button"
-                onClick={() => set(prev => ({
-                  ...prev,
-                  formats: [
-                    { id: uid('f'), label: 'A3 — 297×420mm', price: 120 },
-                    { id: uid('f'), label: 'A2 — 420×594mm', price: 180 },
-                    { id: uid('f'), label: 'A1 — 594×841mm', price: 220 },
-                  ],
-                }))}
-                className="rounded-md border px-2 py-1 text-xs hover:bg-neutral-50"
-              >
-                Préremplir A3/A2/A1
-              </button>
-            </div>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {(value.formats ?? []).map((f, idx) => (
-              <div key={f.id} className="grid grid-cols-[1fr_auto] items-end gap-2 rounded-lg border p-3">
-                <div className="col-span-2 grid gap-2 sm:col-span-1">
-                  <SmallField
-                    label="Libellé (ex : A3 — 297×420mm)"
-                    value={f.label}
-                    onChange={v => setFormat(idx, { label: v })}
-                    placeholder="ex : A2 — 420×594mm"
-                    required
-                  />
-                </div>
-                <div className="grid gap-2 sm:col-span-1">
-                  <SmallField
-                    label="Prix (€)"
-                    value={String(f.price ?? 0)}
-                    onChange={v => setFormat(idx, { price: Number(v || 0) })}
-                    required
-                    inputMode="decimal"
-                  />
-                </div>
-                <div className="col-span-2 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => delFormat(idx)}
-                    className="rounded-md px-2 py-1 text-xs text-neutral-600 hover:bg-neutral-50"
-                  >
-                    Supprimer
-                  </button>
-                </div>
-              </div>
-            ))}
-            {(value.formats ?? []).length === 0 && (
-              <div className="col-span-2 text-sm text-neutral-500">
-                Aucun format. Le prix de base sera utilisé.
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Description */}
-        <div>
-          <label className="mb-1 block text-sm font-medium">Description</label>
-          <textarea
-            className="w-full rounded-md border px-3 py-2 text-sm"
-            rows={4}
-            value={value.description ?? ''}
-            onChange={e => setField('description', e.target.value)}
-          />
-        </div>
-
-        <div className="pt-2">
-          <button
-            type="submit"
-            disabled={!canSubmit || uploading || uploadingMockup}
-            title={uploading || uploadingMockup ? 'Veuillez attendre la fin des uploads' : undefined}
-            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-ink hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {uploading || uploadingMockup ? 'Patiente…' : (editingId ? 'Mettre à jour' : 'Enregistrer l’œuvre')}
-          </button>
-        </div>
-      </form>
-      {/* Toasts */}
-<div className="fixed inset-x-0 top-4 z-50 flex flex-col items-center space-y-2 px-4">
-  {toasts.map(t => (
-    <div
-      key={t.id}
-      className={[
-        'max-w-sm rounded-md px-3 py-2 text-sm shadow',
-        t.kind === 'success' ? 'bg-green-600 text-white' : '',
-        t.kind === 'error' ? 'bg-red-600 text-white' : '',
-        t.kind === 'info' ? 'bg-neutral-800 text-white' : '',
-      ].join(' ')}
-      role="status"
-      aria-live="polite"
-    >
-      {t.msg}
+          </form>
+        </main>
+      </div>
     </div>
-  ))}
-</div>
-    </div>
-  )
-}
-
-/* ---------- Petits inputs réutilisables ---------- */
-
-function Field({
-  label,
-  value,
-  onChange,
-  type = 'text',
-  placeholder,
-  required,
-  className = '',
-  desc,
-  inputMode,
-}: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-  type?: React.HTMLInputTypeAttribute
-  placeholder?: string
-  required?: boolean
-  className?: string
-  desc?: string
-  inputMode?: React.HTMLAttributes<HTMLInputElement>['inputMode']
-}) {
-  return (
-    <div className={className}>
-      <label className="mb-1 block text-sm font-medium">
-        {label}
-        {required && <span className="ml-1 text-red-600">*</span>}
-      </label>
-      <input
-        className="w-full rounded-md border px-3 py-2 text-sm"
-        type={type}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder={placeholder}
-        required={required}
-        inputMode={inputMode}
-      />
-      {desc && <p className="mt-1 text-xs text-neutral-500">{desc}</p>}
-    </div>
-  )
-}
-
-function SmallField(props: React.ComponentProps<typeof Field>) {
-  return <Field {...props} />
-}
-
-function Select({
-  label,
-  value,
-  onChange,
-  options,
-  required,
-}: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-  options: { value: string; label: string }[]
-  required?: boolean
-}) {
-  return (
-    <div>
-      <label className="mb-1 block text-sm font-medium">
-        {label}
-        {required && <span className="ml-1 text-red-600">*</span>}
-      </label>
-      <select
-        className="w-full rounded-md border px-3 py-2 text-sm"
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        required={required}
-      >
-        {options.map(opt => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
-    </div>
-  )
-}
-
-export default function AdminPage() {
-  return (
-    <Suspense fallback={<div className="p-6 text-sm text-neutral-500">Chargement…</div>}>
-      <AdminPageInner />
-    </Suspense>
   )
 }

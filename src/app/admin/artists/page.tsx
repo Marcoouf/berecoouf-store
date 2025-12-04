@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 // --- Types ---
 type ArtistRow = {
@@ -142,6 +142,7 @@ export default function AdminArtistsPage() {
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
   const formDisabled = formLoading || saving;
+  const toastRef = useRef<HTMLDivElement | null>(null);
 
   async function refresh() {
     setLoading(true);
@@ -161,6 +162,12 @@ export default function AdminArtistsPage() {
   useEffect(() => {
     if (!toast) return;
     const id = window.setTimeout(() => setToast(null), 3500);
+    // force scroll pour rendre le toast visible
+    if (toastRef.current) {
+      toastRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
     return () => window.clearTimeout(id);
   }, [toast]);
 
@@ -292,6 +299,7 @@ export default function AdminArtistsPage() {
 
       {toast && (
         <div
+          ref={toastRef}
           className={clsx(
             'mt-4 rounded-md border px-3 py-2 text-sm shadow-sm',
             toast.kind === 'success' ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-700'

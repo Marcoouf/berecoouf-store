@@ -86,6 +86,14 @@ export default async function ArtistPage({ params }: Props) {
     : []
   const isOnVacation = Boolean((artist as any)?.isOnVacation)
 
+  const bioParagraphs =
+    typeof artist.bio === 'string'
+      ? artist.bio
+          .split(/\n{2,}|\r\n\r\n/)
+          .map((p) => p.trim())
+          .filter(Boolean)
+      : []
+
   const labelFromUrl = (s: string) => {
     try {
       const u = new URL(s)
@@ -142,60 +150,76 @@ export default async function ArtistPage({ params }: Props) {
           </div>
 
           {/* Infos artiste */}
-          <div className="flex items-start justify-between gap-6">
-            <div className="flex items-start gap-4">
-              <div className="h-24 w-24 relative overflow-hidden rounded-full border bg-neutral-100">
-                {avatarSrc ? (
-                  <SmartImage
-                    src={avatarSrc}
-                    alt={`Portrait de ${artist.name}`}
-                    fill
-                    sizes="96px"
-                    wrapperClass="absolute inset-0"
-                    imgClassName="object-cover"
-                  />
-                ) : null}
-              </div>
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-medium tracking-tight">{artist.name}</h1>
-                {artist.handle && (
-                  <div className="text-sm text-neutral-500">{artist.handle}</div>
-                )}
-                {isOnVacation ? (
-                  <div className="mt-2 inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
-                    <MoonIcon className="h-4 w-4" />
-                    En vacances — commandes suspendues
+          <div className="rounded-2xl border border-neutral-200 bg-white/90 shadow-sm/30 backdrop-blur-sm">
+            <div className="grid gap-6 p-4 sm:p-6 md:grid-cols-[auto,1fr,200px] md:items-start">
+              <div className="flex items-start gap-4 md:col-span-2">
+                <div className="relative h-24 w-24 sm:h-28 sm:w-28 overflow-hidden rounded-2xl border border-neutral-200 bg-white shadow-sm">
+                  <div className="absolute inset-0 grid place-items-center bg-gradient-to-b from-white to-neutral-50">
+                    <div className="relative h-[70%] w-[70%]">
+                      {avatarSrc ? (
+                        <SmartImage
+                          src={avatarSrc}
+                          alt={`Portrait de ${artist.name}`}
+                          fill
+                          sizes="112px"
+                          imgClassName="object-contain"
+                        />
+                      ) : null}
+                    </div>
                   </div>
-                ) : null}
-                {artist.bio && artist.bio.trim().length > 0 && (
-                  <p className="mt-2 max-w-prose text-sm text-neutral-600 whitespace-pre-line">
-                    {artist.bio.trim()}
-                  </p>
-                )}
-                {socials.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {socials.map((s) => (
-                      <a
-                        key={s}
-                        href={s}
-                        target="_blank"
-                        rel="noopener"
-                        className="inline-flex items-center rounded-full border px-2.5 py-1 text-xs text-neutral-700 hover:bg-neutral-50"
-                      >
-                        {labelFromUrl(s)}
-                      </a>
-                    ))}
+                </div>
+                <div className="space-y-2">
+                  <div>
+                    <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">{artist.name}</h1>
+                    {artist.handle && (
+                      <div className="text-sm text-neutral-500">{artist.handle}</div>
+                    )}
                   </div>
-                )}
+                  {isOnVacation ? (
+                    <div className="inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                      <MoonIcon className="h-4 w-4" />
+                      En vacances — commandes suspendues
+                    </div>
+                  ) : null}
+                  {bioParagraphs.length > 0 && (
+                    <div
+                      className="max-w-3xl space-y-3 text-sm leading-relaxed text-neutral-700"
+                      style={{ textAlign: 'justify' }}
+                    >
+                      {bioParagraphs.map((p, idx) => (
+                        <p key={idx}>{p}</p>
+                      ))}
+                    </div>
+                  )}
+                  {socials.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {socials.map((s) => (
+                        <a
+                          key={s}
+                          href={s}
+                          target="_blank"
+                          rel="noopener"
+                          className="inline-flex items-center gap-1 rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs text-neutral-700 hover:bg-neutral-100"
+                        >
+                          <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+                          {labelFromUrl(s)}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-            <div className="ml-auto min-w-[200px] text-right">
-              <div className="text-xs text-neutral-500">Statistiques</div>
-              <div className="mt-1 text-sm">{worksCount} œuvre{worksCount > 1 ? 's' : ''}</div>
-              <div className="mt-1 text-sm">À partir de <span className="tabular-nums">{minPriceFormatted}</span></div>
+
+              <div className="md:text-right md:pt-2">
+                <div className="text-xs uppercase tracking-wide text-neutral-400">Statistiques</div>
+                <div className="mt-2 text-sm text-neutral-800">{worksCount} œuvre{worksCount > 1 ? 's' : ''}</div>
+                <div className="mt-1 text-sm text-neutral-700">
+                  À partir de <span className="tabular-nums font-medium">{minPriceFormatted}</span>
+                </div>
+              </div>
             </div>
           </div>
-          <div className="mt-4 border-t border-neutral-200/60" />
+          <div className="border-t border-neutral-200/60" />
         </div>
       </section>
 
